@@ -34,6 +34,13 @@ const emit = defineEmits<{
     temperature?: number
   }]
   testLlm: []
+  updateLlmSettingsAndTest: [payload: {
+    provider: string
+    base_url?: string
+    api_key?: string
+    model_id?: string
+    temperature?: number
+  }]
   updateTranscriptionSettings: [payload: {
     device?: 'cpu' | 'cuda'
     enable_bilibili_subtitle_fetch?: boolean
@@ -148,6 +155,32 @@ const handleSaveLlmSettings = () => {
   }
 
   emit('updateLlmSettings', payload)
+  llmApiKey.value = ''
+}
+
+const handleTestLlm = () => {
+  // 构建配置 payload
+  const payload: {
+    provider: string
+    base_url?: string
+    api_key?: string
+    model_id?: string
+    temperature?: number
+  } = {
+    provider: llmProvider.value,
+    base_url: llmBaseUrl.value.trim(),
+    model_id: llmModelId.value.trim(),
+    temperature: llmTemperature.value,
+  }
+
+  if (llmApiKey.value.trim()) {
+    payload.api_key = llmApiKey.value.trim()
+  }
+
+  // 触发保存并测试
+  emit('updateLlmSettingsAndTest', payload)
+
+  // 清空 API Key 输入框
   llmApiKey.value = ''
 }
 
@@ -344,7 +377,7 @@ const handleSaveSummarizationSettings = () => {
                 <span>{{ isUpdatingLlmSettings ? '保存中...' : '保存配置' }}</span>
               </button>
               <button
-                @click="emit('testLlm')"
+                @click="handleTestLlm"
                 :disabled="isTestingLlm || isUpdatingLlmSettings"
                 class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >

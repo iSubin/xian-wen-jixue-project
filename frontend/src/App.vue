@@ -373,6 +373,25 @@ const handleUpdateLlmSettings = async (payload: {
   }
 }
 
+const handleUpdateLlmSettingsAndTest = async (payload: {
+  provider: string
+  base_url?: string
+  api_key?: string
+  model_id?: string
+  temperature?: number
+}) => {
+  try {
+    // 先保存配置
+    await updateLlmSettings(payload)
+    success('LLM 配置已更新')
+
+    // 配置保存成功后立即测试
+    await handleTestLlm()
+  } catch (_e) {
+    // 错误信息由 useTaskViewModel + Toast 统一处理
+  }
+}
+
 const handleUpdateTranscriptionSettings = async (payload: {
   device?: 'cpu' | 'cuda'
   enable_bilibili_subtitle_fetch?: boolean
@@ -550,6 +569,7 @@ watch(
       :isUpdatingSummarizationSettings="isUpdatingSummarizationSettings"
       @close="isSettingsModalOpen = false"
       @updateLlmSettings="handleUpdateLlmSettings"
+      @updateLlmSettingsAndTest="handleUpdateLlmSettingsAndTest"
       @testLlm="handleTestLlm"
       @updateTranscriptionSettings="handleUpdateTranscriptionSettings"
       @updateSummarizationSettings="handleUpdateSummarizationSettings"

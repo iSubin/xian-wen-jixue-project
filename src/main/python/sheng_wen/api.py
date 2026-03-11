@@ -943,9 +943,12 @@ async def test_llm_connection():
     from .llm.llm import LLMMessage, LLMResponseError, LLMConnectionError
     import asyncio
 
+    logger.info("开始测试 LLM 连接...")
+
     try:
         # 获取当前 LLM 客户端
         if llm_worker is None:
+            logger.error("LLM Worker 未初始化")
             return LLMTestResult(
                 status="error",
                 message="LLM Worker 未初始化",
@@ -954,11 +957,14 @@ async def test_llm_connection():
 
         llm_client = getattr(llm_worker, "_llm_client", None)
         if llm_client is None:
+            logger.error("LLM Client 未找到")
             return LLMTestResult(
                 status="error",
                 message="LLM Client 未找到",
                 response=None
             )
+
+        logger.info(f"使用 LLM 配置: provider={llm_client._provider}, base_url={llm_client._base_url}, model={llm_client._model_id}")
 
         # 准备测试消息
         test_message = LLMMessage(role="user", content="Reply with exactly: OK")
@@ -984,6 +990,7 @@ async def test_llm_connection():
 
         # 检查是否有错误
         if error_occurred:
+            logger.error(f"LLM 响应错误: {error_occurred}")
             return LLMTestResult(
                 status="error",
                 message=f"LLM 响应错误: {str(error_occurred)}",
@@ -995,12 +1002,14 @@ async def test_llm_connection():
 
         # 检查响应是否为 "OK"
         if full_response == "OK":
+            logger.info("LLM 测试通过")
             return LLMTestResult(
                 status="success",
                 message="测试通过，模型响应正确",
                 response=full_response
             )
         else:
+            logger.warning(f"LLM 测试响应不符合预期: 期望 'OK'，实际 '{full_response}'")
             return LLMTestResult(
                 status="warning",
                 message=f"模型已响应，但内容不符合预期（期望: 'OK'，实际: '{full_response}'）",
@@ -1008,12 +1017,14 @@ async def test_llm_connection():
             )
 
     except asyncio.TimeoutError:
+        logger.error("LLM 测试超时（10秒）")
         return LLMTestResult(
             status="error",
             message="请求超时（10秒），请检查网络连接或 API 地址",
             response=None
         )
     except LLMConnectionError as e:
+        logger.error(f"LLM 连接失败: {e}", exc_info=True)
         return LLMTestResult(
             status="error",
             message=f"连接失败: {str(e)}",
