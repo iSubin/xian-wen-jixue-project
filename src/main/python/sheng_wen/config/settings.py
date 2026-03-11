@@ -41,7 +41,7 @@ class AppConfig:
     enable_progress_test: bool = False
     enable_mdns: bool = False
     frontend_dist_dir: str = "frontend/dist"
-    prompt_file: str = "docs/prompt.md"
+    prompt_file: str = "src/main/python/sheng_wen/prompt.md"
 
     def __post_init__(self):
         self.frontend_dist_dir = _resolve_project_path(self.frontend_dist_dir)
@@ -71,7 +71,7 @@ class LLMConfig:
     provider: str = "openai_compatible"
     base_url: str = ""
     api_key: str = ""
-    model_id: str = "gemini-2.5-pro-1m"
+    model_id: str = ""
     temperature: float = 0.7
     context_window_size: int = 1000000
 

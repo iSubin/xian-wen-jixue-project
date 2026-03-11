@@ -297,7 +297,7 @@ const handleSaveSummarizationSettings = () => {
               <input
                 v-model="llmModelId"
                 type="text"
-                placeholder="gpt-4"
+                placeholder="example-model-id"
                 :disabled="isTestingLlm || isUpdatingLlmSettings"
                 class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
