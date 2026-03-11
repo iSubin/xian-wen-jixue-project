@@ -1,0 +1,460 @@
+
+# 声文智汇（ShengWen）- 让刷课更爽
+
+<p align="center">
+  <img src="prj-docs/images/web-wide.png" alt="最终生成图片预览" width="900">
+  <br>
+</p>
+
+<p align="center">
+  <strong>界面展示（将本地考试复习资料总结成文）</strong>
+</p>
+
+<p align="center">
+  <a href="#快速部署"><img src="https://img.shields.io/badge/Version-v0.1.0-orange.svg?style=for-the-badge" alt="Version v0.1.0"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL%20v3-blue.svg?style=for-the-badge" alt="GPL v3 License"></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/Python-3.10+-blue.svg?style=for-the-badge" alt="Python 3.10+"></a>
+  <a href="https://vuejs.org/"><img src="https://img.shields.io/badge/Vue-3.x-green.svg?style=for-the-badge" alt="Vue 3"></a>
+  <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/FastAPI-0.100+-teal.svg?style=for-the-badge" alt="FastAPI"></a>
+</p>
+
+> **数小时的视频课程，几倍速刷完还是很累？**
+> **AI总结工具只给你一个大纲，细节全丢了？**
+> **想要的是详实的笔记，而不是概略的摘要？**
+
+**声文智汇（ShengWen）** 就是为了解决这些问题而生的。
+
+---
+
+## 💡 为什么做这个项目
+
+作为一个经常刷教学视频的学习者，我发现：
+
+- 📹 **动辄几小时的课程视频**，倍速观看很累，走神现象经常发生
+- 📝 **现有的AI总结工具**只能生成"大纲式"的概略总结，细节全丢了
+- 🤖 **即使是长上下文模型**（如Gemini 2.5 Pro），面对超长视频也会"注意力涣散"
+
+于是我做了ShengWen，核心创新是**智能上下文技术**：
+
+> 💡 **就像旧时代需要管理内存一样，AI时代需要管理AI上下文**
+
+- 让每个LLM不仅处理当前分块，还能智能地将关键信息传递给下一个LLM
+- 程序固有部分确保总结风格一致，LLM智能传递部分保留关键细节
+- 最终实现：**将视频总结为结构丰富、细节完整的流畅文章**
+
+现在对于长视频——不管是中文还是外文——可一键变成详实的中文学习笔记。
+
+
+---
+
+## 🎯 适合谁用
+
+**如果你是**：
+
+- 📚 **大学生/研究生**：需要刷大量课程视频、学术讲座，做笔记备考
+- 🌍 **自学者**：经常看各种教学视频，希望转化为中文笔记
+- ✍️ **内容创作者**：需要快速了解视频内容，转化为文章素材
+- 💼 **职场人士**：需要将会议录音、培训视频转化为文字记录
+
+这**就是**你要找的工具。
+
+
+---
+
+
+
+## 核心特性
+
+### **1. 智能总结引擎 🤖**
+
+**标准模式**：
+- 基于精心调试的提示词与总结流程
+- 适合绝大多数视频场景（建议40分钟-1小时以内）
+- 在信息密度、可读性和结构化表达之间做平衡
+
+**Agent 增强模式**（✅ 已实现）：
+- 🎯 **核心创新**：智能上下文技术
+- 🔥 **解决痛点**：处理长文本时模型上下文有限、注意力涣散导致原文细节丢失
+- ✨ **技术原理**：
+  - 程序固有部分：确保总结风格和结构一致性
+  - LLM智能传递部分：每个LLM自主决定哪些关键信息需要传递给下一个LLM
+  - 就像管理内存一样管理AI上下文，实现跨分块总结而保持文章流畅完整
+- 📊 **效果对比**：
+  - **⬇️点击查看对比**（均由 Gemini 2.5 Pro + tiny 转录模型生成）
+  - [🙂标准模式总结结果](prj-docs/长视频总结-非agent.md) vs **[😄Agent 增强模式总结结果](prj-docs/长视频总结-带agent.md)**
+  - 测试视频：[《如何像高级工程师一样设计API？REST、GraphQL、认证与安全核心要点》(时长01:23:21)](https://www.bilibili.com/video/BV16wZKBbEbd)
+  - **Agent增强模式**：细节更丰富，更像是一篇详实的完整文章
+- ⚙️ **使用方式**：
+  - 在配置文件 `config/settings.json` 中设置 `summarization.mode` 为 `"agent"` 或 `"auto"`
+  - `"auto"` 模式会根据视频长度自动选择（超过40分钟自动启用Agent模式）
+
+### **2. 丰富输出 📊**
+
+**时间戳跳转**：
+- ✅ 阅读文章时点击时间戳 → 直接跳转原视频对应位置
+- 方便复习重点内容
+
+**文章大纲导航**：
+- ✅ 自动提取Markdown标题生成章节导航
+- 支持快速跳转到文章任意章节
+- 实时高亮当前阅读位置
+
+**Mermaid 图表**：
+- 自动生成流程图、思维导图
+- 可视化视频内容结构
+
+**一键成图导出**：
+
+
+<p align="center">
+  <img src="prj-docs/images/picture-worker.png" alt="最终生成图片预览" width="900">
+  <br>
+</p>
+
+- **成图工作台**：支持先预览再导出，避免反复试错
+  - 可调输出宽度、页面比例（如 9:64 超长图）
+  - 可配置元信息显示策略（如仅首图显示）
+  - 可选编码格式（JPEG 推荐）、渲染精度、目标体积（KB）
+  - 支持压缩质量、字体缩放、间距缩放微调，兼顾清晰度与体积
+  - 右侧查看最终排版效果，用于分享与归档
+
+### **3. 可追溯性 🔗**
+
+- 每个总结都包含**原视频链接**和**UP主主页链接**
+- 方便回溯原始内容和原作者
+
+### **4. 多任务管理 🧾**
+
+- 进度条实时显示任务状态
+- 任务元数据、视频链接可追溯
+- 支持任务处理流水线（下载 → 转录 → 摘要）
+
+### **5. 音视频支持 🎬**
+
+- **Bilibili直链转换**：支持B站视频一键下载
+- **本地文件上传**：支持本地音频/视频文件
+
+当前版本对本地文件采用**扩展名白名单校验**，支持如下格式：
+
+- 视频：`.mp4`、`.avi`、`.mov`、`.mkv`、`.flv`、`.wmv`、`.webm`、`.m4v`
+- 音频：`.mp3`、`.wav`、`.flac`、`.aac`、`.ogg`、`.m4a`、`.wma`、`.opus`
+
+#### **5. CPU 友好 + GPU 加速 ⚡**
+默认即开即用的 `CPU` 转录体验，同时提供可切换的 `CUDA` 加速路径：
+
+- **CPU 开箱可用**：默认 `tiny + CPU`，在 i7-12700 上实测约 `10x` 识别倍率（具体耗时与音频质量、模型大小有关）
+- **CUDA 智能诊断**：自动检测 `NVIDIA / PyTorch CUDA / CTranslate2` 状态；可用时启用 GPU 转录，不可用时给出原因与处理建议
+- **字幕优先，回退语音识别**：可开启”优先使用字幕”，未获取到字幕时自动回退到本地语音识别
+
+<p align="center">
+  <img src="prj-docs/images/subtitle.png" alt="转录设置" width="600">
+  <br>
+</p>
+
+**如何启用CUDA加速**：
+
+1. **确认硬件**：需要NVIDIA显卡（支持CUDA）
+
+2. **安装CUDA Toolkit**：
+   - 下载地址：https://developer.nvidia.com/cuda-downloads
+   - 推荐版本：CUDA 11.8 或 12.x
+
+3. **安装PyTorch（CUDA版本）**：
+   ```bash
+   # CUDA 11.8
+   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+   # CUDA 12.x
+   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+   ```
+
+4. **在前端切换到CUDA模式**：
+   - 打开”转录设置”，将”设备”从`cpu`切换为`cuda`，保存配置
+
+**CUDA加速效果**：
+- 相比起 CPU ，转录速度可提升 3-10 倍（取决于显卡性能）
+- 推荐显存：4GB以上（tiny/base模型），8GB以上（medium/large模型）
+
+#### **6. PC / 手机端Web阅读支持 📱**
+宽屏/窄屏自适应布局，良好阅读体验
+
+
+---
+## 🧭 导航
+
+- [核心特性](#核心特性)
+- [快速部署](#快速部署)
+- [配置系统](#配置系统)
+- [常见 Q&A](#常见-qa)
+- [TODO / 后续计划](#todo--后续计划)
+- [贡献](#-贡献)
+- [许可证](#-许可证)
+- [致谢](#-致谢)
+
+---
+## 💿 快速部署
+
+### 一键部署脚本
+
+**Linux/macOS:**
+```bash
+chmod +x deploy.sh
+./deploy.sh
+```
+
+**Windows:**
+```cmd
+deploy.bat
+```
+
+脚本会自动完成：
+1. 安装前端依赖并构建
+2. 安装 Python 后端依赖
+3. 提示配置 `config/settings.json`
+
+### 你也可手动部署
+
+#### 前端构建
+```bash
+cd frontend
+npm install
+npm run build
+cd ..
+```
+#### 安装后端依赖
+```bash
+pip install -r requirements.txt
+```
+
+### 配置文件
+
+```bash
+cp config/settings.example.json config/settings.json
+# Windows 可用: copy config\\settings.example.json config\\settings.json
+```
+
+然后编辑 `config/settings.json`。
+
+### 启动服务
+
+```bash
+python ShengWen-app.py
+```
+### 成功启动提示参考
+```bash
+PS D:\tool\ShengWen> python .\ShengWen-app.py
+INFO  2026-02-28 08:41:54.241 Using SQLite database: ShengWen.db
+INFO  2026-02-28 08:41:54.455 --- ShengWen v0.1.0 启动中 ---
+INFO  2026-02-28 08:41:54.455 --- 启动 FastAPI 服务器于 http://0.0.0.0:8000 ---
+INFO:     Started server process [18388]
+INFO:     Waiting for application startup.
+INFO  2026-02-28 08:41:54.495 --- [Transcriber] 使用本地模型路径: C:\Users\t819t\.cache\huggingface\hub\models--Systran--faster-whisper-tiny\snapshots\d90ca5fe260221311c53c58e660288d3deb8d356 ---
+INFO  2026-02-28 08:41:54.496 --- [Lifespan] 正在初始化工作单元 ---
+INFO  2026-02-28 08:41:54.496 --- [Lifespan] 1/5 初始化转录器（此阶段可能触发模型下载）... ---
+INFO  2026-02-28 08:41:57.436 [FastWhisperTranscriber] Hugging Face 缓存根目录: C:\Users\Administrator\.cache\huggingface\hub (source=huggingface_hub.constants.HUGGINGFACE_HUB_CACHE)
+INFO  2026-02-28 08:41:57.436 [FastWhisperTranscriber] 检测结果: 使用本地模型目录（不需要下载）: C:\Users\t819t\.cache\huggingface\hub\models--Systran--faster-whisper-tiny\snapshots\d90ca5fe260221311c53c58e660288d3deb8d356
+INFO  2026-02-28 08:41:57.437 [FastWhisperTranscriber] 正在加载本地模型: C:\Users\t819t\.cache\huggingface\hub\models--Systran--faster-whisper-tiny\snapshots\d90ca5fe260221311c53c58e660288d3deb8d356 (device=cpu, compute_type=int8)
+
+......
+
+INFO  2026-02-28 09:02:44.995 所有工作单元已启动。
+INFO  2026-02-28 09:02:44.995 --- [Lifespan] 5/5 后台 Worker 启动完成 ---
+INFO  2026-02-28 09:02:44.996 --- [Lifespan] 后台工作单元已就绪 ---
+INFO  2026-02-28 09:02:44.996 ============================================================
+INFO  2026-02-28 09:02:44.996 服务启动完成，可通过浏览器访问：
+INFO  2026-02-28 09:02:44.996   本机可通过浏览器访问 http://localhost:8000/
+INFO  2026-02-28 09:02:44.996   其它设备可通过浏览器访问 http://192.168.0.254:8000/
+INFO  2026-02-28 09:02:44.996 ============================================================
+INFO  2026-02-28 09:02:44.996 [VideoDownloaderWorker] 工作单元已启动。
+INFO  2026-02-28 09:02:44.996 [FileUploadWorker] 工作单元已启动。
+INFO  2026-02-28 09:02:44.996 [TranscriberWorker] 工作单元已启动。
+INFO  2026-02-28 09:02:44.996 [LLMWorker] 工作单元已启动。
+INFO:     Application startup complete.
+```
+
+- 启动后本机即可在浏览器通过 `localhost:<端口号>` 访问
+- 局域网内的其它设备即可通过 `<服务器局域网IP>:<端口号>` 访问
+
+---
+
+## ⚙️ 配置系统
+
+ShengWen 当前版本使用 **JSON 单一配置源**：
+
+- 唯一配置文件：`config/settings.json`
+- 建议首次先从 `config/settings.example.json` 复制一份
+- 前端设置面板（`LLM` / `转录设置`）会直接写回该文件
+
+---
+
+### 配置示例
+
+```json
+{
+  "whisper": {
+    "model_path": "E:/models/faster-whisper/tiny",
+    "model_size": "tiny",
+    "device": "cpu",
+    "enable_bilibili_subtitle_fetch": true,
+    "bilibili_sessdata": ""
+  },
+  "llm": {
+    "provider": "openai_compatible",
+    "base_url": "https://your-llm-endpoint/v1",
+    "api_key": "your_api_key",
+    "model_id": "your_model_id",
+    "temperature": 0.7,
+    "context_window_size": 1000000
+  }
+}
+```
+
+### B 站字幕直取与 Cookie 来源
+
+- 当开启 `enable_bilibili_subtitle_fetch` 时，B 站任务会优先尝试直取字幕，失败自动回退到下载+ASR。
+- `SESSDATA` 来源优先级为：
+  1. 全局配置（转录设置面板保存到 `config/settings.json`）
+  2. 环境变量（`BILIBILI_SESSDATA` / `SESSDATA`）
+- 前端仅显示掩码值与来源，不显示明文。
+
+
+---
+## 🤔 常见 Q&A
+
+### Q1. 怎么用转录模型？
+
+首次启动时，转录模型会自动联网下载；网络不通时任务可能无法正常开始。也可先准备好本地模型，再让 ShengWen 直接读取本地文件夹。
+
+| 模型档位 | 速度/资源占用 | 质量与适用场景 | 官方下载页 |
+| :--- | :--- | :--- | :--- |
+| **tiny** | 最快、最省资源 | 快速首选；转录精度有限，会有错字，但经 AI 总结后通常可读性仍然不错 | https://huggingface.co/Systran/faster-whisper-tiny |
+| **base** | 快 | 比 tiny 更稳一点，适合希望更稳但仍追求速度的场景 | https://huggingface.co/Systran/faster-whisper-base |
+| **small** | 中等 | 精度继续提升，适合日常较高质量转录 | https://huggingface.co/Systran/faster-whisper-small |
+| **medium** | 偏慢、资源要求较高 | 精度更好，建议性能较好的电脑使用 | https://huggingface.co/Systran/faster-whisper-medium |
+| **large-v3** | 最慢、资源占用最高 | 通常精度最好，适合对细节更敏感的离线批处理场景 | https://huggingface.co/Systran/faster-whisper-large-v3 |
+- **如何配置模型：**
+
+  1. **自动下载**（网络通畅时）：
+     ```json
+     {
+       "whisper": {
+         "model_size": "tiny"
+       }
+     }
+     ```
+     也可以改成 `base` / `small` / `medium` / `large`。
+
+  2. **或本地配置**：
+     ```json
+     {
+       "whisper": {
+         "model_path": "E:/models/faster-whisper/tiny"
+       }
+     }
+     ```
+     一个可用的模型文件夹中通常包含（缺少其中文件时，模型通常无法被正确加载）：
+
+     ```text
+     E:/models/faster-whisper/tiny/
+     ├─ config.json
+     ├─ model.bin
+     ├─ tokenizer.json
+     └─ vocabulary.txt
+     ```
+- **高性能电脑建议：**  
+  可以直接尝试 `small` / `medium` / `large`。若已准备好本地模型目录，在 `config/settings.json` 中填写 `whisper.model_path` 即可。
+
+### Q2. 我要选哪个 AI 模型来总结？
+
+- 通常来说，本项目更加适合于**有思考能力的、上下文能力较好**的大语言 AI 模型，这会影响总结的结构性、细节保真和时间戳标注正确性性。
+- 即使是同一篇文章、同一个模型，由于 LLM 模型生成的随机性，**最终总结质量会发生浮动**；对内容不满意 / 总结内容出错时可点击悬浮工具栏的 “AI 重新总结” 按钮进行**重新”抽卡”**
+
+---
+
+#### **一些大语言 AI 模型效果测试**
+
+| 大语言 AI 模型 | 总结风格（实测） |  总结效果示例<br>（总结至 [@林亦LYi](https://space.bilibili.com/4401694/?spm_id_from=333.788.upinfo.detail.click) 的 [一个视频搞懂OpenClaw！](https://www.bilibili.com/video/BV1jEAaz3E6K)） |
+| :--- | :--- | :--- | 
+| **Gemini 2.5/3.0 Pro** | 上下文能力较好 + 带思考，原文细节较为丰富（个人最习惯用） | [点击查看示例图](prj-docs/images/llm-gemini-25pro-summary-20260301-1214.png) |
+| **DeepSeek V3.2** | 输出迅速，结构完整，出现错字概率稍高，可尝试搭配更大的转录模型或抽卡解决 | [点击查看示例图](prj-docs/images/llm-deepseek-v32-summary-20260301-1223.png) |
+| **GPT 5.2** | 细节丰富，有专业感 | [点击查看示例图](prj-docs/images/llm-gpt52-summary-20260301-1213.png) |
+- 不同的模型会对最终总结文章的**风味造成影响**。
+- 可尝试用同一视频分别交给不同 AI 模型总结后横向对比，选择最符合自己口味的模型。
+- **模型风味测试实操**：
+  - 选择一个已完成的任务，在前端设置好感兴趣的 AI 模型后点击悬浮工具栏的 “AI 重新总结” 按钮
+  - 感受总结完成后的文章风格差异
+
+### Q3. 这个项目的能力边界是什么？
+
+#### 😄 适合
+- 把公开视频/音频变成“可读文本 + AI 总结”
+- 课程复盘、会议整理、个人知识归档
+
+#### 😱 不适合
+- 要求“每句话 100% 准确”的正式法律/医疗场景
+- 需要实时字幕、同声传译、直播级低延迟
+- 语音不清晰甚至无语音的视频
+
+#### ❕ 使用建议
+- 音频越清晰，转录越准；多人重叠说话、噪音大会影响准确率
+- AI 总结是辅助阅读，重要结论请回看原文转录再确认
+- 超长内容建议分段处理（当前版本建议单次 40-60 分钟内）
+- 本地文件请优先使用 README 中列出的支持格式（尤其推荐 `.mp3` / `.wav` / `.mp4`）
+
+---
+## 🧾 TODO / 后续计划
+- [x] ~~视频链接旁添加视频作者解析和显示~~（2026-03-01已实现）
+- [x] ~~一键生图的预览、调整功能，使其更加适合调整 / 阅读 / 储存 / 传播~~（2026-03-03已实现）
+- [x] ~~字幕文件直接获取 / 解析 / 降级~~（2026-03-04已实现）
+- [x] ~~Agent 增强模式集成（长内容分段理解、跨段关联总结）~~（2026-03-07已实现）
+- [x] ~~文章大纲导航（自动提取标题、快速跳转章节）~~（2026-03-07已实现）
+- [x] ~~时间戳跳转（点击时间戳跳转视频对应时间点）~~（2026-03-08已实现）
+- [ ] 支持处理字幕文件（`.srt` / `.ass` / `.vtt`）
+- [ ] 英文语言支持（界面与提示）
+- [ ] 批量任务处理（批量链接、批量本地文件、带分 P 视频链接处理、批量导出总结文本）
+- [ ] 模型下载与检测助手（自动检测本地模型、缺失时给出下载指引）
+- [ ] 研究如何结合 AI 视觉能力，让总结中包含视频画面信息
+
+---
+## 💓 其它信息
+
+- 本项目源于我自己的真实需求：刷教学视频太耗时，倍速观看很累，现有AI总结工具只给大纲不给细节
+- 在开发过程中发现：即使是长上下文模型，面对超长视频也会"注意力涣散"，于是设计了智能上下文技术
+- 将总结文本分享后发现受到欢迎，故决定发展成完整项目并开源
+- 项目尚处于萌芽期，可能有疏忽和考虑不周全之处，**欢迎在 Issue 中反馈**
+- 如果这个项目对你有帮助，请点个 ⭐️Star，你的反馈是我持续改进的动力！
+
+---
+
+## 📄 许可证
+
+本项目采用 [GPL v3](LICENSE) 许可证。
+
+---
+
+## 🙏 致谢
+
+### 技术依赖
+- [faster-whisper](https://github.com/guillaumekln/faster-whisper) - 高性能语音转录引擎
+- [litellm](https://github.com/BerriAI/litellm) - 统一 LLM 接口
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) - 强大的视频下载工具
+- [FastAPI](https://fastapi.tiangolo.com/) - 现代 Python Web 框架
+- [Vue.js](https://vuejs.org/) - 渐进式 JavaScript 框架
+
+### 特别鸣谢
+- **[Linux Do 论坛](https://linux.do/)** - 感谢这个纯粹、高质量的技术社区，为独立开发者提供了真诚的反馈和支持。我相信开源项目的价值不仅在于代码，更在于背后的故事和社区的力量。
+
+
+<div align="center">
+
+---
+**最后，如果觉得这个项目有用，请点个 ⭐️Star，大家的反馈是我持续改进的动力🥰~**
+
+[⬆ 回到顶部](#️-声文智汇---ShengWen)
+
+Made ❤️ by **[smileFAace](https://linux.do/u/smileface/summary)**
+
+联系我: [smileFAace@outlook.com](mailto:smileFAace@outlook.com)
+
+</div>
+

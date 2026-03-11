@@ -1,0 +1,56 @@
+{
+  "app": {
+    "host": "0.0.0.0",
+    "port": 8000,
+    "enable_progress_test": false,
+    "enable_mdns": false,
+    "frontend_dist_dir": "frontend/dist",
+    "prompt_file": "src/main/python/sheng_wen/prompt.md"
+  },
+  "whisper": {
+    "model_path": null,
+    "model_size": "tiny",
+    "device": "cpu",
+    "enable_bilibili_subtitle_fetch": true,
+    "bilibili_sessdata": "",
+    "faster_whisper_model_path": null
+  },
+  "llm": {
+    "provider": "openai_compatible",
+    "base_url": "",
+    "api_key": "",
+    "model_id": "",
+    "temperature": 0.7,
+    "context_window_size": 1000000
+  },
+  "database": {
+    "database_url": null,
+    "sqlite_path": "ShengWen.db",
+    "json_file_path": "tasks.json"
+  },
+  "cors": {
+    "allow_origins": "*",
+    "allow_credentials": true,
+    "allow_methods": "*",
+    "allow_headers": "*"
+  },
+  "summarization": {
+    "mode": "auto",
+    "auto_chunk_min_audio_duration_sec": 2400,
+    "auto_chunk_min_transcript_lines": 1800,
+    "chunk_target_duration_sec": 2400,
+    "chunk_min_duration_sec": 1800,
+    "chunk_max_duration_sec": 3000,
+    "boundary_jump_sec": 10,
+    "prev_tail_timestamp_lines_m": 10,
+    "prev_summary_tail_chars_j": 500,
+    "llm_call_retry_max": 3,
+    "fallback_to_standard_on_agent_error": true,
+    "chunk_prompt_file": "src/main/python/sheng_wen/prompt_for_chunk.md",
+    "max_agent_value_chars": 500,
+    "chunk_debug_dump_enabled": false,
+    "chunk_debug_dump_dir": "temp/chunk_debug",
+    "enable_agent_pipeline": false,
+    "transcript_chunk_emit_duration_sec": 600
+  }
+}

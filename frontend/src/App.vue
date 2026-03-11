@@ -1,0 +1,707 @@
+<script setup lang="ts">
+import { computed, watch, ref } from 'vue'
+import { PhMonitorPlay, PhList } from '@phosphor-icons/vue'
+import { marked } from 'marked'
+import { useTaskViewModel } from './composables/useTaskViewModel'
+import { useMermaidViewer } from './composables/useMermaidViewer'
+import {
+  useSummaryImageExporter,
+  createDefaultSummaryImageExportSettings,
+  type SummaryImagePreviewPage,
+  type SummaryImageExportSettings,
+  type SummaryImageLayoutPreset,
+  type SummaryImageFormat,
+  type SummaryImageMetaMode,
+} from './composables/useSummaryImageExporter'
+import { useToast } from './composables/useToast'
+import { stripDoubleBracePlaceholders } from './utils/formatters'
+import { postProcessCompiledMarkdown } from './utils/markdownPostProcessor'
+import type { Task, MarkdownHeadingItem } from './types'
+import Sidebar from './components/Sidebar.vue'
+import FloatingToolbar from './components/FloatingToolbar.vue'
+import TaskInfoModal from './components/TaskInfoModal.vue'
+import TaskContentArea from './components/TaskContentArea.vue'
+import MermaidViewerModal from './components/MermaidViewerModal.vue'
+import SummaryImageWorkbenchModal from './components/SummaryImageWorkbenchModal.vue'
+import SettingsModal from './components/SettingsModal.vue'
+import ToastContainer from './components/ToastContainer.vue'
+
+const {
+  tasks,
+  selectedTask,
+  videoUrl,
+  selectedFile,
+  localFilePath,
+  isLocalClient,
+  quality,
+  summaryMode,
+  isSubmitting,
+  error,
+  activeTab,
+  llmProviders,
+  llmSettings,
+  isUpdatingLlmSettings,
+  transcriptionSettings,
+  isUpdatingTranscriptionSettings,
+  summarizationSettings,
+  isUpdatingSummarizationSettings,
+  submitTask,
+  cancelSubmitting,
+  selectTask,
+  downloadContent,
+  copyContent,
+  isSidebarOpen,
+  deleteTask,
+  reSummarize,
+  reTranscribe,
+  updateTaskTopic,
+  updateLlmSettings,
+  updateTranscriptionSettings,
+  updateSummarizationSettings,
+  testLlm
+} = useTaskViewModel()
+
+// 状态变量
+const showInfoModal = ref(false)
+const isSettingsModalOpen = ref(false)
+const isEditingTopic = ref(false)
+const editingTopicValue = ref('')
+const isTestingLlm = ref(false)
+const summaryHighlightRequest = ref<{
+  taskId: string
+  keyword: string
+  source: 'topic' | 'summary'
+  requestId: number
+} | null>(null)
+const markdownHeadings = ref<MarkdownHeadingItem[]>([])
+const activeHeadingId = ref('')
+const headingJumpRequest = ref<{ id: string; requestId: number } | null>(null)
+const headingJumpSeq = ref(0)
+
+// Mermaid 查看器
+const mermaidViewerModalRef = ref<{
+  stage: HTMLElement | null
+  viewport: HTMLElement | null
+} | null>(null)
+
+// Toast 通知
+const { toasts, removeToast, success, info, error: toastError } = useToast()
+
+const {
+  showMermaidViewer,
+  currentMermaidSvg,
+  currentZoom,
+  openMermaidViewer,
+  closeMermaidViewer,
+  resetView,
+  fitView,
+  zoomIn,
+  zoomOut,
+} = useMermaidViewer(mermaidViewerModalRef)
+
+const { exportSummaryAsImage, generateSummaryImagePreview } = useSummaryImageExporter()
+
+const SUMMARY_IMAGE_SETTINGS_STORAGE_KEY = 'ShengWen:summary-image-export-settings'
+
+const summaryLayoutOptions: Array<{ label: string; value: SummaryImageLayoutPreset }> = [
+  { label: '9:16 手机竖版', value: 'mobile-9-16' },
+  { label: '9:32 长屏', value: 'mobile-9-32' },
+  { label: '9:64 超长图', value: 'mobile-9-64' },
+  { label: '长图原始比例', value: 'long' },
+]
+
+const summaryMetaModeOptions: Array<{ label: string; value: SummaryImageMetaMode }> = [
+  { label: '每个图片顶端都显示元信息', value: 'all-pages' },
+  { label: '仅第一张图顶部显示元信息', value: 'first-page-only' },
+]
+
+const summaryFormatOptions: Array<{ label: string; value: SummaryImageFormat }> = [
+  { label: 'JPEG（推荐）', value: 'jpeg' },
+  { label: 'WebP（更小）', value: 'webp' },
+  { label: 'PNG（无损）', value: 'png' },
+]
+
+const summaryWidthOptions = [960, 1080, 1242, 1440]
+const summaryPixelRatioOptions = [1, 1.25, 1.5, 1.8, 2]
+
+const loadSummaryImageSettings = (): SummaryImageExportSettings => {
+  const defaults = createDefaultSummaryImageExportSettings()
+  try {
+    const raw = localStorage.getItem(SUMMARY_IMAGE_SETTINGS_STORAGE_KEY)
+    if (!raw) return defaults
+    const parsed = JSON.parse(raw) as Partial<SummaryImageExportSettings>
+    const merged: SummaryImageExportSettings = {
+      ...defaults,
+      ...parsed,
+    }
+    if (!summaryLayoutOptions.some((option) => option.value === merged.layoutPreset)) {
+      merged.layoutPreset = defaults.layoutPreset
+    }
+    if (!summaryMetaModeOptions.some((option) => option.value === merged.metaMode)) {
+      merged.metaMode = defaults.metaMode
+    }
+    return merged
+  } catch {
+    return defaults
+  }
+}
+
+const summaryImageSettings = ref<SummaryImageExportSettings>(loadSummaryImageSettings())
+const isSummaryImageSettingsOpen = ref(false)
+const isSummaryPreviewRendering = ref(false)
+const summaryPreviewDirty = ref(true)
+const summaryPreviewPages = ref<SummaryImagePreviewPage[]>([])
+const summaryPreviewActiveIndex = ref(0)
+const summaryPreviewTotalSizeKB = ref(0)
+const showAllPreviewPages = ref(false)
+
+const getSummaryImageExportPayload = () => {
+  if (!selectedTask.value?.summary) return null
+  return {
+    task: selectedTask.value,
+    topic: topic.value || selectedTask.value.title || 'AI 总结',
+    compiledMarkdown: compiledMarkdown.value,
+    rawSummary: selectedTask.value.summary,
+  }
+}
+
+const canRefreshSummaryPreview = computed(() => {
+  if (!isSummaryImageSettingsOpen.value) return false
+  if (!summaryPreviewDirty.value) return false
+  if (isSummaryPreviewRendering.value) return false
+  return !!getSummaryImageExportPayload()
+})
+
+const summaryRefreshButtonLabel = computed(() => {
+  if (isSummaryPreviewRendering.value) return '重新生成中...'
+  if (summaryPreviewDirty.value) return '参数已变更，点击刷新'
+  return '预览已是最新'
+})
+
+let summaryPreviewSequence = 0
+
+const refreshSummaryImagePreview = async (options?: { manual?: boolean; force?: boolean }) => {
+  if (!isSummaryImageSettingsOpen.value) return
+
+  const payload = getSummaryImageExportPayload()
+  if (!payload) return
+
+  if (!options?.force && !summaryPreviewDirty.value) return
+
+  if (options?.manual) {
+    info('正在重新生成预览图...')
+  }
+
+  const currentSequence = ++summaryPreviewSequence
+  isSummaryPreviewRendering.value = true
+
+  try {
+    const preview = await generateSummaryImagePreview(payload, summaryImageSettings.value)
+    if (currentSequence !== summaryPreviewSequence) return
+
+    summaryPreviewPages.value = preview.pages
+    summaryPreviewTotalSizeKB.value = preview.totalSizeKB
+    summaryPreviewActiveIndex.value = Math.min(
+      summaryPreviewActiveIndex.value,
+      Math.max(0, preview.pages.length - 1),
+    )
+    summaryPreviewDirty.value = false
+
+    if (options?.manual) {
+      success(`预览已更新：共 ${preview.pages.length} 张，约 ${preview.totalSizeKB}KB`)
+    }
+  } catch (_error) {
+    if (currentSequence === summaryPreviewSequence) {
+      toastError('预览生成失败，请调整参数后重试')
+    }
+  } finally {
+    if (currentSequence === summaryPreviewSequence) {
+      isSummaryPreviewRendering.value = false
+    }
+  }
+}
+
+const handleOpenSummaryImageSettings = () => {
+  if (!selectedTask.value?.summary) {
+    toastError('暂无可导出的 AI 总结')
+    return
+  }
+
+  isSummaryImageSettingsOpen.value = true
+  showAllPreviewPages.value = false
+  summaryPreviewActiveIndex.value = 0
+  summaryPreviewDirty.value = true
+  void refreshSummaryImagePreview({ force: true })
+}
+
+const handleRefreshSummaryImagePreview = () => {
+  void refreshSummaryImagePreview({ manual: true })
+}
+
+const handleSelectPreviewPage = (index: number) => {
+  if (index < 0 || index >= summaryPreviewPages.value.length) return
+  summaryPreviewActiveIndex.value = index
+}
+
+const handlePreviewPagePrev = () => {
+  if (summaryPreviewActiveIndex.value <= 0) return
+  summaryPreviewActiveIndex.value -= 1
+}
+
+const handlePreviewPageNext = () => {
+  if (summaryPreviewActiveIndex.value >= summaryPreviewPages.value.length - 1) return
+  summaryPreviewActiveIndex.value += 1
+}
+
+const handleCloseSummaryImageSettings = () => {
+  isSummaryImageSettingsOpen.value = false
+}
+
+const handleCloseViewer = () => {
+  closeMermaidViewer()
+}
+
+// 包装删除任务，添加成功反馈
+const handleDeleteTask = async (taskId: string) => {
+  const result = await deleteTask(taskId)
+  if (result) {
+    success('任务已删除')
+  }
+}
+
+const handleCopySummary = async () => {
+  const result = await copyContent('summary')
+  if (result) {
+    success('AI 总结已复制到剪贴板')
+  } else {
+    toastError('复制失败，内容为空')
+  }
+}
+
+const handleCopyTranscript = async () => {
+  const result = await copyContent('transcript')
+  if (result) {
+    success('转录文本已复制到剪贴板')
+  } else {
+    toastError('复制失败，内容为空')
+  }
+}
+
+const handleReSummarize = (taskId: string) => {
+  const { info } = useToast()
+  info('正在重新生成 AI 总结...')
+  reSummarize(taskId)
+}
+
+const handleReTranscribe = (taskId: string) => {
+  const { info } = useToast()
+  info('正在重新转录原文...')
+  reTranscribe(taskId)
+}
+
+const handleDownloadMarkdown = () => {
+  success('开始下载 AI 总结...')
+  downloadContent('summary')
+}
+
+const handleDownloadTxt = () => {
+  success('开始下载转录文本...')
+  downloadContent('transcript')
+}
+
+const handleTestLlm = async () => {
+  isTestingLlm.value = true
+  const { info, success, error, warning } = useToast()
+  info('正在测试 LLM 连接...')
+
+  try {
+    const result = await testLlm()
+
+    if (result.status === 'success') {
+      success(result.message)
+    } else if (result.status === 'warning') {
+      warning(result.message)
+    } else {
+      error(result.message)
+    }
+  } catch (err) {
+    error(`测试失败: ${err instanceof Error ? err.message : '未知错误'}`)
+  } finally {
+    isTestingLlm.value = false
+  }
+}
+
+const handleExportSummaryImage = async () => {
+  const payload = getSummaryImageExportPayload()
+  if (!payload) {
+    toastError('暂无可导出的 AI 总结')
+    return
+  }
+
+  const { info } = useToast()
+  info('正在生成分享图片...')
+
+  try {
+    const result = await exportSummaryAsImage(payload, summaryImageSettings.value)
+    if (result.files > 1) {
+      success(`导出成功：共 ${result.files} 张，约 ${result.totalSizeKB}KB`)
+    } else {
+      const first = result.pages[0]
+      if (first) {
+        success(`导出成功：${first.width}x${first.height} · ${first.sizeKB}KB`)
+      } else {
+        success('导出成功')
+      }
+    }
+  } catch (_error) {
+    toastError('成图失败，请稍后重试')
+  }
+}
+
+const handleUpdateLlmSettings = async (payload: {
+  provider: string
+  base_url?: string
+  api_key?: string
+  model_id?: string
+  temperature?: number
+}) => {
+  try {
+    await updateLlmSettings(payload)
+    success('LLM 配置已更新')
+  } catch (_e) {
+    // 错误信息由 useTaskViewModel + Toast 统一处理
+  }
+}
+
+const handleUpdateTranscriptionSettings = async (payload: {
+  device?: 'cpu' | 'cuda'
+  enable_bilibili_subtitle_fetch?: boolean
+  bilibili_sessdata?: string
+  clear_bilibili_sessdata?: boolean
+}) => {
+  try {
+    await updateTranscriptionSettings(payload)
+    success('转录配置已更新')
+  } catch (_e) {
+    // 错误信息由 useTaskViewModel + Toast 统一处理
+  }
+}
+
+const startEditingTopic = () => {
+  editingTopicValue.value = topic.value || selectedTask.value?.title || ''
+  isEditingTopic.value = true
+}
+
+const saveTopic = async () => {
+  if (!selectedTask.value) return
+  try {
+    await updateTaskTopic(selectedTask.value.id, editingTopicValue.value)
+    isEditingTopic.value = false
+    success('主题已更新')
+  } catch (e) {
+    // Error handled in composable and shown via toast
+  }
+}
+
+const cancelEditingTopic = () => {
+  isEditingTopic.value = false
+}
+
+const handleSelectTask = (task: Task) => {
+  summaryHighlightRequest.value = null
+  markdownHeadings.value = []
+  activeHeadingId.value = ''
+  headingJumpRequest.value = null
+  selectTask(task)
+}
+
+const handleFocusSearchMatch = (payload: {
+  taskId: string
+  keyword: string
+  source: 'topic' | 'summary'
+  requestId: number
+}) => {
+  activeTab.value = 'summary'
+  summaryHighlightRequest.value = payload
+}
+
+const handleJumpHeading = (headingId: string) => {
+  headingJumpSeq.value += 1
+  headingJumpRequest.value = {
+    id: headingId,
+    requestId: headingJumpSeq.value,
+  }
+}
+
+const handleUpdateSummarizationSettings = async (payload: {
+  chunk_target_duration_sec?: number
+  chunk_min_duration_sec?: number
+  chunk_max_duration_sec?: number
+  boundary_jump_sec?: number
+  auto_chunk_min_audio_duration_sec?: number
+  auto_chunk_min_transcript_lines?: number
+  max_agent_value_chars?: number
+  fallback_to_standard_on_agent_error?: boolean
+}) => {
+  try {
+    await updateSummarizationSettings(payload)
+    success('总结配置已更新')
+  } catch (_e) {
+    // 错误信息由 useTaskViewModel + Toast 统一处理
+  }
+}
+
+const handleMarkdownHeadingsUpdate = (headings: MarkdownHeadingItem[]) => {
+  markdownHeadings.value = headings
+}
+
+const handleActiveHeadingIdUpdate = (headingId: string) => {
+  activeHeadingId.value = headingId
+}
+
+// 错误处理
+watch(error, (newError) => {
+  if (newError) {
+    toastError(newError)
+  }
+})
+
+watch(summaryImageSettings, (nextSettings) => {
+  try {
+    localStorage.setItem(SUMMARY_IMAGE_SETTINGS_STORAGE_KEY, JSON.stringify(nextSettings))
+  } catch {
+    // Ignore persistence failure.
+  }
+  if (isSummaryImageSettingsOpen.value) {
+    summaryPreviewDirty.value = true
+  }
+}, { deep: true })
+
+// 配置 marked 渲染器以支持 mermaid 类名
+const renderer = new marked.Renderer()
+renderer.code = ({ text, lang }) => {
+  if (lang === 'mermaid') {
+    return `<pre class="mermaid">${text}</pre>`
+  }
+  return `<pre><code class="language-${lang}">${text}</code></pre>`
+}
+marked.setOptions({ renderer })
+
+const compiledMarkdown = computed(() => {
+  if (!selectedTask.value?.summary) return ''
+  const cleanedSummary = stripDoubleBracePlaceholders(selectedTask.value.summary)
+  const html = marked.parse(cleanedSummary) as string
+  return postProcessCompiledMarkdown(html, {
+    videoUrl: selectedTask.value.video_url || '',
+  })
+})
+
+const topic = computed(() => {
+  if (selectedTask.value?.topic) return selectedTask.value.topic
+  if (!selectedTask.value?.summary) return ''
+  const match = selectedTask.value.summary.match(/\{\{(.*?)\}\}/i)
+  if (match && match[1]) {
+    return match[1].trim()
+  }
+  return ''
+})
+
+watch(
+  [
+    () => isSummaryImageSettingsOpen.value,
+    () => selectedTask.value?.id,
+    compiledMarkdown,
+    topic,
+  ],
+  () => {
+    if (isSummaryImageSettingsOpen.value) {
+      summaryPreviewDirty.value = true
+    }
+  },
+)
+</script>
+
+<template>
+  <div class="flex h-[100dvh] w-full overflow-hidden bg-bg text-slate-800 font-sans relative">
+    <!-- Toast 通知容器 -->
+    <ToastContainer
+      :toasts="toasts"
+      position="bottom-right"
+      class="md:block hidden"
+      @close="removeToast"
+    />
+    <ToastContainer
+      :toasts="toasts"
+      position="bottom-center"
+      class="block md:hidden"
+      @close="removeToast"
+    />
+
+    <!-- 设置弹窗 -->
+    <SettingsModal
+      :isOpen="isSettingsModalOpen"
+      :llmProviders="llmProviders"
+      :llmSettings="llmSettings"
+      :isUpdatingLlmSettings="isUpdatingLlmSettings"
+      :isTestingLlm="isTestingLlm"
+      :transcriptionSettings="transcriptionSettings"
+      :isUpdatingTranscriptionSettings="isUpdatingTranscriptionSettings"
+      :summarizationSettings="summarizationSettings"
+      :isUpdatingSummarizationSettings="isUpdatingSummarizationSettings"
+      @close="isSettingsModalOpen = false"
+      @updateLlmSettings="handleUpdateLlmSettings"
+      @testLlm="handleTestLlm"
+      @updateTranscriptionSettings="handleUpdateTranscriptionSettings"
+      @updateSummarizationSettings="handleUpdateSummarizationSettings"
+    />
+
+    <!-- 遮罩层 (Mobile Only) -->
+    <transition name="fade">
+      <div v-if="isSidebarOpen" @click="isSidebarOpen = false" class="fixed inset-0 bg-slate-900/50 z-30 backdrop-blur-sm md:hidden"></div>
+    </transition>
+
+    <!-- 左侧边栏 -->
+    <Sidebar
+      v-model:videoUrl="videoUrl"
+      v-model:selectedFile="selectedFile"
+      v-model:localFilePath="localFilePath"
+      v-model:quality="quality"
+      v-model:summaryMode="summaryMode"
+      v-model:isSidebarOpen="isSidebarOpen"
+      :isLocalClient="isLocalClient"
+      :tasks="tasks"
+      :selectedTask="selectedTask"
+      :isSubmitting="isSubmitting"
+      :llmProviders="llmProviders"
+      :llmSettings="llmSettings"
+      :isUpdatingLlmSettings="isUpdatingLlmSettings"
+      :isTestingLlm="isTestingLlm"
+      :transcriptionSettings="transcriptionSettings"
+      :isUpdatingTranscriptionSettings="isUpdatingTranscriptionSettings"
+      :summarizationSettings="summarizationSettings"
+      :isUpdatingSummarizationSettings="isUpdatingSummarizationSettings"
+      @submit="submitTask"
+      @cancelSubmit="cancelSubmitting"
+      @selectTask="handleSelectTask"
+      @deleteTask="handleDeleteTask"
+      @updateLlmSettings="handleUpdateLlmSettings"
+      @updateTranscriptionSettings="handleUpdateTranscriptionSettings"
+      @updateSummarizationSettings="handleUpdateSummarizationSettings"
+      @startTestLlm="handleTestLlm"
+      @focusSearchMatch="handleFocusSearchMatch"
+      @showInfo="(task) => { handleSelectTask(task); showInfoModal = true; }"
+      @openSettings="isSettingsModalOpen = true"
+    />
+
+    <!-- 右侧内容区 -->
+    <main class="flex-1 flex flex-col h-full bg-gray-50 relative w-full">
+      <template v-if="selectedTask">
+        <!-- 悬浮气泡工具栏 -->
+        <FloatingToolbar
+          v-model:activeTab="activeTab"
+          :selectedTask="selectedTask"
+          :isSidebarOpen="isSidebarOpen"
+          :headings="markdownHeadings"
+          :active-heading-id="activeHeadingId"
+          @reSummarize="handleReSummarize(selectedTask.id)"
+          @reTranscribe="handleReTranscribe(selectedTask.id)"
+          @copySummary="handleCopySummary"
+          @copyTranscript="handleCopyTranscript"
+          @downloadMarkdown="handleDownloadMarkdown"
+          @downloadTxt="handleDownloadTxt"
+          @exportSummaryImage="handleExportSummaryImage"
+          @openSummaryImageSettings="handleOpenSummaryImageSettings"
+          @toggleSidebar="isSidebarOpen = true"
+          @jumpHeading="handleJumpHeading"
+        />
+
+        <!-- 内容滚动区 -->
+        <TaskContentArea
+          :task="selectedTask"
+          :active-tab="activeTab"
+          :compiled-markdown="compiledMarkdown"
+          :summary-highlight-request="summaryHighlightRequest"
+          :heading-jump-request="headingJumpRequest"
+          :topic="topic"
+          :is-editing-topic="isEditingTopic"
+          :editing-topic-value="editingTopicValue"
+          @open-mermaid-viewer="openMermaidViewer"
+          @start-edit-topic="startEditingTopic"
+          @save-topic="saveTopic"
+          @cancel-edit-topic="cancelEditingTopic"
+          @update:editing-topic-value="(val) => editingTopicValue = val"
+          @update-markdown-headings="handleMarkdownHeadingsUpdate"
+          @update-active-heading-id="handleActiveHeadingIdUpdate"
+        />
+      </template>
+
+      <!-- 未选中状态 -->
+      <div v-else class="flex-1 flex flex-col h-full">
+        <!-- 移动端顶部栏（未选中任务时显示） -->
+        <header class="h-14 bg-white border-b border-gray-100 px-4 flex items-center md:hidden shrink-0 sticky top-0 z-20">
+          <button @click="isSidebarOpen = true" class="p-1.5 -ml-1.5 text-slate-600 hover:bg-gray-100 rounded-lg active:scale-90 transition-transform">
+            <PhList :size="24" />
+          </button>
+        </header>
+
+        <div class="flex-1 flex flex-col items-center justify-center text-slate-400">
+          <PhMonitorPlay :size="64" weight="thin" class="mb-4 opacity-20" />
+          <p>请从左侧选择一个任务查看详情</p>
+        </div>
+      </div>
+    </main>
+
+    <!-- 任务信息模态框 -->
+    <TaskInfoModal
+      v-model:show="showInfoModal"
+      :selectedTask="selectedTask"
+    />
+    
+    <!-- Mermaid 查看器模态框 -->
+    <MermaidViewerModal
+      ref="mermaidViewerModalRef"
+      :show="showMermaidViewer"
+      :current-zoom="currentZoom"
+      :svg-content="currentMermaidSvg"
+      @close="handleCloseViewer"
+      @fit-view="fitView"
+      @zoom-in="zoomIn"
+      @zoom-out="zoomOut"
+      @reset-view="resetView"
+    />
+
+    <SummaryImageWorkbenchModal
+      :show="isSummaryImageSettingsOpen"
+      v-model:settings="summaryImageSettings"
+      v-model:showAllPreviewPages="showAllPreviewPages"
+      :layout-options="summaryLayoutOptions"
+      :meta-mode-options="summaryMetaModeOptions"
+      :format-options="summaryFormatOptions"
+      :width-options="summaryWidthOptions"
+      :pixel-ratio-options="summaryPixelRatioOptions"
+      :is-preview-rendering="isSummaryPreviewRendering"
+      :preview-dirty="summaryPreviewDirty"
+      :can-refresh-preview="canRefreshSummaryPreview"
+      :refresh-button-label="summaryRefreshButtonLabel"
+      :preview-pages="summaryPreviewPages"
+      :preview-active-index="summaryPreviewActiveIndex"
+      :preview-total-size-kb="summaryPreviewTotalSizeKB"
+      @close="handleCloseSummaryImageSettings"
+      @refresh-preview="handleRefreshSummaryImagePreview"
+      @export-image="handleExportSummaryImage"
+      @preview-prev="handlePreviewPagePrev"
+      @preview-next="handlePreviewPageNext"
+      @select-preview-page="handleSelectPreviewPage"
+    />
+  </div>
+</template>
+
+<style>
+/* 移动端过渡动画 */
+.fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+
+/* 移动端点击高亮优化 */
+html, body { -webkit-tap-highlight-color: transparent; }
+</style>
+

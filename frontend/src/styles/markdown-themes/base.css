@@ -1,0 +1,333 @@
+/**
+ * Markdown 主题基础样式
+ *
+ * 使用 CSS 变量实现主题动态切换
+ * 所有颜色、大小、间距都通过变量定义，主题只需修改变量值即可
+ */
+
+/* ========== 主题容器基础设置 ========== */
+/* 注意：CSS 变量默认值由 useMarkdownTheme 在 :root 上设置，此处不再重复定义 */
+
+/* ========== 应用主题变量到 Tailwind Typography ========== */
+.markdown-theme-container.prose {
+  font-size: var(--md-base-font-size);
+  line-height: var(--md-base-line-height);
+}
+
+/* ========== 标题 ========== */
+.markdown-theme-container.prose h1,
+.markdown-theme-container.prose h2,
+.markdown-theme-container.prose h3,
+.markdown-theme-container.prose h4 {
+  color: var(--md-heading-color);
+  font-weight: 700;
+  margin-top: 0;
+  margin-bottom: 0.5em;
+}
+
+.markdown-theme-container.prose h1 {
+  font-size: var(--md-h1-font-size);
+  line-height: 1.2;
+}
+
+.markdown-theme-container.prose h2 {
+  font-size: var(--md-h2-font-size);
+  line-height: 1.3;
+  margin-top: 2em;
+}
+
+.markdown-theme-container.prose h3 {
+  font-size: var(--md-h3-font-size);
+  line-height: 1.4;
+  margin-top: 1.6em;
+}
+
+.markdown-theme-container.prose h4 {
+  font-size: var(--md-h4-font-size);
+  line-height: 1.4;
+  margin-top: 1.4em;
+}
+
+/* ========== 段落和列表 ========== */
+.markdown-theme-container.prose p,
+.markdown-theme-container.prose ul,
+.markdown-theme-container.prose ol,
+.markdown-theme-container.prose blockquote {
+  color: var(--md-text-color);
+  line-height: var(--md-base-line-height);
+}
+
+.markdown-theme-container.prose ul,
+.markdown-theme-container.prose ol {
+  padding-left: 1.5em;
+}
+
+.markdown-theme-container.prose li {
+  margin-bottom: 0.25em;
+}
+
+/* ========== 链接 ========== */
+.markdown-theme-container.prose a {
+  color: var(--md-link-color);
+  text-decoration: var(--md-link-decoration);
+  transition: color 0.2s ease, text-decoration 0.2s ease;
+}
+
+.markdown-theme-container.prose a:hover {
+  color: var(--md-link-hover-color);
+  text-decoration: underline;
+}
+
+/* ========== 时间跳转标签（(见 HH:MM:SS) 自动替换） ========== */
+.markdown-theme-container.prose .ss-time-jump-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25em;
+  margin: 0 0.15em;
+  padding: 0.12em 0.4em;
+  border-radius: 5px;
+  background: rgba(142, 142, 147, 0.12);
+  color: #6e6e73;
+  font-size: 0.72em;
+  font-weight: 500;
+  line-height: 1.3;
+  text-decoration: none;
+  white-space: nowrap;
+  vertical-align: baseline;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.markdown-theme-container.prose .ss-time-jump-chip:hover {
+  background: rgba(142, 142, 147, 0.18);
+  color: #1d1d1f;
+  text-decoration: none;
+  transform: translateY(-0.5px);
+}
+
+.markdown-theme-container.prose .ss-time-jump-chip:focus-visible {
+  outline: 2px solid rgba(0, 125, 250, 0.6);
+  outline-offset: 2px;
+}
+
+.markdown-theme-container.prose .ss-time-jump-chip--disabled {
+  cursor: default;
+  opacity: 0.4;
+  background: rgba(142, 142, 147, 0.08);
+  color: #a1a1a6;
+}
+
+.markdown-theme-container.prose .ss-time-jump-chip--disabled:hover {
+  transform: none;
+}
+
+/* 播放图标样式 */
+.markdown-theme-container.prose .ss-time-chip-icon {
+  width: 0.7em;
+  height: 0.7em;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+/* ========== 强调 ========== */
+.markdown-theme-container.prose strong {
+  color: var(--md-heading-color);
+  font-weight: 600;
+}
+
+.markdown-theme-container.prose em {
+  font-style: italic;
+}
+
+/* ========== 引用块 ========== */
+.markdown-theme-container.prose blockquote {
+  border-left: 4px solid var(--md-blockquote-border);
+  padding-left: 1em;
+  margin-left: 0;
+  color: var(--md-blockquote-color);
+  font-style: normal;
+}
+
+/* ========== 行内代码 ========== */
+.markdown-theme-container.ss-shared-prose code.ss-inline-code,
+.markdown-theme-container.ss-shared-prose :not(pre) > code {
+  background-color: var(--md-code-bg);
+  color: var(--md-code-color);
+  padding: var(--md-code-padding);
+  border-radius: max(var(--md-code-radius), 0.5em);
+  font-size: var(--md-code-font-size);
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
+  line-height: 1.25;
+  text-align: left;
+  direction: ltr;
+  unicode-bidi: normal;
+  vertical-align: middle;
+  float: none;
+  position: static;
+  width: auto;
+  font-family: 'Consolas', 'Microsoft YaHei', 'Segoe UI', monospace;
+}
+
+/* html2canvas 对 inline-flex 行内基线存在偏差：导出模式下改为 inline-block，避免文字视觉偏上 */
+.markdown-theme-container.ss-shared-prose.ss-export-mode code.ss-inline-code,
+.markdown-theme-container.ss-shared-prose.ss-export-mode :not(pre) > code {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.25;
+  padding-top: 0em;
+  padding-bottom: 0.4em;
+  vertical-align: middle;
+}
+
+/* html2canvas 对 quotes + 伪元素兼容较差：导出时禁用自动引号，并对中文引号单字做基线锁定 */
+.markdown-theme-container.ss-shared-prose.ss-export-mode blockquote,
+.markdown-theme-container.ss-shared-prose.ss-export-mode q {
+  quotes: none !important;
+}
+
+.markdown-theme-container.ss-shared-prose.ss-export-mode blockquote p:first-of-type::before,
+.markdown-theme-container.ss-shared-prose.ss-export-mode blockquote p:last-of-type::after,
+.markdown-theme-container.ss-shared-prose.ss-export-mode q::before,
+.markdown-theme-container.ss-shared-prose.ss-export-mode q::after {
+  content: none !important;
+}
+
+.markdown-theme-container.ss-shared-prose.ss-export-mode .ss-export-cjk-quote {
+  display: inline-block;
+  line-height: 1;
+  vertical-align: baseline;
+  transform: translateY(0.04em);
+}
+
+/* html2canvas 对列表 marker 兼容不稳定：导出时关闭原生 marker，改用 DOM 注入 marker */
+.markdown-theme-container.ss-shared-prose.ss-export-mode ul,
+.markdown-theme-container.ss-shared-prose.ss-export-mode ol {
+  list-style: none !important;
+  margin-left: 0 !important;
+  padding-left: 1.2em !important;
+}
+
+.markdown-theme-container.ss-shared-prose.ss-export-mode li.ss-export-list-item {
+  list-style: none !important;
+  display: flex !important;
+  align-items: flex-start;
+  gap: 0.55em;
+  margin-bottom: 0.25em;
+}
+
+.markdown-theme-container.ss-shared-prose.ss-export-mode li.ss-export-list-item::marker {
+  content: none;
+}
+
+.markdown-theme-container.ss-shared-prose.ss-export-mode .ss-export-list-marker {
+  flex: 0 0 auto;
+  min-width: 1.2em;
+  text-align: right;
+  line-height: var(--md-base-line-height);
+  font-weight: 600;
+  color: currentColor;
+}
+
+.markdown-theme-container.ss-shared-prose.ss-export-mode .ss-export-list-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.markdown-theme-container.ss-shared-prose.ss-export-mode .ss-export-list-body > p {
+  margin: 0;
+}
+
+.markdown-theme-container.ss-shared-prose.ss-export-mode .ss-export-list-body > p + p {
+  display: block;
+  margin-top: 0.45em;
+}
+
+/* ========== 代码块 ========== */
+.markdown-theme-container.ss-shared-prose pre {
+  background-color: var(--md-pre-bg);
+  border: 1px solid var(--md-pre-border);
+  border-radius: var(--md-pre-radius);
+  padding: var(--md-pre-padding);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-x: auto;
+  margin: 1em 0;
+}
+
+.markdown-theme-container.ss-shared-prose pre code {
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+  display: block;
+  white-space: inherit;
+  word-break: inherit;
+  overflow-wrap: inherit;
+}
+
+/* ========== 代码块的 ::before 和 ::after 伪元素 ========== */
+.markdown-theme-container.ss-shared-prose code.ss-inline-code::before,
+.markdown-theme-container.ss-shared-prose code.ss-inline-code::after,
+.markdown-theme-container.ss-shared-prose code::before,
+.markdown-theme-container.ss-shared-prose code::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* ========== 图片 ========== */
+.markdown-theme-container.prose img {
+  border-radius: 8px;
+  max-width: 100%;
+  height: auto;
+  margin: 1.5em 0;
+}
+
+/* ========== 表格 ========== */
+.markdown-theme-container.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+}
+
+.markdown-theme-container.prose th,
+.markdown-theme-container.prose td {
+  border: 1px solid var(--md-pre-border);
+  padding: 0.5em 1em;
+  text-align: left;
+}
+
+.markdown-theme-container.prose th {
+  background-color: var(--md-code-bg);
+  font-weight: 600;
+}
+
+.markdown-theme-container.prose tr:nth-child(even) {
+  background-color: var(--md-code-bg);
+}
+
+/* ========== 水平分割线 ========== */
+.markdown-theme-container.prose hr {
+  border: none;
+  border-top: 2px solid var(--md-pre-border);
+  margin: 2em 0;
+}
+
+/* ========== Mermaid 对齐（前端与导出统一） ========== */
+.markdown-theme-container .mermaid,
+.markdown-theme-container .ss-mermaid-render {
+  text-align: center;
+}
+
+.markdown-theme-container .mermaid svg,
+.markdown-theme-container .ss-mermaid-render svg {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}

@@ -1,0 +1,460 @@
+from __future__ import annotations
+
+import asyncio
+import json
+import re
+from pathlib import Path
+from typing import Any
+
+from ..api import notify_task_update
+from ..config.settings import config
+from ..summarization.chunked_summarizer import ChunkedSummarizer
+from ..summarization.chunker import count_timestamp_lines, split_transcript_into_chunks
+from ..utils.logger import logger
+from ..worker import TaskCancelledError, Worker
+from .llm import LLM, LLMError, LLMMessage
+
+
+VALID_SUMMARY_MODES = {"auto", "standard", "agent"}
+
+
+class LLMWorker(Worker):
+    """
+    使用 LLM 将转录文本转为总结文本。
+    支持三种策略：
+    - standard: 单次总结
+    - agent: 分块总结
+    - auto: 自动判定（长文本走 agent）
+    """
+
+    def __init__(self, name: str, llm_client: LLM):
+        super().__init__(name)
+        self._llm_client = llm_client
+        self.system_prompt: str | None = None
+        self._chunk_prompt_cache_path: str | None = None
+        self._chunk_prompt_cache_text: str | None = None
+
+    def load_system_prompt(self, prompt_file: str):
+        try:
+            with open(prompt_file, "r", encoding="utf-8") as f:
+                self.system_prompt = f.read()
+            logger.info(f"[{self.name}] 系统提示已从 {prompt_file} 成功加载。")
+        except FileNotFoundError:
+            logger.error(f"[{self.name}] 错误: 在 {prompt_file} 未找到提示文件。")
+            self.system_prompt = None
+        except Exception as e:
+            logger.error(f"[{self.name}] 加载提示文件时发生错误: {e}", exc_info=True)
+            self.system_prompt = None
+
+    async def process_task(self, payload: dict[str, Any]):
+        intermediate_file_path = payload.get("intermediate_file_path")
+        output_file = payload.get("output_file")
+        task_id = str(payload.get("task_id") or "").strip() or None
+
+        if not intermediate_file_path or not output_file:
+            await self._mark_failed(task_id, "payload 中缺少 'intermediate_file_path' 或 'output_file'")
+            return
+
+        if task_id and self.is_task_cancelled(task_id):
+            raise TaskCancelledError(f"任务已取消，跳过总结: {task_id}")
+
+        try:
+            with open(intermediate_file_path, "r", encoding="utf-8") as f:
+                transcript_text = f.read()
+        except FileNotFoundError:
+            await self._mark_failed(task_id, f"找不到中间转录文件 {intermediate_file_path}")
+            return
+        except Exception as e:
+            await self._mark_failed(task_id, f"读取中间文件时出错: {e}")
+            return
+
+        task_data = None
+        if task_id:
+            from ..db import db
+
+            task_data = db.get_task(task_id)
+            if task_data is None:
+                raise TaskCancelledError(f"任务已被删除，停止总结: {task_id}")
+
+        requested_mode = self._resolve_requested_mode(payload, task_data)
+        effective_mode = self._resolve_effective_mode(
+            requested_mode=requested_mode,
+            task_data=task_data,
+            transcript_text=transcript_text,
+        )
+
+        auto_metrics = self._collect_auto_mode_metrics(task_data=task_data, transcript_text=transcript_text)
+        logger.info(
+            f"[{self.name}] 任务 {task_id or '<unknown>'} 总结模式: "
+            f"requested={requested_mode}, effective={effective_mode}, "
+            f"audio_duration_sec={auto_metrics['audio_duration_sec']:.2f}, "
+            f"transcript_timestamp_lines={auto_metrics['line_count']}"
+        )
+        if requested_mode == "auto":
+            logger.info(
+                f"[{self.name}] 任务 {task_id or '<unknown>'} Auto 判定依据: "
+                f"audio_duration {auto_metrics['audio_duration_sec']:.2f}s"
+                f"{'>=' if auto_metrics['audio_triggered'] else '<'}"
+                f"{config.summarization.auto_chunk_min_audio_duration_sec}s, "
+                f"timestamp_lines {auto_metrics['line_count']}"
+                f"{'>=' if auto_metrics['line_triggered'] else '<'}"
+                f"{config.summarization.auto_chunk_min_transcript_lines}, "
+                f"result={effective_mode}"
+            )
+
+        try:
+            if effective_mode == "agent":
+                final_summary, topic, summary_meta = await self._run_chunked_summary(
+                    transcript_text=transcript_text,
+                    task_id=task_id,
+                    mode_value=requested_mode,
+                )
+                mode_used = "agent"
+            else:
+                final_summary, topic = await self._run_standard_summary(
+                    transcript_text=transcript_text,
+                    task_id=task_id,
+                )
+                summary_meta = {}
+                mode_used = "standard"
+        except asyncio.CancelledError:
+            logger.info(f"[{self.name}] 任务被取消: {task_id or '<unknown>'}")
+            raise
+        except TaskCancelledError as e:
+            logger.info(f"[{self.name}] {e}")
+            return
+        except Exception as e:
+            if effective_mode == "agent" and config.summarization.fallback_to_standard_on_agent_error:
+                logger.warning(f"[{self.name}] 分块总结失败，回退标准模式: {e}")
+                try:
+                    final_summary, topic = await self._run_standard_summary(
+                        transcript_text=transcript_text,
+                        task_id=task_id,
+                    )
+                    summary_meta = {
+                        "fallback_triggered": True,
+                        "fallback_reason": str(e),
+                    }
+                    mode_used = "standard"
+                except Exception as fallback_err:
+                    await self._mark_failed(task_id, f"分块总结失败且回退标准模式失败: {fallback_err}")
+                    return
+            else:
+                await self._mark_failed(task_id, f"LLM 处理过程中发生错误: {e}")
+                return
+
+        if task_id and self.is_task_cancelled(task_id):
+            raise TaskCancelledError(f"任务已取消，停止写入总结结果: {task_id}")
+
+        try:
+            Path(output_file).parent.mkdir(parents=True, exist_ok=True)
+            with open(output_file, "w", encoding="utf-8") as f:
+                f.write(final_summary)
+        except Exception as e:
+            await self._mark_failed(task_id, f"写入总结结果失败: {e}")
+            return
+
+        if task_id:
+            from ..db import db, TaskStatus
+
+            update_data: dict[str, Any] = {
+                "summary": final_summary,
+                "status": TaskStatus.COMPLETED,
+                "progress": 100,
+                "summary_mode": mode_used,
+                "summary_meta": json.dumps(summary_meta, ensure_ascii=False) if summary_meta else None,
+            }
+            if topic:
+                update_data["topic"] = topic
+
+            if mode_used != "agent":
+                update_data["summary_chunk_total"] = None
+                update_data["summary_chunk_done"] = None
+
+            db.update_task(task_id, update_data)
+            await notify_task_update(task_id)
+
+    def _resolve_requested_mode(self, payload: dict[str, Any], task_data: dict[str, Any] | None) -> str:
+        payload_mode = str(payload.get("summary_mode") or "").strip().lower()
+        if payload_mode in VALID_SUMMARY_MODES:
+            return payload_mode
+
+        task_mode = str((task_data or {}).get("summary_mode") or "").strip().lower()
+        if task_mode in VALID_SUMMARY_MODES:
+            return task_mode
+
+        cfg_mode = str(config.summarization.mode or "auto").strip().lower()
+        if cfg_mode in VALID_SUMMARY_MODES:
+            return cfg_mode
+        return "auto"
+
+    def _resolve_effective_mode(
+        self,
+        requested_mode: str,
+        task_data: dict[str, Any] | None,
+        transcript_text: str,
+    ) -> str:
+        if requested_mode in {"standard", "agent"}:
+            return requested_mode
+
+        metrics = self._collect_auto_mode_metrics(task_data=task_data, transcript_text=transcript_text)
+        if metrics["audio_triggered"] or metrics["line_triggered"]:
+            return "agent"
+        return "standard"
+
+    def _collect_auto_mode_metrics(
+        self,
+        task_data: dict[str, Any] | None,
+        transcript_text: str,
+    ) -> dict[str, float | int | bool]:
+        audio_duration = 0.0
+        if task_data:
+            try:
+                audio_duration = float(task_data.get("audio_duration") or 0.0)
+            except (TypeError, ValueError):
+                audio_duration = 0.0
+        line_count = count_timestamp_lines(transcript_text)
+        audio_triggered = audio_duration >= config.summarization.auto_chunk_min_audio_duration_sec
+        line_triggered = line_count >= config.summarization.auto_chunk_min_transcript_lines
+        return {
+            "audio_duration_sec": audio_duration,
+            "line_count": line_count,
+            "audio_triggered": audio_triggered,
+            "line_triggered": line_triggered,
+        }
+
+    async def _run_standard_summary(self, transcript_text: str, task_id: str | None) -> tuple[str, str | None]:
+        if not self.system_prompt:
+            raise RuntimeError("未加载系统提示词，无法执行标准总结。")
+
+        messages = [
+            LLMMessage(role="system", content=self.system_prompt),
+            LLMMessage(role="user", content=transcript_text),
+        ]
+        response_chunks: list[str] = []
+        last_update = asyncio.get_event_loop().time()
+        llm_error: LLMError | None = None
+
+        async def flush_partial_summary():
+            if not task_id:
+                return
+            from ..db import db, TaskStatus
+
+            db.update_task(
+                task_id,
+                {
+                    "status": TaskStatus.SUMMARIZING,
+                    "summary": "".join(response_chunks),
+                    "summary_mode": "standard",
+                    "summary_chunk_total": None,
+                    "summary_chunk_done": None,
+                },
+            )
+            await notify_task_update(task_id)
+
+        def callback(chunk: str | LLMError):
+            nonlocal llm_error, last_update
+            if task_id and self.is_task_cancelled(task_id):
+                raise asyncio.CancelledError()
+
+            if isinstance(chunk, LLMError):
+                llm_error = chunk
+                return
+
+            response_chunks.append(chunk)
+            now = asyncio.get_event_loop().time()
+            if task_id and now - last_update >= 0.5:
+                self._submit_coro(flush_partial_summary())
+                last_update = now
+
+        await self._llm_client.response(messages=messages, resp_callback=callback)
+        if llm_error:
+            raise llm_error
+
+        final_summary = "".join(response_chunks)
+        topic = _extract_topic(final_summary)
+        return final_summary, topic
+
+    async def _run_chunked_summary(
+        self,
+        transcript_text: str,
+        task_id: str | None,
+        mode_value: str,
+    ) -> tuple[str, str | None, dict[str, Any]]:
+        chunk_prompt = self._load_chunk_prompt(config.summarization.chunk_prompt_file)
+        if not chunk_prompt:
+            raise RuntimeError("分块提示词为空，无法执行 Agent 增强模式。")
+
+        task_label = task_id or "<unknown>"
+        logger.info(
+            f"[{self.name}] 任务 {task_label} 准备执行 Agent 分块总结: "
+            f"target={config.summarization.chunk_target_duration_sec}s, "
+            f"min={config.summarization.chunk_min_duration_sec}s, "
+            f"max={config.summarization.chunk_max_duration_sec}s, "
+            f"boundary_jump={config.summarization.boundary_jump_sec}s"
+        )
+        try:
+            preview_chunks = split_transcript_into_chunks(
+                transcript_text=transcript_text,
+                target_duration_sec=config.summarization.chunk_target_duration_sec,
+                min_duration_sec=config.summarization.chunk_min_duration_sec,
+                max_duration_sec=config.summarization.chunk_max_duration_sec,
+                boundary_jump_sec=config.summarization.boundary_jump_sec,
+            )
+            logger.info(f"[{self.name}] 任务 {task_label} Agent 预分块结果: total_chunks={len(preview_chunks)}")
+            for idx, chunk in enumerate(preview_chunks, start=1):
+                logger.info(
+                    f"[{self.name}] 任务 {task_label} 分块 {idx}/{len(preview_chunks)}: "
+                    f"time={chunk.time_range_hms}, duration={chunk.duration_sec}s, lines={chunk.line_count}"
+                )
+        except Exception as e:
+            logger.warning(f"[{self.name}] 任务 {task_label} Agent 预分块日志失败: {e}")
+
+        def cancel_check() -> bool:
+            return bool(task_id and self.is_task_cancelled(task_id))
+
+        last_stream_update = 0.0
+        last_stream_summary = ""
+
+        def update_chunk_progress(done: int, total: int, partial_summary: str):
+            nonlocal last_stream_summary
+            if not task_id:
+                return
+            from ..db import db, TaskStatus
+
+            if self.is_task_cancelled(task_id):
+                return
+
+            current_task = db.get_task(task_id)
+            if not current_task:
+                return
+            current_status = str(current_task.get("status") or "")
+            # 避免晚到的分块进度回写覆盖最终状态（例如已 COMPLETED 却被写回 SUMMARIZING）。
+            if current_status != TaskStatus.SUMMARIZING.value:
+                return
+
+            progress = int((done / total) * 100) if total > 0 else 0
+            db.update_task(
+                task_id,
+                {
+                    "status": TaskStatus.SUMMARIZING,
+                    "summary": partial_summary,
+                    "progress": progress,
+                    "summary_mode": mode_value if mode_value in {"auto", "agent"} else "agent",
+                    "summary_chunk_total": total,
+                    "summary_chunk_done": done,
+                },
+            )
+            last_stream_summary = partial_summary
+            self._submit_coro(notify_task_update(task_id))
+
+        def update_chunk_stream(done: int, total: int, streaming_summary: str):
+            nonlocal last_stream_update, last_stream_summary
+            if not task_id or not streaming_summary:
+                return
+            from ..db import db, TaskStatus
+
+            if self.is_task_cancelled(task_id):
+                return
+
+            now = asyncio.get_event_loop().time()
+            if now - last_stream_update < 0.5:
+                return
+            if streaming_summary == last_stream_summary:
+                return
+
+            current_task = db.get_task(task_id)
+            if not current_task:
+                return
+            current_status = str(current_task.get("status") or "")
+            if current_status != TaskStatus.SUMMARIZING.value:
+                return
+
+            progress = int((done / total) * 100) if total > 0 else 0
+            db.update_task(
+                task_id,
+                {
+                    "status": TaskStatus.SUMMARIZING,
+                    "summary": streaming_summary,
+                    "progress": progress,
+                    "summary_mode": mode_value if mode_value in {"auto", "agent"} else "agent",
+                    "summary_chunk_total": total,
+                    "summary_chunk_done": done,
+                },
+            )
+            last_stream_update = now
+            last_stream_summary = streaming_summary
+            self._submit_coro(notify_task_update(task_id))
+
+        summarizer = ChunkedSummarizer(
+            llm_client=self._llm_client,
+            chunk_system_prompt=chunk_prompt,
+            chunk_target_duration_sec=config.summarization.chunk_target_duration_sec,
+            chunk_min_duration_sec=config.summarization.chunk_min_duration_sec,
+            chunk_max_duration_sec=config.summarization.chunk_max_duration_sec,
+            boundary_jump_sec=config.summarization.boundary_jump_sec,
+            prev_tail_timestamp_lines_m=config.summarization.prev_tail_timestamp_lines_m,
+            prev_summary_tail_chars_j=config.summarization.prev_summary_tail_chars_j,
+            llm_call_retry_max=config.summarization.llm_call_retry_max,
+            max_agent_value_chars=config.summarization.max_agent_value_chars,
+            cancel_check=cancel_check,
+            chunk_debug_dump_enabled=config.summarization.chunk_debug_dump_enabled,
+            chunk_debug_dump_dir=config.summarization.chunk_debug_dump_dir,
+        )
+
+        result = await summarizer.summarize(
+            transcript_text=transcript_text,
+            on_chunk_progress=update_chunk_progress,
+            on_chunk_stream=update_chunk_stream,
+        )
+        topic = _extract_topic(result.summary_text)
+        summary_meta = {
+            "mode": "agent",
+            "chunk_total": result.chunk_total,
+            "chunk_done": result.chunk_done,
+            "warnings": result.warnings,
+            "assembly_logs": result.assembly_logs,
+        }
+        return result.summary_text, topic, summary_meta
+
+    def _load_chunk_prompt(self, prompt_file: str) -> str:
+        normalized = str(prompt_file or "").strip()
+        if not normalized:
+            return ""
+        if self._chunk_prompt_cache_path == normalized and self._chunk_prompt_cache_text is not None:
+            return self._chunk_prompt_cache_text
+
+        try:
+            with open(normalized, "r", encoding="utf-8") as f:
+                text = f.read()
+            self._chunk_prompt_cache_path = normalized
+            self._chunk_prompt_cache_text = text
+            logger.info(f"[{self.name}] 分块提示词已加载: {normalized}")
+            return text
+        except Exception as e:
+            logger.error(f"[{self.name}] 读取分块提示词失败: {normalized}, error={e}")
+            return ""
+
+    async def _mark_failed(self, task_id: str | None, error_message: str) -> None:
+        logger.error(f"[{self.name}] {error_message}")
+        if not task_id:
+            return
+        if self.is_task_cancelled(task_id):
+            return
+        from ..db import db, TaskStatus
+
+        db.update_task(task_id, {"status": TaskStatus.FAILED, "error_message": error_message})
+        await notify_task_update(task_id)
+
+
+def _extract_topic(summary: str) -> str | None:
+    for match in re.finditer(r"\{\{(.*?)\}\}", summary or "", re.IGNORECASE):
+        token = (match.group(1) or "").strip()
+        if not token:
+            continue
+        if token.lower().startswith("chunk_"):
+            continue
+        if token.lower().startswith("opt-tools"):
+            continue
+        return token
+    return None

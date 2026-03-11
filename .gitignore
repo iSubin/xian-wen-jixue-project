@@ -1,0 +1,55 @@
+
+# ————构建必须——
+# config
+# frontend
+# src
+
+# ——开发必须——
+.dist/
+.claude/
+test_runs/
+meta-docs/
+docs/
+scripts/
+memory/
+CLAUDE.md
+CLAUDE_template.md
+AGENT.md
+
+# ——本地文件——
+# 数据库
+tasks.json
+*.db
+*.sqlite
+*.sqlite3
+
+# 缓存
+.env
+.env.local
+config/settings.json
+scripts/fetch_subtitle/.bilibili_cookie.env
+
+
+# ——其它缓存——
+
+# Python
+temp/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.venv/
+build/
+dist/
+
+# IDE specific
+.vscode/
+.idea/
+
+# npm cache
+.npm-cache
+frontend/.npm-cache
+frontend/node_modules/
+frontend/dist/
+
