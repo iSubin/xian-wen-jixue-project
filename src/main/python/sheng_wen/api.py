@@ -964,7 +964,12 @@ async def test_llm_connection():
                 response=None
             )
 
-        logger.info(f"使用 LLM 配置: provider={llm_client._provider}, base_url={llm_client._base_url}, model={llm_client._model_id}")
+        # 记录当前配置
+        config = getattr(llm_client, "config", None)
+        if config:
+            logger.info(f"使用 LLM 配置: provider={config.provider}, base_url={config.base_url}, model={config.model_id}")
+        else:
+            logger.warning("无法获取 LLM 配置信息")
 
         # 准备测试消息
         test_message = LLMMessage(role="user", content="Reply with exactly: OK")
