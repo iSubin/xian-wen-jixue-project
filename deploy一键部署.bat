@@ -187,10 +187,20 @@ if errorlevel 1 (
 REM 前端构建
 echo 📦 步骤 3/5: 安装前端依赖...
 cd frontend
+set "NPM_INSTALL_CMD=npm install --no-audit --fund=false"
 if exist package-lock.json (
-    call npm ci
-) else (
-    call npm install
+    set "NPM_INSTALL_CMD=npm ci --no-audit --fund=false"
+)
+call %NPM_INSTALL_CMD%
+if errorlevel 1 (
+    set "HAS_PROXY="
+    for %%v in (http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy NO_PROXY no_proxy) do (
+        if defined %%v set "HAS_PROXY=1"
+    )
+    if defined HAS_PROXY (
+        echo ⚠️ 检测到代理环境，正在无代理重试...
+        call cmd /d /v:on /c "set http_proxy=&set https_proxy=&set HTTP_PROXY=&set HTTPS_PROXY=&set ALL_PROXY=&set all_proxy=&set NO_PROXY=&set no_proxy=& %NPM_INSTALL_CMD%"
+    )
 )
 if errorlevel 1 (
     echo ❌ 前端依赖安装失败

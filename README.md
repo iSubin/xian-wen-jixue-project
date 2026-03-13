@@ -230,12 +230,13 @@ deploy一键部署.bat
 
 脚本会自动完成：
 1. 检查 Node.js/Python 版本（前端构建需要 Node 20+，后端需要 Python 3.10+）
-2. 在 Linux 下尝试补齐系统依赖（`ffmpeg` / `git` / `python3-venv`，需 sudo）
+2. 在 Linux 下尝试补齐系统依赖（`ffmpeg` / `git` / `python3-venv`，仅在需要时调用 sudo）
 3. 创建并复用项目虚拟环境 `.venv`
-4. 安装前端依赖并构建
+4. 安装前端依赖并构建（自动处理 lockfile/代理/前端目录权限异常）
 5. 安装 Python 后端依赖
 
 **注意**：
+- **不要用 `sudo` 直接运行部署脚本，也不要用 `sudo npm`。**请始终用普通用户运行 `./deploy一键部署.sh`。
 - 部署脚本不会自动启动服务，需要手动运行启动命令
 - 如果项目有更新，执行 `git pull` 后需要重新运行部署脚本以更新依赖和前端构建
 
@@ -249,7 +250,7 @@ python -m pip install --upgrade pip setuptools wheel
 python -m pip install -r requirements.txt
 
 cd frontend
-npm ci
+npm ci --no-audit --fund=false
 npm run build
 cd ..
 ```
@@ -259,7 +260,7 @@ cd ..
 python -m pip install --upgrade pip setuptools wheel
 python -m pip install -r requirements.txt
 cd frontend
-npm install
+npm ci --no-audit --fund=false
 npm run build
 cd ..
 ```
@@ -469,7 +470,7 @@ ShengWen 当前版本以 **前端设置面板** 作为主要配置入口，同�
 - [x] ~~时间戳跳转（点击时间戳跳转视频对应时间点）~~（2026-03-08已实现）
 - [ ] 支持处理字幕文件（`.srt` / `.ass` / `.vtt`）
 - [ ] 英文语言支持（界面与提示）
-- [ ] 批量任务处理（批量链接、批量本地文件、带分 P 视频链接处理、批量导出总结文本）
+- [ ] 批量任务处理（批量链接、批量本地文件、带分 P 视频链接处理一键批量任务、批量导出总结文本等）
 - [ ] 模型下载与检测助手（自动检测本地模型、缺失时给出下载指引）
 - [ ] 研究如何结合 AI 视觉能力，让总结中包含视频画面信息（如果研究出来了，我是不是可以把这个项目的名字从“**声文智汇**”改成“**声文视汇**”……？🤔）
 

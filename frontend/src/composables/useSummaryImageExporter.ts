@@ -1,4 +1,5 @@
 import type { Task } from '../types'
+import html2canvas from 'html2canvas'
 import { normalizeMermaidSvgLayout } from '../utils/mermaidLayout'
 import {
   formatDuration,
@@ -11,12 +12,6 @@ import {
 import { getCurrentTheme, type MarkdownTheme } from './useMarkdownTheme'
 import { normalizeAccidentalInlineCodeBlocks } from '../utils/markdownNormalizer'
 import { getMermaid } from '../utils/mermaidLoader'
-
-declare global {
-  interface Window {
-    html2canvas?: (element: HTMLElement, options?: Record<string, unknown>) => Promise<HTMLCanvasElement>
-  }
-}
 
 export type SummaryImageLayoutPreset = 'long' | 'mobile-9-16' | 'mobile-9-32' | 'mobile-9-64'
 export type SummaryImageFormat = 'png' | 'jpeg' | 'webp'
@@ -168,8 +163,6 @@ const DEFAULT_EXPORT_SETTINGS: SummaryImageExportSettings = {
   fontScale: 1,
   contentPaddingScale: 1,
 }
-
-let html2CanvasLoading: Promise<NonNullable<Window['html2canvas']>> | null = null
 
 const waitNextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
 const waitMs = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -327,38 +320,6 @@ const createOffscreenHost = () => {
 const createScalePx = (fontScaleMultiplier: number) => {
   const scale = BASE_FONT_SCALE * fontScaleMultiplier
   return (basePx: number) => `${Math.round(basePx * scale * 10) / 10}px`
-}
-
-const loadHtml2Canvas = async (): Promise<NonNullable<Window['html2canvas']>> => {
-  if (window.html2canvas) return window.html2canvas
-  if (html2CanvasLoading) return html2CanvasLoading
-
-  html2CanvasLoading = new Promise((resolve, reject) => {
-    const existing = document.getElementById('html2canvas-cdn-loader') as HTMLScriptElement | null
-    if (existing) {
-      existing.addEventListener('load', () => {
-        if (window.html2canvas) resolve(window.html2canvas)
-      })
-      existing.addEventListener('error', () => reject(new Error('html2canvas 加载失败')))
-      return
-    }
-
-    const script = document.createElement('script')
-    script.id = 'html2canvas-cdn-loader'
-    script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'
-    script.async = true
-    script.onload = () => {
-      if (window.html2canvas) {
-        resolve(window.html2canvas)
-      } else {
-        reject(new Error('html2canvas 未注入'))
-      }
-    }
-    script.onerror = () => reject(new Error('html2canvas CDN 请求失败'))
-    document.head.appendChild(script)
-  })
-
-  return html2CanvasLoading
 }
 
 const restoreTimestampChipsToText = (root: HTMLElement) => {
@@ -604,29 +565,47 @@ const createPageCard = (
   footer.style.fontSize = scalePx(13)
   footer.style.color = '#94a3b8'
   footer.style.display = 'flex'
+  footer.style.flexDirection = 'column'
   footer.style.alignItems = 'center'
-  footer.style.justifyContent = 'center'
-  footer.style.gap = '8px'
+  footer.style.gap = '6px'
   footer.style.textAlign = 'center'
   footer.style.background = '#ffffff'
-  footer.style.flexWrap = 'wrap'
+
+  const footerMainRow = document.createElement('div')
+  footerMainRow.style.display = 'flex'
+  footerMainRow.style.alignItems = 'center'
+  footerMainRow.style.justifyContent = 'center'
+  footerMainRow.style.gap = '8px'
 
   const aiIcon = document.createElement('span')
   aiIcon.textContent = '✨'
   aiIcon.style.fontSize = scalePx(16)
 
-  const footerText = document.createElement('span')
-  footerText.textContent = '由 声文智汇 总结：'
-  footerText.style.color = '#a7b6ca'
+  const footerMainText = document.createElement('span')
+  footerMainText.textContent = '由 声文智汇(ShengWen) 智能总结'
+  footerMainText.style.color = '#a7b6ca'
 
-  const footerLink = document.createElement('span')
-  footerLink.textContent = shareUrl
-  footerLink.style.color = '#7c97bc'
-  footerLink.style.textDecoration = 'underline'
-  footerLink.style.textUnderlineOffset = '2px'
-  footerLink.style.wordBreak = 'break-all'
+  const footerProjectRow = document.createElement('div')
+  footerProjectRow.style.display = 'flex'
+  footerProjectRow.style.alignItems = 'center'
+  footerProjectRow.style.justifyContent = 'center'
+  footerProjectRow.style.gap = '4px'
+  footerProjectRow.style.flexWrap = 'wrap'
 
-  footer.append(aiIcon, footerText, footerLink)
+  const footerProjectLabel = document.createElement('span')
+  footerProjectLabel.textContent = '项目:'
+  footerProjectLabel.style.color = '#a7b6ca'
+
+  const footerProjectLink = document.createElement('span')
+  footerProjectLink.textContent = shareUrl
+  footerProjectLink.style.color = '#7c97bc'
+  footerProjectLink.style.textDecoration = 'underline'
+  footerProjectLink.style.textUnderlineOffset = '2px'
+  footerProjectLink.style.wordBreak = 'break-all'
+
+  footerMainRow.append(aiIcon, footerMainText)
+  footerProjectRow.append(footerProjectLabel, footerProjectLink)
+  footer.append(footerMainRow, footerProjectRow)
 
   if (header) {
     card.append(header, contentWrap, footer)
@@ -1039,7 +1018,7 @@ const paginateSummaryBlocks = (
 
 const captureNode = async (
   node: HTMLElement,
-  html2canvasFn: NonNullable<Window['html2canvas']>,
+  html2canvasFn: typeof html2canvas,
   pixelRatio: number,
   exportWidth: number,
 ) => {
@@ -1067,7 +1046,7 @@ const getCaptureScaleCandidates = (preferredScale: number, isPreview: boolean) =
 
 const captureWithFallback = async (
   card: HTMLElement,
-  html2canvasFn: NonNullable<Window['html2canvas']>,
+  html2canvasFn: typeof html2canvas,
   settings: SummaryImageExportSettings,
   isPreview: boolean,
 ) => {
@@ -1132,7 +1111,7 @@ const buildPageCanvases = async (
   settings: SummaryImageExportSettings,
   isPreview: boolean,
 ): Promise<HTMLCanvasElement[]> => {
-  const html2canvasFn = await loadHtml2Canvas()
+  const html2canvasFn = html2canvas
   await waitForExportFonts()
   const now = new Date()
   const currentTheme = getCurrentTheme()

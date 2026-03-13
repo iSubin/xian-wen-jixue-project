@@ -234,10 +234,105 @@ maybe_upgrade_node_linux() {
   return 0
 }
 
+ensure_frontend_permissions() {
+  local targets=("." "package.json")
+  if [[ -e "package-lock.json" ]]; then
+    targets+=("package-lock.json")
+  fi
+  if [[ -d "node_modules" ]]; then
+    targets+=("node_modules")
+  fi
+
+  local needs_fix=0
+  local target
+  for target in "${targets[@]}"; do
+    if [[ ! -w "$target" ]]; then
+      needs_fix=1
+      break
+    fi
+  done
+
+  if [[ "$needs_fix" -eq 0 ]]; then
+    info "前端目录权限正常"
+    return 0
+  fi
+
+  warn "检测到前端目录写权限异常，尝试自动修复"
+
+  if [[ "$(id -u)" -eq 0 ]]; then
+    chown -R "${SUDO_UID:-0}:${SUDO_GID:-0}" node_modules package-lock.json 2>/dev/null || true
+  elif command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then
+    local fix_targets=()
+    for target in "${targets[@]}"; do
+      if [[ -e "$target" && ! -w "$target" ]]; then
+        fix_targets+=("$target")
+      fi
+    done
+    if [[ "${#fix_targets[@]}" -gt 0 ]]; then
+      sudo chown -R "$(id -u):$(id -g)" "${fix_targets[@]}"
+    fi
+  else
+    err "前端目录不可写且无法使用 sudo 自动修复，请执行: sudo chown -R $(id -u):$(id -g) frontend/node_modules frontend/package-lock.json"
+    return 1
+  fi
+
+  for target in "${targets[@]}"; do
+    if [[ -e "$target" && ! -w "$target" ]]; then
+      err "权限修复失败: $target 仍不可写"
+      return 1
+    fi
+  done
+
+  info "前端目录权限修复完成"
+  return 0
+}
+
+has_proxy_env() {
+  local proxy_vars=(http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy NO_PROXY no_proxy)
+  local var
+  for var in "${proxy_vars[@]}"; do
+    if [[ -n "${!var:-}" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+install_frontend_deps() {
+  local npm_cmd=(npm install --no-audit --fund=false)
+  if [[ -f package-lock.json ]]; then
+    npm_cmd=(npm ci --no-audit --fund=false)
+  fi
+
+  info "开始安装前端依赖"
+  if "${npm_cmd[@]}"; then
+    info "前端依赖安装成功"
+    return 0
+  fi
+
+  if has_proxy_env; then
+    warn "检测到代理环境，尝试无代理重试"
+    if env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u all_proxy -u NO_PROXY -u no_proxy "${npm_cmd[@]}"; then
+      info "无代理重试成功"
+      return 0
+    fi
+  fi
+
+  err "前端依赖安装失败"
+  return 1
+}
+
 echo "=========================================="
 echo "  ShengWen 一键部署脚本 (Linux/macOS)"
 echo "=========================================="
 echo
+
+if [[ "$(id -u)" -eq 0 ]]; then
+  err "请不要使用 sudo 或 root 运行本脚本。"
+  err "正确做法：使用普通用户运行 ./deploy一键部署.sh，脚本会在需要系统权限时单独调用 sudo。"
+  err "如果你之前用 sudo 执行过 npm，可先修复权限：sudo chown -R $(id -u):$(id -g) frontend/node_modules frontend/package-lock.json ~/.npm"
+  exit 1
+fi
 
 require_cmd git "请先安装 Git。"
 require_cmd node "请先安装 Node.js ${NODE_MIN_MAJOR}+。"
@@ -286,11 +381,8 @@ python -m pip install -r requirements.txt
 
 info "步骤 3/5: 安装前端依赖"
 pushd frontend >/dev/null
-if [[ -f package-lock.json ]]; then
-  npm ci
-else
-  npm install
-fi
+ensure_frontend_permissions
+install_frontend_deps
 
 info "步骤 4/5: 构建前端"
 npm run build
