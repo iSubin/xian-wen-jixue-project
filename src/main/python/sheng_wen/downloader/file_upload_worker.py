@@ -51,10 +51,9 @@ class FileUploadWorker(Worker):
         logger.info(f"[{self.name}] 开始处理上传文件: {filename} (任务ID: {task_id})")
 
         if task_id:
-            from ..api import notify_task_update
-            from ..db import db, TaskStatus
-            db.update_task(task_id, {"status": TaskStatus.UPLOADING, "progress": 0.0})
-            await notify_task_update(task_id)
+            from ..db import TaskStatus
+            from ..task_updater import update_and_notify
+            await update_and_notify(task_id, {"status": TaskStatus.UPLOADING, "progress": 0.0})
 
         try:
             # 获取文件大小
@@ -102,10 +101,9 @@ class FileUploadWorker(Worker):
             # 获取文件标题（用于显示）
             title = os.path.splitext(filename)[0]
             if task_id:
-                from ..api import notify_task_update
-                from ..db import db, TaskStatus
-                db.update_task(task_id, {"title": title, "status": TaskStatus.TRANSCRIBING})
-                await notify_task_update(task_id)
+                from ..db import TaskStatus
+                from ..task_updater import update_and_notify
+                await update_and_notify(task_id, {"title": title, "status": TaskStatus.TRANSCRIBING})
 
             # 传递给下一个 Worker
             if self.next_worker:
@@ -126,7 +124,6 @@ class FileUploadWorker(Worker):
 
     async def _mark_task_failed(self, task_id: str, error_msg: str):
         """标记任务为失败状态并通知前端"""
-        from ..api import notify_task_update
-        from ..db import db, TaskStatus
-        db.update_task(task_id, {"status": TaskStatus.FAILED, "error_message": error_msg})
-        await notify_task_update(task_id)
+        from ..db import TaskStatus
+        from ..task_updater import update_and_notify
+        await update_and_notify(task_id, {"status": TaskStatus.FAILED, "error_message": error_msg})

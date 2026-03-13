@@ -30,10 +30,9 @@ class BilibiliInfoWorker(Worker):
             error_msg = "任务负载中缺少 'video_url'"
             logger.error(f"[{self.name}] 错误: {error_msg}")
             if task_id:
-                from ..api import notify_task_update
-                from ..db import db, TaskStatus
-                db.update_task(task_id, {"status": TaskStatus.FAILED, "error_message": error_msg})
-                asyncio.create_task(notify_task_update(task_id))
+                from ..db import TaskStatus
+                from ..task_updater import update_and_notify
+                asyncio.create_task(update_and_notify(task_id, {"status": TaskStatus.FAILED, "error_message": error_msg}))
             return
 
         logger.info(f"[{self.name}] 开始获取视频信息: {video_url}")
@@ -84,10 +83,9 @@ class BilibiliInfoWorker(Worker):
         except Exception as e:
             logger.error(f"[{self.name}] 获取视频信息时出错: {e}", exc_info=True)
             if task_id:
-                from ..api import notify_task_update
-                from ..db import db, TaskStatus
-                db.update_task(task_id, {"status": TaskStatus.FAILED, "error_message": str(e)})
-                asyncio.create_task(notify_task_update(task_id))
+                from ..db import TaskStatus
+                from ..task_updater import update_and_notify
+                asyncio.create_task(update_and_notify(task_id, {"status": TaskStatus.FAILED, "error_message": str(e)}))
 
     def _format_duration(self, seconds: float) -> str:
         """

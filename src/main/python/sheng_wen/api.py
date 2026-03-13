@@ -45,14 +45,14 @@ async def _fail_task_with_model_error(task_id: str | None, error: ModelLoadError
     logger.warning(f"[Transcriber] 模型加载失败: task_id={task_id}, detail={detail}")
     if not task_id:
         return
-    db.update_task(
+    from .task_updater import update_and_notify
+    await update_and_notify(
         task_id,
         {
             "status": TaskStatus.FAILED,
             "error_message": detail,
         },
     )
-    await notify_task_update(task_id)
 
 
 async def _resolve_worker_or_raise(worker_factory, task_id: str | None = None):
@@ -288,16 +288,25 @@ manager = ConnectionManager()
 _author_resolution_inflight_task_ids: set[str] = set()
 _author_resolution_attempted_task_ids: set[str] = set()
 
-async def notify_task_update(task_id: str):
-    """通知所有客户端任务已更新"""
-    task_data = db.get_task(task_id)
+async def notify_task_update(task_id: str, task_data: dict = None):
+    """
+    通知所有客户端任务已更新
+
+    Args:
+        task_id: 任务ID
+        task_data: 可选的任务数据，如果不提供则从数据库读取
+                   传入此参数可避免重复读取数据库，确保广播的是最新数据
+    """
+    if task_data is None:
+        task_data = db.get_task(task_id)
+
     if task_data:
         # Convert datetime to string for JSON broadcast
         if isinstance(task_data.get("created_at"), datetime):
             task_data["created_at"] = task_data["created_at"].isoformat()
         if isinstance(task_data.get("latest_modified_at"), datetime):
             task_data["latest_modified_at"] = task_data["latest_modified_at"].isoformat()
-            
+
         message = json.dumps({
             "type": "task_update",
             "task": task_data
@@ -527,15 +536,15 @@ def _normalize_summary_mode(raw_value: str | None, fallback: str | None = None) 
 
 async def _try_resolve_and_persist_author(task_id: str, video_url: str) -> bool:
     try:
+        from .task_updater import update_and_notify
         author_info = await resolve_bilibili_author(video_url)
-        db.update_task(
+        await update_and_notify(
             task_id,
             {
                 "author_name": author_info.get("author_name"),
                 "author_url": author_info.get("author_url"),
             },
         )
-        await notify_task_update(task_id)
         return True
     except BilibiliAuthorResolveError as e:
         logger.info(f"[AuthorResolver] 任务 {task_id} 作者解析失败（仅提示，不影响流程）: {e}")
@@ -821,13 +830,13 @@ async def update_task(task_id: str, task_update: TaskUpdate):
     task = db.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    
+
     updates = task_update.dict(exclude_unset=True)
     if updates:
-        updated_task = db.update_task(task_id, updates)
-        await notify_task_update(task_id)
+        from .task_updater import update_and_notify
+        updated_task = await update_and_notify(task_id, updates)
         return updated_task
-    
+
     return task
 
 @app.post("/tasks/{task_id}/re-summarize", response_model=Task)
@@ -848,8 +857,9 @@ async def re_summarize_task(task_id: str, payload: ReSummarizeRequest | None = N
         fallback=str(task.get("summary_mode") or ""),
     )
 
+    from .task_updater import update_and_notify
     worker = await get_llm_worker()
-    db.update_task(
+    await update_and_notify(
         task_id,
         {
             "status": TaskStatus.SUMMARIZING,
@@ -861,7 +871,6 @@ async def re_summarize_task(task_id: str, payload: ReSummarizeRequest | None = N
             "summary_meta": None,
         },
     )
-    await notify_task_update(task_id)
 
     temp_file = os.path.join("temp", f"{task_id}_re.txt")
     os.makedirs("temp", exist_ok=True)
@@ -985,13 +994,12 @@ async def re_transcribe_task(task_id: str, payload: ReTranscribeRequest | None =
         "summary_chunk_done": None,
         "summary_meta": None,
     }
-    db.update_task(task_id, reset_data)
-    await notify_task_update(task_id)
+    from .task_updater import update_and_notify
+    await update_and_notify(task_id, reset_data)
 
     if local_media_file:
         transcriber_w = await _resolve_worker_or_raise(get_transcriber_worker, task_id=task_id)
-        db.update_task(task_id, {"status": TaskStatus.TRANSCRIBING})
-        await notify_task_update(task_id)
+        await update_and_notify(task_id, {"status": TaskStatus.TRANSCRIBING})
         await transcriber_w.add_task(
             build_transcriber_payload(
                 task_id=task_id,
@@ -1003,8 +1011,7 @@ async def re_transcribe_task(task_id: str, payload: ReTranscribeRequest | None =
         return db.get_task(task_id)
 
     downloader_w = await _resolve_worker_or_raise(get_downloader_worker, task_id=task_id)
-    db.update_task(task_id, {"status": TaskStatus.DOWNLOADING})
-    await notify_task_update(task_id)
+    await update_and_notify(task_id, {"status": TaskStatus.DOWNLOADING})
     await downloader_w.add_task({
         "task_id": task_id,
         "video_url": video_url,

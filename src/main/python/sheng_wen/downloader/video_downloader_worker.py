@@ -301,15 +301,14 @@ class VideoDownloaderWorker(Worker):
             with open(intermediate_file_path, "w", encoding="utf-8", errors="replace") as f:
                 f.write(transcript)
 
-            from ..api import notify_task_update
-            from ..db import db, TaskStatus
-            db.update_task(task_id, {"status": TaskStatus.TRANSCRIBING})
-            self._submit_coro(notify_task_update(task_id))
+            from ..db import TaskStatus
+            from ..task_updater import update_and_notify
+            self._submit_coro(update_and_notify(task_id, {"status": TaskStatus.TRANSCRIBING}))
 
             if self.is_task_cancelled(task_id):
                 raise TaskCancelledError(f"任务已取消，停止字幕分支: {task_id}")
 
-            db.update_task(task_id, {
+            update_data = {
                 "title": subtitle_result.get("title"),
                 "status": TaskStatus.SUMMARIZING,
                 "progress": 0.0,
@@ -319,11 +318,11 @@ class VideoDownloaderWorker(Worker):
                 "summary_chunk_total": None,
                 "summary_chunk_done": None,
                 "summary_meta": None,
-            })
+            }
             summary_mode = str(payload.get("summary_mode") or "").strip().lower()
             if summary_mode in {"auto", "standard", "agent"}:
-                db.update_task(task_id, {"summary_mode": summary_mode})
-            self._submit_coro(notify_task_update(task_id))
+                update_data["summary_mode"] = summary_mode
+            self._submit_coro(update_and_notify(task_id, update_data))
 
             next_payload = payload.copy()
             next_payload.update({
@@ -348,17 +347,15 @@ class VideoDownloaderWorker(Worker):
 
         try:
             author_info = await resolve_bilibili_author(video_url)
-            from ..api import notify_task_update
-            from ..db import db
+            from ..task_updater import update_and_notify
 
-            db.update_task(
+            await update_and_notify(
                 task_id,
                 {
                     "author_name": author_info.get("author_name"),
                     "author_url": author_info.get("author_url"),
                 },
             )
-            await notify_task_update(task_id)
             logger.info(
                 f"[{self.name}] 已解析 B 站作者信息: "
                 f"{author_info.get('author_name')} ({author_info.get('author_url')})"
@@ -382,10 +379,9 @@ class VideoDownloaderWorker(Worker):
             error_msg = "任务负载中缺少 'video_url'"
             logger.error(f"[{self.name}] 错误: {error_msg}")
             if task_id:
-                from ..api import notify_task_update
-                from ..db import db, TaskStatus
-                db.update_task(task_id, {"status": TaskStatus.FAILED, "error_message": error_msg})
-                self._submit_coro(notify_task_update(task_id))
+                from ..db import TaskStatus
+                from ..task_updater import update_and_notify
+                self._submit_coro(update_and_notify(task_id, {"status": TaskStatus.FAILED, "error_message": error_msg}))
             return
 
         try:
@@ -401,10 +397,9 @@ class VideoDownloaderWorker(Worker):
         logger.info(f"[{self.name}] 开始下载视频: {video_url} (质量: {quality})")
 
         if task_id:
-            from ..api import notify_task_update
-            from ..db import db, TaskStatus
-            db.update_task(task_id, {"status": TaskStatus.DOWNLOADING})
-            self._submit_coro(notify_task_update(task_id))
+            from ..db import TaskStatus
+            from ..task_updater import update_and_notify
+            self._submit_coro(update_and_notify(task_id, {"status": TaskStatus.DOWNLOADING}))
 
         def progress_hook(d):
             if task_id and self.is_task_cancelled(task_id):
@@ -466,10 +461,9 @@ class VideoDownloaderWorker(Worker):
                 self._submit_coro(self._resolve_and_save_bilibili_author(task_id, str(video_url)))
 
             if task_id:
-                from ..api import notify_task_update
-                from ..db import db, TaskStatus
-                db.update_task(task_id, {"status": TaskStatus.TRANSCRIBING})
-                self._submit_coro(notify_task_update(task_id))
+                from ..db import TaskStatus
+                from ..task_updater import update_and_notify
+                self._submit_coro(update_and_notify(task_id, {"status": TaskStatus.TRANSCRIBING}))
 
             if self.next_worker:
                 next_payload = payload.copy()
@@ -485,9 +479,8 @@ class VideoDownloaderWorker(Worker):
         except Exception as e:
             logger.error(f"[{self.name}] 下载视频时出错: {e}", exc_info=True)
             if task_id:
-                from ..api import notify_task_update
-                from ..db import db, TaskStatus
+                from ..db import TaskStatus
+                from ..task_updater import update_and_notify
                 # 清理错误信息中的 ANSI 转义序列
                 clean_error = re.sub(r'\x1B(?:[@-Z\-_]|\[[0-?]*[ -/]*[@-~])', '', str(e))
-                db.update_task(task_id, {"status": TaskStatus.FAILED, "error_message": clean_error})
-                self._submit_coro(notify_task_update(task_id))
+                self._submit_coro(update_and_notify(task_id, {"status": TaskStatus.FAILED, "error_message": clean_error}))

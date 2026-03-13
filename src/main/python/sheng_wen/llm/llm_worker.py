@@ -171,8 +171,8 @@ class LLMWorker(Worker):
                 update_data["summary_chunk_total"] = None
                 update_data["summary_chunk_done"] = None
 
-            db.update_task(task_id, update_data)
-            await notify_task_update(task_id)
+            from ..task_updater import update_and_notify
+            await update_and_notify(task_id, update_data)
 
     def _resolve_requested_mode(self, payload: dict[str, Any], task_data: dict[str, Any] | None) -> str:
         payload_mode = str(payload.get("summary_mode") or "").strip().lower()
@@ -238,9 +238,10 @@ class LLMWorker(Worker):
         async def flush_partial_summary():
             if not task_id:
                 return
-            from ..db import db, TaskStatus
+            from ..db import TaskStatus
+            from ..task_updater import update_and_notify
 
-            db.update_task(
+            await update_and_notify(
                 task_id,
                 {
                     "status": TaskStatus.SUMMARIZING,
@@ -250,7 +251,6 @@ class LLMWorker(Worker):
                     "summary_chunk_done": None,
                 },
             )
-            await notify_task_update(task_id)
 
         def callback(chunk: str | LLMError):
             nonlocal llm_error, last_update
@@ -334,7 +334,8 @@ class LLMWorker(Worker):
                 return
 
             progress = int((done / total) * 100) if total > 0 else 0
-            db.update_task(
+            from ..task_updater import update_and_notify
+            self._submit_coro(update_and_notify(
                 task_id,
                 {
                     "status": TaskStatus.SUMMARIZING,
@@ -344,9 +345,8 @@ class LLMWorker(Worker):
                     "summary_chunk_total": total,
                     "summary_chunk_done": done,
                 },
-            )
+            ))
             last_stream_summary = partial_summary
-            self._submit_coro(notify_task_update(task_id))
 
         def update_chunk_stream(done: int, total: int, streaming_summary: str):
             nonlocal last_stream_update, last_stream_summary
@@ -371,7 +371,8 @@ class LLMWorker(Worker):
                 return
 
             progress = int((done / total) * 100) if total > 0 else 0
-            db.update_task(
+            from ..task_updater import update_and_notify
+            self._submit_coro(update_and_notify(
                 task_id,
                 {
                     "status": TaskStatus.SUMMARIZING,
@@ -381,10 +382,9 @@ class LLMWorker(Worker):
                     "summary_chunk_total": total,
                     "summary_chunk_done": done,
                 },
-            )
+            ))
             last_stream_update = now
             last_stream_summary = streaming_summary
-            self._submit_coro(notify_task_update(task_id))
 
         summarizer = ChunkedSummarizer(
             llm_client=self._llm_client,
@@ -441,10 +441,10 @@ class LLMWorker(Worker):
             return
         if self.is_task_cancelled(task_id):
             return
-        from ..db import db, TaskStatus
+        from ..db import TaskStatus
+        from ..task_updater import update_and_notify
 
-        db.update_task(task_id, {"status": TaskStatus.FAILED, "error_message": error_message})
-        await notify_task_update(task_id)
+        await update_and_notify(task_id, {"status": TaskStatus.FAILED, "error_message": error_message})
 
 
 def _extract_topic(summary: str) -> str | None:
