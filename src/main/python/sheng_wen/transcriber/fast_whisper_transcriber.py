@@ -1,8 +1,10 @@
 import time
 import os
+from contextlib import contextmanager
 from pathlib import Path
 from threading import Event, Thread
 import math
+from urllib.parse import urlsplit
 
 from faster_whisper import WhisperModel
 from faster_whisper.utils import download_model
@@ -15,6 +17,17 @@ from .transcriber import (
     TranscriptionCancelled,
 )
 from ..utils.logger import logger
+
+
+_PROXY_ENV_VAR_NAMES = (
+    "ALL_PROXY",
+    "all_proxy",
+    "HTTPS_PROXY",
+    "https_proxy",
+    "HTTP_PROXY",
+    "http_proxy",
+)
+
 
 class FastWhisperTranscriber(Transcriber):
     """
@@ -83,6 +96,135 @@ class FastWhisperTranscriber(Transcriber):
         return (str(Path.home() / ".cache" / "huggingface" / "hub"), "default")
 
     @staticmethod
+    def _normalize_proxy_url(proxy_url: str) -> tuple[str, bool]:
+        normalized = str(proxy_url or "").strip()
+        if normalized.lower().startswith("socks://"):
+            return (f"socks5://{normalized[len('socks://'):]}", True)
+        return (normalized, False)
+
+    @staticmethod
+    def _mask_proxy_for_log(proxy_url: str) -> str:
+        raw = str(proxy_url or "").strip()
+        if not raw:
+            return ""
+        try:
+            parts = urlsplit(raw)
+            scheme = parts.scheme
+            host = parts.hostname or ""
+            port = f":{parts.port}" if parts.port else ""
+            has_auth = "yes" if parts.username or parts.password else "no"
+            if scheme:
+                return f"{scheme}://{host}{port} (auth={has_auth})"
+            return raw
+        except Exception:
+            return raw
+
+    @classmethod
+    def _build_proxy_env_snapshot(cls) -> str:
+        items: list[str] = []
+        for env_name in _PROXY_ENV_VAR_NAMES:
+            value = os.environ.get(env_name)
+            if value:
+                items.append(f"{env_name}={cls._mask_proxy_for_log(value)}")
+            else:
+                items.append(f"{env_name}=<empty>")
+
+        no_proxy_value = os.environ.get("NO_PROXY") or os.environ.get("no_proxy") or ""
+        if no_proxy_value:
+            rules = [rule.strip() for rule in no_proxy_value.split(",") if rule.strip()]
+            preview = ", ".join(rules[:8])
+            if len(rules) > 8:
+                preview += f", ... (+{len(rules) - 8})"
+            items.append(f"NO_PROXY={preview}")
+        else:
+            items.append("NO_PROXY=<empty>")
+
+        return " | ".join(items)
+
+    @classmethod
+    def _log_proxy_env_snapshot(cls):
+        logger.info(
+            "[FastWhisperTranscriber] 模型加载前代理环境快照: "
+            f"{cls._build_proxy_env_snapshot()}"
+        )
+
+    @classmethod
+    @contextmanager
+    def _patched_proxy_env_for_httpx(cls):
+        """
+        临时修正 httpx 不接受的代理 scheme。
+        当前仅兼容 Clash 等工具常见导出的 socks:// -> socks5://。
+
+        额外处理：重置 huggingface_hub 的全局 HTTP session，
+        防止其在旧代理环境下缓存了不可用的 client。
+        """
+        patched_values: dict[str, str] = {}
+        for env_name in _PROXY_ENV_VAR_NAMES:
+            raw_value = os.environ.get(env_name)
+            if not raw_value:
+                continue
+            normalized_value, changed = cls._normalize_proxy_url(raw_value)
+            if not changed:
+                continue
+            patched_values[env_name] = raw_value
+            os.environ[env_name] = normalized_value
+            logger.warning(
+                "[FastWhisperTranscriber] 检测到不兼容代理配置，"
+                f"已临时将 {env_name}=socks://... 修正为 socks5://... 以兼容 httpx。"
+            )
+
+        try:
+            try:
+                from huggingface_hub.utils._http import close_session
+
+                close_session()
+            except Exception:
+                pass
+            yield
+        finally:
+            try:
+                from huggingface_hub.utils._http import close_session
+
+                close_session()
+            except Exception:
+                pass
+            for env_name, raw_value in patched_values.items():
+                os.environ[env_name] = raw_value
+
+    @staticmethod
+    def _build_model_load_error_message(model_identifier: str, error: Exception) -> str:
+        text = str(error or "").strip()
+        lowered = text.lower()
+        prefix = f"加载模型 '{model_identifier}' 失败。"
+
+        if "unknown scheme for proxy url" in lowered and "socks://" in lowered:
+            return (
+                f"{prefix} 检测到代理地址使用了不兼容的 socks:// 格式。"
+                "请将代理变量改为 socks5://127.0.0.1:端口，或改用 HTTP 代理后重试。"
+            )
+
+        if "using socks proxy" in lowered and "socksio" in lowered:
+            return (
+                f"{prefix} 当前环境配置了 SOCKS 代理，但缺少 httpx 的 SOCKS 依赖 socksio。"
+                "请安装相关依赖，或改用 HTTP 代理后重试。"
+            )
+
+        if (
+            error.__class__.__name__ == "LocalEntryNotFoundError"
+            or "cannot find the appropriate snapshot folder" in lowered
+            or "please check your internet connection and try again" in lowered
+        ):
+            return (
+                f"{prefix} 本地未找到该模型缓存，且当前无法从 Hugging Face 下载。"
+                "请检查网络或代理是否可访问 huggingface.co，"
+                "或者先手动下载模型并切换到本地模型目录。"
+            )
+
+        if text:
+            return f"{prefix} {text}"
+        return prefix
+
+    @staticmethod
     def _probe_media_duration(file_path: str) -> float:
         """
         使用 ffprobe 兜底探测媒体时长（秒）。
@@ -137,55 +279,59 @@ class FastWhisperTranscriber(Transcriber):
         model_identifier = model_size_or_path if model_size_or_path else model_size
         try:
             cache_root, cache_source = self._resolve_hf_cache_root()
+            self._log_proxy_env_snapshot()
             logger.info(
                 f"[FastWhisperTranscriber] Hugging Face 缓存根目录: {cache_root} (source={cache_source})"
             )
 
-            source, source_detail = self._probe_model_source(str(model_identifier))
-            if source == "local_path":
-                logger.info(
-                    f"[FastWhisperTranscriber] 检测结果: 使用本地模型目录（不需要下载）: {source_detail}"
-                )
-                logger.info(
-                    f"[FastWhisperTranscriber] 正在加载本地模型: {model_identifier} (device={device}, compute_type={compute_type})"
-                )
-            elif source == "hf_cache_hit":
-                logger.info(
-                    f"[FastWhisperTranscriber] 检测结果: 命中 Hugging Face 本地缓存（不需要下载）: {source_detail}"
-                )
-                logger.info(
-                    f"[FastWhisperTranscriber] 正在从缓存加载模型: {model_identifier} (device={device}, compute_type={compute_type})"
-                )
-            elif source == "hf_cache_miss":
-                logger.warning(
-                    "[FastWhisperTranscriber] 检测结果: 本地未找到该模型缓存，将尝试联网下载。"
-                )
-                logger.info(
-                    f"[FastWhisperTranscriber] 正在加载模型: {model_identifier} (device={device}, compute_type={compute_type})"
-                )
-                logger.info(
-                    "[FastWhisperTranscriber] 如果网络无法访问 Hugging Face，稍后会报加载失败。"
-                )
-            else:
-                logger.info(
-                    f"[FastWhisperTranscriber] 正在加载模型: {model_identifier} (device={device}, compute_type={compute_type})"
-                )
-                logger.info(
-                    "[FastWhisperTranscriber] 无法预判是否需要下载；如本地无缓存将自动下载（首次可能较慢）。"
-                )
-                logger.debug(f"[FastWhisperTranscriber] 预探测细节: {source_detail}")
+            # 注意：huggingface_hub/httpx 可能会在预探测阶段初始化全局 client。
+            # 因此代理修正要覆盖“预探测 + 实际加载”两个阶段，避免 socks:// 造成的全局污染。
+            with self._patched_proxy_env_for_httpx():
+                source, source_detail = self._probe_model_source(str(model_identifier))
+                if source == "local_path":
+                    logger.info(
+                        f"[FastWhisperTranscriber] 检测结果: 使用本地模型目录（不需要下载）: {source_detail}"
+                    )
+                    logger.info(
+                        f"[FastWhisperTranscriber] 正在加载本地模型: {model_identifier} (device={device}, compute_type={compute_type})"
+                    )
+                elif source == "hf_cache_hit":
+                    logger.info(
+                        f"[FastWhisperTranscriber] 检测结果: 命中 Hugging Face 本地缓存（不需要下载）: {source_detail}"
+                    )
+                    logger.info(
+                        f"[FastWhisperTranscriber] 正在从缓存加载模型: {model_identifier} (device={device}, compute_type={compute_type})"
+                    )
+                elif source == "hf_cache_miss":
+                    logger.warning(
+                        "[FastWhisperTranscriber] 检测结果: 本地未找到该模型缓存，将尝试联网下载。"
+                    )
+                    logger.info(
+                        f"[FastWhisperTranscriber] 正在加载模型: {model_identifier} (device={device}, compute_type={compute_type})"
+                    )
+                    logger.info(
+                        "[FastWhisperTranscriber] 如果网络无法访问 Hugging Face，稍后会报加载失败。"
+                    )
+                else:
+                    logger.info(
+                        f"[FastWhisperTranscriber] 正在加载模型: {model_identifier} (device={device}, compute_type={compute_type})"
+                    )
+                    logger.info(
+                        "[FastWhisperTranscriber] 无法预判是否需要下载；如本地无缓存将自动下载（首次可能较慢）。"
+                    )
+                    logger.debug(f"[FastWhisperTranscriber] 预探测细节: {source_detail}")
 
-            heartbeat = Thread(
-                target=self._emit_model_loading_heartbeat,
-                args=(str(model_identifier), heartbeat_stop, start_time),
-                daemon=True,
-            )
-            heartbeat.start()
-            self.model = WhisperModel(model_identifier, device=device, compute_type=compute_type)
+                heartbeat = Thread(
+                    target=self._emit_model_loading_heartbeat,
+                    args=(str(model_identifier), heartbeat_stop, start_time),
+                    daemon=True,
+                )
+                heartbeat.start()
+                self.model = WhisperModel(model_identifier, device=device, compute_type=compute_type)
         except Exception as e:
-            # 捕获所有可能的底层异常 (例如 ValueError, huggingface_hub.utils._errors.RepositoryNotFoundError)
-            # 并将其包装为我们自己的标准异常
-            raise ModelLoadError(f"加载模型 '{model_identifier}' 失败: {e}") from e
+            message = self._build_model_load_error_message(str(model_identifier), e)
+            logger.error(f"[FastWhisperTranscriber] {message}", exc_info=True)
+            raise ModelLoadError(message) from e
         finally:
             heartbeat_stop.set()
             if heartbeat is not None and heartbeat.is_alive():

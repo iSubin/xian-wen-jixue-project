@@ -86,7 +86,7 @@
   - **Agent增强模式**：细节更丰富，更像是一篇详实的完整文章
 - ⚙️ **使用方式**：
   - 在前端页面"开始处理"按钮上方，通过滑块切换标准/Agent模式
-  - 也可在配置文件 `config/settings.json` 中设置 `summarization.mode` 为 `"agent"` 或 `"auto"`（自动根据视频长度选择）
+  - 也可在前端设置中选择自动模式（按视频长度自动选择总结策略）
 
 ### **2. 丰富输出 📊**
 
@@ -229,8 +229,11 @@ deploy一键部署.bat
 或者双击运行 `deploy一键部署.bat`
 
 脚本会自动完成：
-1. 安装前端依赖并构建
-2. 安装 Python 后端依赖
+1. 检查 Node.js/Python 版本（前端构建需要 Node 20+，后端需要 Python 3.10+）
+2. 在 Linux 下尝试补齐系统依赖（`ffmpeg` / `git` / `python3-venv`，需 sudo）
+3. 创建并复用项目虚拟环境 `.venv`
+4. 安装前端依赖并构建
+5. 安装 Python 后端依赖
 
 **注意**：
 - 部署脚本不会自动启动服务，需要手动运行启动命令
@@ -238,32 +241,51 @@ deploy一键部署.bat
 
 ### 你也可手动部署
 
-#### 前端构建
+#### Linux/macOS 手动部署
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements.txt
+
+cd frontend
+npm ci
+npm run build
+cd ..
+```
+
+#### Windows 手动部署
+```cmd
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements.txt
 cd frontend
 npm install
 npm run build
 cd ..
 ```
-#### 安装后端依赖
-```bash
-pip install -r requirements.txt
-```
 
-### 配置文件（可选）
+### 配置（推荐前端设置）
 
-如果需要预先配置 LLM 等设置，可以创建配置文件：
+推荐做法：启动后直接通过前端设置面板配置 LLM 与转录参数，无需手动编辑 JSON。
+
+如果你希望手动维护配置文件，也可以创建：
 
 ```bash
 cp config/settings.example.json config/settings.json
 # Windows 可用: copy config\\settings.example.json config\\settings.json
 ```
 
-然后编辑 `config/settings.json`。
+按需编辑 `config/settings.json` 即可。
 
-**提示**：即使不创建配置文件，也可以在启动后通过前端界面进行所有设置。
+**提示**：前端设置是主要入口；手动编辑配置文件仅作为高级/可选方式。
 
 ### 启动服务
+
+**一键启动（Linux/macOS）：**
+```bash
+chmod +x 一键启动.sh
+./一键启动.sh
+```
 
 **一键启动（Windows）：**
 ```cmd
@@ -273,38 +295,39 @@ cp config/settings.example.json config/settings.json
 
 **手动启动：**
 ```bash
+# Linux/macOS（若使用 deploy 脚本安装）
+source .venv/bin/activate
 python ShengWen-app.py
 ```
+请注意使用创建的虚拟环境中的 python 来启动，否则可能缺少依赖而报错
+
 ### 成功启动提示参考
 ```bash
-PS D:\tool\ShengWen> python .\ShengWen-app.py
-INFO  2026-02-28 08:41:54.241 Using SQLite database: ShengWen.db
-INFO  2026-02-28 08:41:54.455 --- ShengWen v0.1.0 启动中 ---
-INFO  2026-02-28 08:41:54.455 --- 启动 FastAPI 服务器于 http://0.0.0.0:8000 ---
-INFO:     Started server process [18388]
+========================================
+  声文智汇 (ShengWen) - 一键启动
+========================================
+
+使用 Python: D:\prj\SonicScribe\.venv\Scripts\python.exe
+
+INFO  2026-03-13 10:13:01.248 Using SQLite database: ShengWen.db
+INFO  2026-03-13 10:13:03.422 --- [Startup] 未检测到代理环境，已自动接管本地代理端口 7890 ---
+INFO  2026-03-13 10:13:03.429 ╔════════════════════════════════════════════════════════════╗
+INFO  2026-03-13 10:13:03.429 ║  声文智汇 ShengWen v0.1.0                           ║
+INFO  2026-03-13 10:13:03.429 ╚════════════════════════════════════════════════════════════╝
+INFO:     Started server process [22792]
 INFO:     Waiting for application startup.
-INFO  2026-02-28 08:41:54.495 --- [Transcriber] 使用本地模型路径: C:\Users\t819t\.cache\huggingface\hub\models--Systran--faster-whisper-tiny\snapshots\d90ca5fe260221311c53c58e660288d3deb8d356 ---
-INFO  2026-02-28 08:41:54.496 --- [Lifespan] 正在初始化工作单元 ---
-INFO  2026-02-28 08:41:54.496 --- [Lifespan] 1/5 初始化转录器（此阶段可能触发模型下载）... ---
-INFO  2026-02-28 08:41:57.436 [FastWhisperTranscriber] Hugging Face 缓存根目录: C:\Users\Administrator\.cache\huggingface\hub (source=huggingface_hub.constants.HUGGINGFACE_HUB_CACHE)
-INFO  2026-02-28 08:41:57.436 [FastWhisperTranscriber] 检测结果: 使用本地模型目录（不需要下载）: C:\Users\t819t\.cache\huggingface\hub\models--Systran--faster-whisper-tiny\snapshots\d90ca5fe260221311c53c58e660288d3deb8d356
-INFO  2026-02-28 08:41:57.437 [FastWhisperTranscriber] 正在加载本地模型: C:\Users\t819t\.cache\huggingface\hub\models--Systran--faster-whisper-tiny\snapshots\d90ca5fe260221311c53c58e660288d3deb8d356 (device=cpu, compute_type=int8)
-
-......
-
-INFO  2026-02-28 09:02:44.995 所有工作单元已启动。
-INFO  2026-02-28 09:02:44.995 --- [Lifespan] 5/5 后台 Worker 启动完成 ---
-INFO  2026-02-28 09:02:44.996 --- [Lifespan] 后台工作单元已就绪 ---
-INFO  2026-02-28 09:02:44.996 ============================================================
-INFO  2026-02-28 09:02:44.996 服务启动完成，可通过浏览器访问：
-INFO  2026-02-28 09:02:44.996   本机可通过浏览器访问 http://localhost:8000/
-INFO  2026-02-28 09:02:44.996   其它设备可通过浏览器访问 http://192.168.0.254:8000/
-INFO  2026-02-28 09:02:44.996 ============================================================
-INFO  2026-02-28 09:02:44.996 [VideoDownloaderWorker] 工作单元已启动。
-INFO  2026-02-28 09:02:44.996 [FileUploadWorker] 工作单元已启动。
-INFO  2026-02-28 09:02:44.996 [TranscriberWorker] 工作单元已启动。
-INFO  2026-02-28 09:02:44.996 [LLMWorker] 工作单元已启动。
+INFO  2026-03-13 10:13:03.588 --- [Lifespan] 服务启动完成，前端已可访问 ---
+INFO  2026-03-13 10:13:03.589 --- [Lifespan] Workers 将在首次使用时自动初始化 ---
+INFO  2026-03-13 10:13:03.595 ╔════════════════════════════════════════════════════════════╗
+INFO  2026-03-13 10:13:03.596 ║  🚀 服务启动完成，可通过浏览器访问：                       ║
+INFO  2026-03-13 10:13:03.596 ╠════════════════════════════════════════════════════════════╣
+INFO  2026-03-13 10:13:03.596 ║  📱 本机访问:  http://localhost:8000/
+INFO  2026-03-13 10:13:03.596 ║  🌐 局域网访问: http://192.168.0.45:8000/
+INFO  2026-03-13 10:13:03.596 ╚════════════════════════════════════════════════════════════╝
 INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     ('127.0.0.1', 51382) - "WebSocket /ws" [accepted]
+INFO:     connection open
 ```
 
 - 启动后本机即可在浏览器通过 `localhost:<端口号>` 访问
@@ -314,11 +337,11 @@ INFO:     Application startup complete.
 
 ## ⚙️ 配置系统
 
-ShengWen 当前版本使用 **JSON 单一配置源**：
+ShengWen 当前版本以 **前端设置面板** 作为主要配置入口，同时保留 JSON 文件供手动维护：
 
-- 唯一配置文件：`config/settings.json`
-- 建议首次先从 `config/settings.example.json` 复制一份
-- 前端设置面板（`LLM` / `转录设置`）会直接写回该文件
+- 推荐入口：前端设置面板（`LLM` / `转录设置`）
+- 配置文件：`config/settings.json`
+- 如需手动维护，可先从 `config/settings.example.json` 复制一份
 
 ---
 
@@ -348,7 +371,7 @@ ShengWen 当前版本使用 **JSON 单一配置源**：
 
 - 当开启 `enable_bilibili_subtitle_fetch` 时，B 站任务会优先尝试直取字幕，失败自动回退到下载+ASR。
 - `SESSDATA` 来源优先级为：
-  1. 全局配置（转录设置面板保存到 `config/settings.json`）
+  1. 全局配置（可在前端转录设置面板中维护）
   2. 环境变量（`BILIBILI_SESSDATA` / `SESSDATA`）
 - 前端仅显示掩码值与来源，不显示明文。
 
@@ -397,7 +420,7 @@ ShengWen 当前版本使用 **JSON 单一配置源**：
      └─ vocabulary.txt
      ```
 - **高性能电脑建议：**  
-  可以直接尝试 `small` / `medium` / `large`。若已准备好本地模型目录，在 `config/settings.json` 中填写 `whisper.model_path` 即可。
+  可以直接尝试 `small` / `medium` / `large`。若已准备好本地模型目录，可在前端“转录设置”中填写模型路径（`whisper.model_path`）。
 
 ### Q2. 我要选哪个 AI 模型来总结？
 

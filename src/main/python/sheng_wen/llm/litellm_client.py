@@ -107,6 +107,19 @@ class LiteLLMClient(LLM):
         """
         # 将我们的 LLMMessage 转换为 litellm 需要的字典格式
         message_dicts = [{"role": msg.role, "content": msg.content} for msg in messages]
+
+        # 处理不支持 system role 的模型（如 Gemini）
+        # 将 system 消息合并到第一条 user 消息中
+        if message_dicts and message_dicts[0].get("role") == "system":
+            system_content = message_dicts[0].get("content", "")
+            # 查找第一条 user 消息
+            user_idx = next((i for i, m in enumerate(message_dicts) if m.get("role") == "user"), None)
+            if user_idx is not None:
+                # 将 system 内容作为前缀添加到 user 消息中
+                user_content = message_dicts[user_idx].get("content", "")
+                message_dicts[user_idx]["content"] = f"{system_content}\n\n{user_content}"
+                # 移除 system 消息
+                message_dicts.pop(0)
         model_candidates = self._model_candidates()
         last_exception: Exception | None = None
 

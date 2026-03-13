@@ -5,7 +5,7 @@ import re
 import shutil
 import subprocess
 from threading import Lock
-from typing import Any
+from typing import Any, Literal
 
 from ..utils.logger import logger
 from .transcriber import get_transcriber
@@ -162,6 +162,54 @@ def _mask_cookie_value(value: str) -> str:
     return f"{value[:4]}****{value[-4:]}"
 
 
+VALID_MODEL_SIZES = {"tiny", "base", "small", "medium", "large"}
+VALID_MODEL_SOURCES = {"auto_download", "manual_path"}
+REQUIRED_MANUAL_MODEL_FILES = (
+    "config.json",
+    "model.bin",
+    "tokenizer.json",
+    "vocabulary.txt",
+)
+
+
+def _sanitize_model_path(value: str | None) -> str:
+    return str(value or "").strip().strip('"')
+
+
+def _normalize_model_size(value: str | None, fallback: str = "tiny") -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized in VALID_MODEL_SIZES:
+        return normalized
+    return fallback
+
+
+def _normalize_model_source(value: str | None, fallback: str = "auto_download") -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized in VALID_MODEL_SOURCES:
+        return normalized
+    return fallback
+
+
+def _validate_manual_model_dir(model_path: str) -> tuple[bool, str, str]:
+    resolved = _sanitize_model_path(model_path)
+    if not resolved:
+        return (False, "请填写本地模型目录路径。", "")
+    abs_path = os.path.abspath(os.path.expanduser(os.path.expandvars(resolved)))
+    if not os.path.exists(abs_path):
+        return (False, f"模型目录不存在: {abs_path}", abs_path)
+    if not os.path.isdir(abs_path):
+        return (False, f"模型路径不是目录: {abs_path}", abs_path)
+
+    missing = [name for name in REQUIRED_MANUAL_MODEL_FILES if not os.path.isfile(os.path.join(abs_path, name))]
+    if missing:
+        return (
+            False,
+            "模型目录缺少必要文件: " + ", ".join(missing),
+            abs_path,
+        )
+    return (True, "模型目录校验通过。", abs_path)
+
+
 class TranscriptionSettingsManager:
     """运行时转录设置管理器。"""
 
@@ -169,14 +217,19 @@ class TranscriptionSettingsManager:
         self,
         initial_device: str,
         model_size: str,
+        model_source: str = "auto_download",
         model_path: str | None = None,
         initial_enable_bilibili_subtitle_fetch: bool = True,
         initial_bilibili_sessdata: str = "",
     ):
         self._lock = Lock()
         self._device = initial_device
-        self._model_size = model_size
-        self._model_path = model_path
+        self._model_size = _normalize_model_size(model_size, fallback="tiny")
+        self._model_source = _normalize_model_source(model_source, fallback="auto_download")
+        self._model_path = _sanitize_model_path(model_path)
+        if self._model_source == "auto_download" and self._model_path:
+            # 兼容旧配置：曾填写过 model_path 时默认沿用手动模式。
+            self._model_source = "manual_path"
         self._enable_bilibili_subtitle_fetch = initial_enable_bilibili_subtitle_fetch
         self._bilibili_sessdata = _sanitize_cookie_value(initial_bilibili_sessdata)
         self._transcriber_worker: Any = None
@@ -205,6 +258,9 @@ class TranscriptionSettingsManager:
         with self._lock:
             current_device = self._device
             enable_bilibili_subtitle_fetch = self._enable_bilibili_subtitle_fetch
+            model_source = self._model_source
+            model_size = self._model_size
+            model_path = self._model_path
 
         sessdata, source = self.resolve_bilibili_sessdata()
         cuda_diag = _detect_cuda_support()
@@ -212,9 +268,23 @@ class TranscriptionSettingsManager:
         devices = ["cpu"]
         if cuda_available:
             devices.append("cuda")
+        manual_valid, manual_message, manual_resolved_path = _validate_manual_model_dir(model_path)
+        model_path_valid = manual_valid if model_source == "manual_path" else True
+        model_path_message = (
+            manual_message
+            if model_source == "manual_path"
+            else "自动下载模式：首次使用会自动下载/加载所选模型。"
+        )
 
         return {
             "device": current_device,
+            "model_source": model_source,
+            "model_size": model_size,
+            "model_path": model_path,
+            "model_path_valid": model_path_valid,
+            "model_path_message": model_path_message,
+            "model_path_resolved": manual_resolved_path if model_source == "manual_path" else "",
+            "required_model_files": list(REQUIRED_MANUAL_MODEL_FILES),
             "cuda_available": cuda_available,
             "available_devices": devices,
             "has_nvidia_gpu": bool(cuda_diag["has_nvidia_gpu"]),
@@ -230,58 +300,142 @@ class TranscriptionSettingsManager:
             "bilibili_sessdata_masked": _mask_cookie_value(sessdata),
         }
 
-    def _build_transcriber_kwargs(self, device: str) -> dict[str, str]:
+    def _build_transcriber_kwargs(
+        self,
+        device: str,
+        model_source: str,
+        model_size: str,
+        model_path: str,
+    ) -> dict[str, str]:
         kwargs: dict[str, str] = {"device": device}
-        if self._model_path:
-            kwargs["model_size_or_path"] = self._model_path
+        if model_source == "manual_path":
+            valid, message, resolved_path = _validate_manual_model_dir(model_path)
+            if not valid:
+                raise ValueError(message)
+            kwargs["model_size_or_path"] = resolved_path
         else:
-            kwargs["model_size"] = self._model_size
+            kwargs["model_size"] = model_size
         return kwargs
+
+    def build_transcriber_kwargs(self) -> dict[str, str]:
+        with self._lock:
+            return self._build_transcriber_kwargs(
+                device=self._device,
+                model_source=self._model_source,
+                model_size=self._model_size,
+                model_path=self._model_path,
+            )
 
     def update_settings(
         self,
         device: str | None = None,
+        model_source: Literal["auto_download", "manual_path"] | str | None = None,
+        model_size: Literal["tiny", "base", "small", "medium", "large"] | str | None = None,
+        model_path: str | None = None,
         enable_bilibili_subtitle_fetch: bool | None = None,
         bilibili_sessdata: str | None = None,
         clear_bilibili_sessdata: bool | None = None,
     ) -> dict[str, Any]:
         if (
             device is None
+            and model_source is None
+            and model_size is None
+            and model_path is None
             and enable_bilibili_subtitle_fetch is None
             and bilibili_sessdata is None
             and clear_bilibili_sessdata is None
         ):
             raise ValueError("至少需要更新一个配置项")
 
-        transcriber = None
-        normalized = None
+        with self._lock:
+            current_device = self._device
+            current_model_source = self._model_source
+            current_model_size = self._model_size
+            current_model_path = self._model_path
+            worker_for_rebuild = self._transcriber_worker
 
+        next_device = current_device
         if device is not None:
-            normalized = (device or "").strip().lower()
-            if normalized not in {"cpu", "cuda"}:
+            next_device = (device or "").strip().lower()
+            if next_device not in {"cpu", "cuda"}:
                 raise ValueError("仅支持 cpu 或 cuda")
-            if normalized == "cuda":
-                cuda_diag = _detect_cuda_support()
-                if not bool(cuda_diag["cuda_available"]):
-                    raise ValueError(str(cuda_diag["cuda_message"]))
 
-            # 先构建新 transcriber，成功后再切换，避免中间状态不可用
+        next_model_source = current_model_source
+        if model_source is not None:
+            normalized_source = str(model_source or "").strip().lower()
+            if normalized_source not in VALID_MODEL_SOURCES:
+                raise ValueError("model_source 仅支持 auto_download 或 manual_path")
+            next_model_source = normalized_source
+
+        next_model_size = current_model_size
+        if model_size is not None:
+            normalized_size = _normalize_model_size(model_size, fallback="")
+            if normalized_size not in VALID_MODEL_SIZES:
+                raise ValueError("model_size 仅支持 tiny/base/small/medium/large")
+            next_model_size = normalized_size
+
+        next_model_path = current_model_path
+        if model_path is not None:
+            next_model_path = _sanitize_model_path(model_path)
+
+        if next_device == "cuda":
+            cuda_diag = _detect_cuda_support()
+            if not bool(cuda_diag["cuda_available"]):
+                raise ValueError(str(cuda_diag["cuda_message"]))
+
+        if next_model_source == "manual_path":
+            valid, message, _ = _validate_manual_model_dir(next_model_path)
+            if not valid:
+                raise ValueError(message)
+
+        device_changed = next_device != current_device
+        model_source_changed = next_model_source != current_model_source
+        model_size_changed = next_model_size != current_model_size
+        model_path_changed = next_model_path != current_model_path
+        should_rebuild = bool(worker_for_rebuild) and (
+            device_changed
+            or model_source_changed
+            or model_size_changed
+            or model_path_changed
+        )
+
+        transcriber = None
+        if should_rebuild:
             try:
                 logger.info(
                     "[TranscriptionSettingsManager] 正在重建转录器实例，若模型未缓存可能会触发下载，请稍候..."
                 )
-                transcriber = get_transcriber("fast_whisper", **self._build_transcriber_kwargs(normalized))
+                transcriber_kwargs = self._build_transcriber_kwargs(
+                    device=next_device,
+                    model_source=next_model_source,
+                    model_size=next_model_size,
+                    model_path=next_model_path,
+                )
+                transcriber = get_transcriber("fast_whisper", **transcriber_kwargs)
                 logger.info("[TranscriptionSettingsManager] 转录器实例重建完成。")
             except Exception as e:
-                raise ValueError(f"切换转录设备失败: {e}") from e
+                raise ValueError(f"切换转录配置失败: {e}") from e
 
         with self._lock:
-            if transcriber is not None:
-                if self._transcriber_worker is None:
-                    raise ValueError("TranscriberWorker 未初始化")
+            self._device = next_device
+            self._model_source = next_model_source
+            self._model_size = next_model_size
+            self._model_path = next_model_path
+
+            if transcriber is not None and self._transcriber_worker is not None:
                 self._transcriber_worker.update_transcriber(transcriber)
-                self._device = normalized
-                logger.info(f"[TranscriptionSettingsManager] 已更新转录设备: device={normalized}")
+                logger.info(
+                    "[TranscriptionSettingsManager] 已更新转录配置: "
+                    f"device={self._device}, model_source={self._model_source}, model_size={self._model_size}"
+                )
+            elif (
+                (device_changed or model_source_changed or model_size_changed or model_path_changed)
+                and self._transcriber_worker is None
+            ):
+                logger.info(
+                    "[TranscriptionSettingsManager] 已保存转录配置（worker 尚未初始化，将在首次任务时生效）: "
+                    f"device={self._device}, model_source={self._model_source}, model_size={self._model_size}"
+                )
 
             if enable_bilibili_subtitle_fetch is not None:
                 self._enable_bilibili_subtitle_fetch = bool(enable_bilibili_subtitle_fetch)
@@ -306,6 +460,9 @@ class TranscriptionSettingsManager:
         with self._lock:
             return {
                 "device": self._device,
+                "model_source": self._model_source,
+                "model_size": self._model_size,
+                "model_path": self._model_path,
                 "enable_bilibili_subtitle_fetch": self._enable_bilibili_subtitle_fetch,
                 "bilibili_sessdata": self._bilibili_sessdata,
             }

@@ -1,63 +1,317 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+NODE_MIN_MAJOR=20
+PYTHON_MIN_MAJOR=3
+PYTHON_MIN_MINOR=10
+VENV_DIR=".venv"
+
+info() { echo "[INFO] $*"; }
+warn() { echo "[WARN] $*"; }
+err() { echo "[ERROR] $*" >&2; }
+
+require_cmd() {
+  local cmd="$1"
+  local hint="${2:-}"
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    err "缺少命令: $cmd"
+    if [[ -n "$hint" ]]; then
+      err "$hint"
+    fi
+    exit 1
+  fi
+}
+
+detect_linux_pkg_manager() {
+  if command -v apt-get >/dev/null 2>&1; then
+    echo "apt"
+    return
+  fi
+  if command -v dnf >/dev/null 2>&1; then
+    echo "dnf"
+    return
+  fi
+  if command -v yum >/dev/null 2>&1; then
+    echo "yum"
+    return
+  fi
+  if command -v pacman >/dev/null 2>&1; then
+    echo "pacman"
+    return
+  fi
+  if command -v zypper >/dev/null 2>&1; then
+    echo "zypper"
+    return
+  fi
+  echo ""
+}
+
+install_linux_deps() {
+  local mgr
+  mgr="$(detect_linux_pkg_manager)"
+  if [[ -z "$mgr" ]]; then
+    warn "未识别包管理器，跳过自动安装系统依赖。请手动安装: git python3-venv"
+    return
+  fi
+
+  local no_sudo_action="skip"
+  if ! command -v sudo >/dev/null 2>&1 || ! sudo -n true >/dev/null 2>&1; then
+    warn "当前没有 sudo 权限，无法自动安装系统依赖。"
+    if [[ -t 0 ]]; then
+      echo "请选择后续操作："
+      echo "1) 跳过系统依赖安装并继续（推荐）"
+      echo "2) 退出脚本，稍后以有 sudo 权限的用户运行"
+      echo "3) 打印手动安装命令后继续"
+      read -r -p "请输入 1/2/3（默认 1）: " choice
+      case "${choice:-1}" in
+        2) no_sudo_action="exit" ;;
+        3) no_sudo_action="print" ;;
+        *) no_sudo_action="skip" ;;
+      esac
+    fi
+  fi
+
+  if [[ "$no_sudo_action" == "exit" ]]; then
+    err "已退出。请在具备 sudo 权限的环境中重试。"
+    exit 1
+  fi
+
+  if [[ "$no_sudo_action" == "print" ]]; then
+    echo "可手动执行的安装命令（按你的系统选择）："
+    case "$mgr" in
+      apt) echo "sudo apt-get update && sudo apt-get install -y git python3-venv" ;;
+      dnf) echo "sudo dnf install -y git python3 python3-pip python3-virtualenv" ;;
+      yum) echo "sudo yum install -y git python3 python3-pip" ;;
+      pacman) echo "sudo pacman -Sy --noconfirm git python python-virtualenv" ;;
+      zypper) echo "sudo zypper --non-interactive install git python3 python3-pip python3-virtualenv" ;;
+    esac
+  fi
+
+  if ! command -v sudo >/dev/null 2>&1 || ! sudo -n true >/dev/null 2>&1; then
+    warn "跳过自动安装系统依赖。请确保已安装: git python3-venv"
+    return
+  fi
+
+  info "检测到缺失系统依赖，尝试自动安装（需要 sudo）..."
+  case "$mgr" in
+    apt)
+      sudo apt-get update
+      sudo apt-get install -y git python3-venv
+      ;;
+    dnf)
+      sudo dnf install -y git python3 python3-pip python3-virtualenv
+      ;;
+    yum)
+      sudo yum install -y git python3 python3-pip
+      ;;
+    pacman)
+      sudo pacman -Sy --noconfirm git python python-virtualenv
+      ;;
+    zypper)
+      sudo zypper --non-interactive install git python3 python3-pip python3-virtualenv
+      ;;
+  esac
+}
+
+print_node_upgrade_macos() {
+  echo "macOS 更新 Node.js 的常见方式："
+  echo "1) 使用 Homebrew: brew install node@20 或 brew upgrade node"
+  echo "2) 使用 nvm: nvm install 20 && nvm use 20"
+}
+
+warn_macos_missing_deps() {
+  local missing=0
+  if ! "$PYTHON_CMD" -m venv --help >/dev/null 2>&1; then
+    warn "当前 Python 缺少 venv 模块，无法创建虚拟环境。"
+    if command -v brew >/dev/null 2>&1; then
+      echo "可执行: brew install python@3.10"
+    else
+      echo "请安装/升级 Python 3.10+（推荐使用 Homebrew 或 pyenv）"
+    fi
+    missing=1
+  fi
+  return "$missing"
+}
+
+select_python_cmd() {
+  if command -v python3 >/dev/null 2>&1; then
+    echo "python3"
+    return
+  fi
+  if command -v python >/dev/null 2>&1; then
+    echo "python"
+    return
+  fi
+  echo ""
+}
+
+check_python_version() {
+  local py_cmd="$1"
+  "$py_cmd" - <<'PY'
+import sys
+major, minor = sys.version_info[:2]
+need_major, need_minor = 3, 10
+if (major, minor) < (need_major, need_minor):
+    raise SystemExit(f"Python 版本过低: {major}.{minor}，需要 >= {need_major}.{need_minor}")
+print(f"Python 版本: {major}.{minor} (ok)")
+if (major, minor) >= (3, 14):
+    print("[WARN] 当前 Python 版本高于 3.13，虽然部署过程会继续，但部分依赖可能安装很久甚至卡住")
+    print("[WARN] 如遇到依赖安装异常缓慢，建议改用 Python 3.12 或 3.13")
+PY
+}
+
+check_node_version() {
+  local node_major
+  node_major="$(node -p "process.versions.node.split('.')[0]")"
+  if [[ "$node_major" -lt "$NODE_MIN_MAJOR" ]]; then
+    err "Node.js 版本过低: $(node -v)，需要 >= ${NODE_MIN_MAJOR}.x（当前前端依赖 Vite 7）"
+    if [[ "$(uname -s)" == "Linux" ]]; then
+      if maybe_upgrade_node_linux; then
+        node_major="$(node -p "process.versions.node.split('.')[0]")"
+      fi
+    elif [[ "$(uname -s)" == "Darwin" ]]; then
+      print_node_upgrade_macos
+    fi
+    if [[ "$node_major" -lt "$NODE_MIN_MAJOR" ]]; then
+      exit 1
+    fi
+  fi
+  info "Node.js 版本: $(node -v) (ok)"
+}
+
+print_nodesource_instructions() {
+  echo "可手动更新 Node.js（适用于 Ubuntu/Debian）："
+  echo "1) sudo apt remove --purge nodejs npm"
+  echo "2) sudo apt autoremove"
+  echo "3) curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -"
+  echo "4) sudo apt install -y nodejs"
+  echo "如需国内镜像，可将 deb.nodesource.com 替换为 mirrors.aliyun.com/nodesource"
+}
+
+maybe_upgrade_node_linux() {
+  local mgr
+  mgr="$(detect_linux_pkg_manager)"
+  if [[ "$mgr" != "apt" ]]; then
+    warn "仅支持在 Ubuntu/Debian(apt) 上自动更新 Node.js，请手动更新后重试。"
+    return 1
+  fi
+
+  if ! command -v sudo >/dev/null 2>&1 || ! sudo -n true >/dev/null 2>&1; then
+    warn "当前没有 sudo 权限，无法自动更新 Node.js。"
+    print_nodesource_instructions
+    return 1
+  fi
+
+  if ! command -v curl >/dev/null 2>&1; then
+    warn "缺少 curl，无法自动更新 Node.js。请先安装 curl 或手动更新。"
+    print_nodesource_instructions
+    return 1
+  fi
+
+  local do_install="no"
+  if [[ -t 0 ]]; then
+    read -r -p "检测到 Node.js 版本过低，是否自动更新到 20.x？[Y/n]: " choice
+    case "${choice:-Y}" in
+      n|N) do_install="no" ;;
+      *) do_install="yes" ;;
+    esac
+  fi
+
+  if [[ "$do_install" != "yes" ]]; then
+    warn "已跳过自动更新 Node.js。"
+    print_nodesource_instructions
+    return 1
+  fi
+
+  info "准备通过 NodeSource 安装 Node.js 20.x（需要 sudo）..."
+  sudo apt remove --purge -y nodejs npm || true
+  sudo apt autoremove -y || true
+  sudo bash -c "curl -fsSL https://deb.nodesource.com/setup_20.x | bash -"
+  sudo apt install -y nodejs
+  return 0
+}
 
 echo "=========================================="
-echo "  ShengWen 一键部署脚本"
+echo "  ShengWen 一键部署脚本 (Linux/macOS)"
 echo "=========================================="
-echo ""
+echo
 
-# 检查 Node.js
-if ! command -v node &> /dev/null; then
-    echo "❌ 错误: 未找到 Node.js，请先安装 Node.js"
-    exit 1
+require_cmd git "请先安装 Git。"
+require_cmd node "请先安装 Node.js ${NODE_MIN_MAJOR}+。"
+require_cmd npm "请先安装 npm（通常随 Node.js 提供）。"
+
+PYTHON_CMD="$(select_python_cmd)"
+if [[ -z "$PYTHON_CMD" ]]; then
+  err "未找到 Python，请先安装 Python ${PYTHON_MIN_MAJOR}.${PYTHON_MIN_MINOR}+"
+  exit 1
 fi
 
-# 检查 npm
-if ! command -v npm &> /dev/null; then
-    echo "❌ 错误: 未找到 npm，请先安装 npm"
-    exit 1
+if [[ "$(uname -s)" == "Linux" ]]; then
+  need_install=0
+  "$PYTHON_CMD" -m venv --help >/dev/null 2>&1 || need_install=1
+  if [[ "$need_install" -eq 1 ]]; then
+    install_linux_deps
+  fi
+elif [[ "$(uname -s)" == "Darwin" ]]; then
+  warn_macos_missing_deps || true
 fi
 
-# 检查 Python
-if ! command -v python &> /dev/null && ! command -v python3 &> /dev/null; then
-    echo "❌ 错误: 未找到 Python，请先安装 Python 3.8+"
-    exit 1
+check_python_version "$PYTHON_CMD"
+check_node_version
+
+if ! "$PYTHON_CMD" -m venv --help >/dev/null 2>&1; then
+  err "当前 Python 缺少 venv 模块。Linux 请安装 python3-venv；macOS 建议安装/升级 Python 3.10+。"
+  exit 1
 fi
 
-# 使用 python3 或 python
-PYTHON_CMD="python3"
-if ! command -v python3 &> /dev/null; then
-    PYTHON_CMD="python"
+info "步骤 1/5: 创建或复用虚拟环境 ${VENV_DIR}"
+if [[ ! -d "$VENV_DIR" ]]; then
+  "$PYTHON_CMD" -m venv "$VENV_DIR"
 fi
 
-echo "✓ 环境检查通过"
-echo ""
+if [[ -f "${VENV_DIR}/bin/activate" ]]; then
+  # shellcheck disable=SC1091
+  source "${VENV_DIR}/bin/activate"
+else
+  err "未找到虚拟环境激活脚本: ${VENV_DIR}/bin/activate"
+  exit 1
+fi
 
-# 前端构建
-echo "📦 步骤 1/3: 安装前端依赖..."
-cd frontend
-npm install
+info "步骤 2/5: 安装后端依赖"
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements.txt
 
-echo ""
-echo "🔨 步骤 2/3: 构建前端..."
+info "步骤 3/5: 安装前端依赖"
+pushd frontend >/dev/null
+if [[ -f package-lock.json ]]; then
+  npm ci
+else
+  npm install
+fi
+
+info "步骤 4/5: 构建前端"
 npm run build
+popd >/dev/null
 
-cd ..
-echo "✓ 前端构建完成"
-echo ""
+info "步骤 5/5: 准备配置文件"
+mkdir -p config
+if [[ ! -f config/settings.json && -f config/settings.example.json ]]; then
+  cp config/settings.example.json config/settings.json
+  info "已创建 config/settings.json"
+else
+  info "保留现有配置文件（若不存在，首次启动会自动生成默认配置）"
+fi
 
-# 后端依赖
-echo "📦 步骤 3/3: 安装后端依赖..."
-$PYTHON_CMD -m pip install -r requirements.txt
-
-echo ""
+echo
 echo "=========================================="
 echo "✅ 部署完成！"
 echo "=========================================="
-echo ""
+echo
 echo "下一步操作："
-echo "1. 创建配置文件: cp config/settings.example.json config/settings.json"
-echo "2. 配置 LLM API 参数等（llm.base_url / llm.api_key / llm.model_id）"
-echo "3. 启动服务: python ShengWen-app.py"
-echo ""
-
+echo "1. 启动服务: source ${VENV_DIR}/bin/activate && python ShengWen-app.py"
+echo "2. 打开浏览器访问: http://localhost:8000/"
+echo "3. 在前端设置面板中填写 LLM 与转录参数"
+echo

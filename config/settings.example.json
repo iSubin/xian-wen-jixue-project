@@ -8,6 +8,7 @@
     "prompt_file": "src/main/python/sheng_wen/prompt.md"
   },
   "whisper": {
+    "model_source": "auto_download",
     "model_path": null,
     "model_size": "tiny",
     "device": "cpu",
@@ -24,7 +25,6 @@
     "context_window_size": 1000000
   },
   "database": {
-    "database_url": null,
     "sqlite_path": "ShengWen.db",
     "json_file_path": "tasks.json"
   },

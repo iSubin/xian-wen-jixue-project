@@ -50,6 +50,7 @@ class AppConfig:
 
 @dataclass
 class WhisperConfig:
+    model_source: Literal["auto_download", "manual_path"] = "auto_download"
     model_path: str | None = None
     model_size: Literal["tiny", "base", "small", "medium", "large"] = "tiny"
     device: Literal["cpu", "cuda"] = "cpu"
@@ -58,11 +59,20 @@ class WhisperConfig:
     faster_whisper_model_path: str | None = None
 
     @property
+    def configured_model_path(self) -> str | None:
+        direct = str(self.model_path or "").strip()
+        if direct:
+            return direct
+        legacy = str(self.faster_whisper_model_path or "").strip()
+        if legacy:
+            return legacy
+        return None
+
+    @property
     def effective_model_path(self) -> str | None:
-        if self.model_path and Path(self.model_path).exists():
-            return self.model_path
-        if self.faster_whisper_model_path and Path(self.faster_whisper_model_path).exists():
-            return self.faster_whisper_model_path
+        configured = self.configured_model_path
+        if configured and Path(configured).exists():
+            return configured
         return None
 
 
@@ -78,13 +88,8 @@ class LLMConfig:
 
 @dataclass
 class DatabaseConfig:
-    database_url: str | None = None
     sqlite_path: str = "ShengWen.db"
     json_file_path: str = "tasks.json"
-
-    @property
-    def effective_url(self) -> str | None:
-        return self.database_url if self.database_url else None
 
 
 @dataclass
@@ -269,8 +274,22 @@ class JSONConfigManager:
 
     def save_transcription_config(self, payload: dict[str, Any]):
         whisper_patch = {}
+        resolved_model_source = None
         if "device" in payload:
             whisper_patch["device"] = str(payload["device"] or "cpu").lower()
+        if "model_source" in payload:
+            source = str(payload.get("model_source") or "auto_download").strip().lower()
+            resolved_model_source = source if source in {"auto_download", "manual_path"} else "auto_download"
+            whisper_patch["model_source"] = resolved_model_source
+        if "model_size" in payload:
+            size = str(payload.get("model_size") or "tiny").strip().lower()
+            whisper_patch["model_size"] = size if size in {"tiny", "base", "small", "medium", "large"} else "tiny"
+        if "model_path" in payload:
+            whisper_patch["model_path"] = str(payload.get("model_path") or "").strip() or None
+        if resolved_model_source == "auto_download":
+            # 用户显式切回自动下载时，清空手动路径，避免重启后被兼容逻辑回推到 manual_path。
+            whisper_patch["model_path"] = None
+            whisper_patch["faster_whisper_model_path"] = None
         if "enable_bilibili_subtitle_fetch" in payload:
             whisper_patch["enable_bilibili_subtitle_fetch"] = bool(payload["enable_bilibili_subtitle_fetch"])
         if "bilibili_sessdata" in payload:
@@ -334,21 +353,31 @@ class JSONConfigManager:
     def get_whisper_config(self) -> WhisperConfig:
         raw = self.get_raw_config().get("whisper", {})
         defaults = DEFAULT_SETTINGS["whisper"]
+        model_source = str(raw.get("model_source", defaults.get("model_source", "auto_download"))).lower()
+        if model_source not in {"auto_download", "manual_path"}:
+            model_source = "auto_download"
         model_size = str(raw.get("model_size", defaults["model_size"])).lower()
         if model_size not in {"tiny", "base", "small", "medium", "large"}:
             model_size = str(defaults["model_size"])
         device = str(raw.get("device", defaults["device"])).lower()
         if device not in {"cpu", "cuda"}:
             device = str(defaults["device"])
+        model_path = raw.get("model_path", defaults["model_path"])
+        faster_whisper_model_path = raw.get("faster_whisper_model_path", defaults["faster_whisper_model_path"])
+        if model_source == "auto_download":
+            fallback_manual_path = str(model_path or "").strip() or str(faster_whisper_model_path or "").strip()
+            if fallback_manual_path:
+                model_source = "manual_path"
         return WhisperConfig(
-            model_path=raw.get("model_path", defaults["model_path"]),
+            model_source=model_source,  # type: ignore[arg-type]
+            model_path=model_path,
             model_size=model_size,  # type: ignore[arg-type]
             device=device,  # type: ignore[arg-type]
             enable_bilibili_subtitle_fetch=bool(
                 raw.get("enable_bilibili_subtitle_fetch", defaults["enable_bilibili_subtitle_fetch"])
             ),
             bilibili_sessdata=str(raw.get("bilibili_sessdata", defaults["bilibili_sessdata"]) or ""),
-            faster_whisper_model_path=raw.get("faster_whisper_model_path", defaults["faster_whisper_model_path"]),
+            faster_whisper_model_path=faster_whisper_model_path,
         )
 
     def get_llm_config(self) -> LLMConfig:
@@ -367,7 +396,6 @@ class JSONConfigManager:
         raw = self.get_raw_config().get("database", {})
         defaults = DEFAULT_SETTINGS["database"]
         return DatabaseConfig(
-            database_url=raw.get("database_url", defaults["database_url"]),
             sqlite_path=str(raw.get("sqlite_path", defaults["sqlite_path"])),
             json_file_path=str(raw.get("json_file_path", defaults["json_file_path"])),
         )

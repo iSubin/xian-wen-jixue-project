@@ -24,11 +24,13 @@ tasks.json
 *.sqlite3
 
 # 缓存
+venv
+.venv
 .env
 .env.local
 config/settings.json
 scripts/fetch_subtitle/.bilibili_cookie.env
-
+.claude/settings.local
 
 # ——其它缓存——
 

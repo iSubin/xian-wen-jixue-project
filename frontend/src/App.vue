@@ -394,6 +394,9 @@ const handleUpdateLlmSettingsAndTest = async (payload: {
 
 const handleUpdateTranscriptionSettings = async (payload: {
   device?: 'cpu' | 'cuda'
+  model_source?: 'auto_download' | 'manual_path'
+  model_size?: 'tiny' | 'base' | 'small' | 'medium' | 'large'
+  model_path?: string
   enable_bilibili_subtitle_fetch?: boolean
   bilibili_sessdata?: string
   clear_bilibili_sessdata?: boolean

@@ -5,6 +5,7 @@ import glob
 import ipaddress
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Request
 from fastapi import Form
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, HttpUrl
@@ -19,6 +20,7 @@ from .version import APP_VERSION
 from .llm.llm import LLMConfig
 from .llm.provider_manager import LLMProviderManager
 from .transcriber.settings_manager import TranscriptionSettingsManager
+from .transcriber.transcriber import ModelLoadError
 from .utils.media import (
     SUPPORTED_MEDIA_EXTENSIONS,
     build_transcriber_payload,
@@ -31,6 +33,42 @@ from .downloader.bilibili_author_resolver import (
 app = FastAPI(title="ShengWen API", description="视频转录与 AI 总结服务", version=APP_VERSION)
 
 VALID_SUMMARY_MODES = {"auto", "standard", "agent"}
+
+
+def _build_model_load_error_detail(error: ModelLoadError) -> str:
+    detail = str(error or "").strip()
+    return detail or "转录模型加载失败，请检查模型配置、网络或代理设置后重试。"
+
+
+async def _fail_task_with_model_error(task_id: str | None, error: ModelLoadError) -> None:
+    detail = _build_model_load_error_detail(error)
+    logger.warning(f"[Transcriber] 模型加载失败: task_id={task_id}, detail={detail}")
+    if not task_id:
+        return
+    db.update_task(
+        task_id,
+        {
+            "status": TaskStatus.FAILED,
+            "error_message": detail,
+        },
+    )
+    await notify_task_update(task_id)
+
+
+async def _resolve_worker_or_raise(worker_factory, task_id: str | None = None):
+    try:
+        return await worker_factory()
+    except ModelLoadError as e:
+        await _fail_task_with_model_error(task_id, e)
+        raise HTTPException(status_code=503, detail=_build_model_load_error_detail(e)) from e
+
+
+@app.exception_handler(ModelLoadError)
+async def handle_model_load_error(_: Request, exc: ModelLoadError):
+    return JSONResponse(
+        status_code=503,
+        content={"detail": _build_model_load_error_detail(exc)},
+    )
 
 # 允许跨域请求
 app.add_middleware(
@@ -144,6 +182,13 @@ class LLMSettingsUpdate(BaseModel):
 
 class TranscriptionSettings(BaseModel):
     device: str
+    model_source: str
+    model_size: str
+    model_path: str
+    model_path_valid: bool
+    model_path_message: str
+    model_path_resolved: str
+    required_model_files: List[str]
     cuda_available: bool
     available_devices: List[str]
     has_nvidia_gpu: bool
@@ -161,6 +206,9 @@ class TranscriptionSettings(BaseModel):
 
 class TranscriptionSettingsUpdate(BaseModel):
     device: Optional[str] = Field(default=None, description="cpu 或 cuda")
+    model_source: Optional[str] = Field(default=None, description="auto_download 或 manual_path")
+    model_size: Optional[str] = Field(default=None, description="tiny/base/small/medium/large")
+    model_path: Optional[str] = Field(default=None, description="手动模型目录路径")
     enable_bilibili_subtitle_fetch: Optional[bool] = Field(
         default=None,
         description="是否优先尝试直取 B 站字幕（失败时回退 ASR）"
@@ -268,7 +316,7 @@ async def notify_progress_update(task_id: str, progress: float):
 
 # --- 接口定义 ---
 
-# 全局 Worker 引用，由启动脚本初始化
+# 全局 Worker 引用（懒加载模式 - 由 Worker 基类管理初始化）
 downloader_worker = None
 file_upload_worker = None
 llm_worker = None
@@ -302,8 +350,9 @@ initial_bilibili_sessdata = str(whisper_cfg.bilibili_sessdata or "")
 
 transcription_settings_manager = TranscriptionSettingsManager(
     initial_device=initial_transcription_device,
+    model_source=str(whisper_cfg.model_source),
     model_size=whisper_cfg.model_size,
-    model_path=whisper_cfg.effective_model_path,
+    model_path=whisper_cfg.configured_model_path,
     initial_enable_bilibili_subtitle_fetch=initial_enable_bilibili_subtitle_fetch,
     initial_bilibili_sessdata=initial_bilibili_sessdata,
 )
@@ -311,6 +360,108 @@ llm_provider_manager = LLMProviderManager(
     initial_config=initial_llm_config,
     initial_provider_id=initial_provider_id,
 )
+
+
+# --- 全局 Worker 工厂函数（懒初始化）---
+
+async def get_llm_worker():
+    """获取 LLM Worker（懒初始化）"""
+    global llm_worker
+    if llm_worker is not None:
+        return llm_worker
+
+    from .llm.llm import get_llm
+    from .llm.llm_worker import LLMWorker
+
+    llm_config = llm_provider_manager.get_runtime_config()
+    llm_client = get_llm(llm_config)
+    llm_worker = LLMWorker(name="LLMWorker", llm_client=llm_client)
+    llm_worker.load_system_prompt(config.app.prompt_file)
+    llm_provider_manager.bind_llm_worker(llm_worker)
+    llm_worker.start()
+    return llm_worker
+
+
+async def get_transcriber_worker():
+    """获取 Transcriber Worker（懒初始化）"""
+    global transcriber_worker
+    if transcriber_worker is not None:
+        return transcriber_worker
+
+    from .transcriber.transcriber import get_transcriber
+    from .transcriber.transcriber_worker import TranscriberWorker
+
+    runtime_transcription_state = transcription_settings_manager.get_runtime_state()
+    transcriber_config = transcription_settings_manager.build_transcriber_kwargs()
+    model_source = str(runtime_transcription_state.get("model_source") or "auto_download")
+
+    if model_source == "manual_path":
+        logger.info(f"[Transcriber] 使用本地模型路径: {transcriber_config.get('model_size_or_path')}")
+    else:
+        logger.info(f"[Transcriber] 使用模型大小: {transcriber_config.get('model_size')}")
+
+    transcriber = get_transcriber("fast_whisper", **transcriber_config)
+    llm_w = await get_llm_worker()
+    transcriber_worker = TranscriberWorker(
+        name="TranscriberWorker",
+        transcriber=transcriber,
+        next_worker=llm_w
+    )
+    transcription_settings_manager.bind_transcriber_worker(transcriber_worker)
+    transcriber_worker.start()
+    return transcriber_worker
+
+
+async def get_downloader_worker():
+    """获取 Downloader Worker（懒初始化）"""
+    global downloader_worker
+    if downloader_worker is not None:
+        return downloader_worker
+
+    from .downloader.video_downloader_worker import VideoDownloaderWorker
+
+    transcriber_w = await get_transcriber_worker()
+    llm_w = await get_llm_worker()
+
+    downloader_worker = VideoDownloaderWorker(
+        name="VideoDownloaderWorker",
+        next_worker=transcriber_w,
+        summary_worker=llm_w,
+        transcription_settings_manager=transcription_settings_manager,
+    )
+    downloader_worker.start()
+    return downloader_worker
+
+
+async def get_file_upload_worker():
+    """获取 File Upload Worker（懒初始化）"""
+    global file_upload_worker
+    if file_upload_worker is not None:
+        return file_upload_worker
+
+    from .downloader.file_upload_worker import FileUploadWorker
+
+    transcriber_w = await get_transcriber_worker()
+
+    file_upload_worker = FileUploadWorker(
+        name="FileUploadWorker",
+        next_worker=transcriber_w
+    )
+    file_upload_worker.start()
+    return file_upload_worker
+
+
+async def stop_all_workers():
+    """停止所有已初始化的 workers"""
+    workers = [downloader_worker, file_upload_worker, transcriber_worker, llm_worker]
+    for worker in workers:
+        if worker is not None:
+            try:
+                await worker.stop()
+                logger.info(f"[Shutdown] {worker.name} 已停止")
+            except Exception as e:
+                logger.warning(f"[Shutdown] 停止 {worker.name} 失败: {e}")
+
 
 def _is_loopback_client(request: Request) -> bool:
     """仅允许本机请求使用本地路径提交，避免任意文件读取风险。"""
@@ -522,16 +673,14 @@ async def upload_file(
         }
         db.save_task(task_id, task_data)
 
-        # 提交给 FileUploadWorker 处理
-        if file_upload_worker:
-            await file_upload_worker.add_task({
-                "task_id": task_id,
-                "file_path": temp_file_path,
-                "filename": file.filename or "uploaded_file",
+        # 提交给 FileUploadWorker 处理（懒初始化）
+        worker = await _resolve_worker_or_raise(get_file_upload_worker, task_id=task_id)
+        await worker.add_task({
+            "task_id": task_id,
+            "file_path": temp_file_path,
+            "filename": file.filename or "uploaded_file",
                 "summary_mode": resolved_summary_mode,
             })
-        else:
-            raise HTTPException(status_code=500, detail="FileUploadWorker 未初始化")
 
         await notify_task_update(task_id)
         return task_data
@@ -557,9 +706,6 @@ async def upload_local_path(payload: LocalPathTaskCreate, request: Request):
             status_code=403,
             detail="仅允许本机 localhost 请求使用本地路径直读。"
         )
-
-    if transcriber_worker is None:
-        raise HTTPException(status_code=500, detail="TranscriberWorker 未初始化")
 
     raw_path = (payload.file_path or "").strip().strip('"')
     if not raw_path:
@@ -604,7 +750,8 @@ async def upload_local_path(payload: LocalPathTaskCreate, request: Request):
         summary_mode=resolved_summary_mode,
     )
 
-    await transcriber_worker.add_task(payload_data)
+    worker = await _resolve_worker_or_raise(get_transcriber_worker, task_id=task_id)
+    await worker.add_task(payload_data)
     await notify_task_update(task_id)
     return task_data
 
@@ -630,19 +777,19 @@ async def create_task(task_in: TaskCreate):
         "summary_meta": None,
     }
     db.save_task(task_id, task_data)
-    
-    if downloader_worker:
-        task_payload = {
-            "task_id": task_id,
-            "video_url": str(task_in.video_url),
-            "quality": task_in.quality,
-            "summary_mode": resolved_summary_mode,
-        }
-        task_cookie = _sanitize_cookie_value(task_in.bilibili_sessdata)
-        if task_cookie:
-            task_payload["bilibili_sessdata"] = task_cookie
-        await downloader_worker.add_task(task_payload)
-    
+
+    worker = await _resolve_worker_or_raise(get_downloader_worker, task_id=task_id)
+    task_payload = {
+        "task_id": task_id,
+        "video_url": str(task_in.video_url),
+        "quality": task_in.quality,
+        "summary_mode": resolved_summary_mode,
+    }
+    task_cookie = _sanitize_cookie_value(task_in.bilibili_sessdata)
+    if task_cookie:
+        task_payload["bilibili_sessdata"] = task_cookie
+    await worker.add_task(task_payload)
+
     await notify_task_update(task_id)
     return task_data
 
@@ -701,33 +848,33 @@ async def re_summarize_task(task_id: str, payload: ReSummarizeRequest | None = N
         fallback=str(task.get("summary_mode") or ""),
     )
 
-    if llm_worker:
-        db.update_task(
-            task_id,
-            {
-                "status": TaskStatus.SUMMARIZING,
-                "summary": "",
-                "progress": 0.0,
-                "summary_mode": resolved_summary_mode,
-                "summary_chunk_total": None,
-                "summary_chunk_done": None,
-                "summary_meta": None,
-            },
-        )
-        await notify_task_update(task_id)
-        
-        temp_file = os.path.join("temp", f"{task_id}_re.txt")
-        os.makedirs("temp", exist_ok=True)
-        with open(temp_file, "w", encoding="utf-8") as f:
-            f.write(task["transcript"])
-            
-        await llm_worker.add_task({
-            "task_id": task_id,
-            "intermediate_file_path": temp_file,
-            "output_file": os.path.join("temp", f"{task_id}_re_summary.md"),
+    worker = await get_llm_worker()
+    db.update_task(
+        task_id,
+        {
+            "status": TaskStatus.SUMMARIZING,
+            "summary": "",
+            "progress": 0.0,
             "summary_mode": resolved_summary_mode,
-        })
-        
+            "summary_chunk_total": None,
+            "summary_chunk_done": None,
+            "summary_meta": None,
+        },
+    )
+    await notify_task_update(task_id)
+
+    temp_file = os.path.join("temp", f"{task_id}_re.txt")
+    os.makedirs("temp", exist_ok=True)
+    with open(temp_file, "w", encoding="utf-8") as f:
+        f.write(task["transcript"])
+
+    await worker.add_task({
+        "task_id": task_id,
+        "intermediate_file_path": temp_file,
+        "output_file": os.path.join("temp", f"{task_id}_re_summary.md"),
+        "summary_mode": resolved_summary_mode,
+    })
+
     return db.get_task(task_id)
 
 
@@ -811,9 +958,6 @@ async def re_transcribe_task(task_id: str, payload: ReTranscribeRequest | None =
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    if transcriber_worker is None and downloader_worker is None:
-        raise HTTPException(status_code=500, detail="Worker 未初始化")
-
     requested_mode = payload.summary_mode if payload else None
     resolved_summary_mode = _normalize_summary_mode(
         requested_mode,
@@ -844,10 +988,11 @@ async def re_transcribe_task(task_id: str, payload: ReTranscribeRequest | None =
     db.update_task(task_id, reset_data)
     await notify_task_update(task_id)
 
-    if local_media_file and transcriber_worker is not None:
+    if local_media_file:
+        transcriber_w = await _resolve_worker_or_raise(get_transcriber_worker, task_id=task_id)
         db.update_task(task_id, {"status": TaskStatus.TRANSCRIBING})
         await notify_task_update(task_id)
-        await transcriber_worker.add_task(
+        await transcriber_w.add_task(
             build_transcriber_payload(
                 task_id=task_id,
                 media_path=local_media_file,
@@ -857,12 +1002,10 @@ async def re_transcribe_task(task_id: str, payload: ReTranscribeRequest | None =
         )
         return db.get_task(task_id)
 
-    if downloader_worker is None:
-        raise HTTPException(status_code=500, detail="DownloaderWorker 未初始化")
-
+    downloader_w = await _resolve_worker_or_raise(get_downloader_worker, task_id=task_id)
     db.update_task(task_id, {"status": TaskStatus.DOWNLOADING})
     await notify_task_update(task_id)
-    await downloader_worker.add_task({
+    await downloader_w.add_task({
         "task_id": task_id,
         "video_url": video_url,
         "quality": "audio_only",
@@ -882,7 +1025,8 @@ async def delete_task(task_id: str):
 
     # 先通知各工作单元取消该任务，避免删除后仍继续占用计算资源。
     cancellation_reports: list[str] = []
-    for worker in (downloader_worker, file_upload_worker, transcriber_worker, llm_worker):
+    workers = [downloader_worker, file_upload_worker, transcriber_worker, llm_worker]
+    for worker in workers:
         if worker is None:
             continue
         cancel_fn = getattr(worker, "cancel_task", None)
@@ -940,34 +1084,25 @@ async def update_llm_settings(payload: LLMSettingsUpdate):
 @app.post("/llm/test", response_model=LLMTestResult)
 async def test_llm_connection():
     """测试当前 LLM 配置是否可用。"""
-    from .llm.llm import LLMMessage, LLMResponseError, LLMConnectionError
+    from .llm.llm import LLMMessage, LLMResponseError, LLMConnectionError, get_llm
     import asyncio
 
     logger.info("开始测试 LLM 连接...")
 
     try:
-        # 获取当前 LLM 客户端
-        if llm_worker is None:
-            logger.error("LLM Worker 未初始化")
-            return LLMTestResult(
-                status="error",
-                message="LLM Worker 未初始化",
-                response=None
-            )
-
-        llm_client = getattr(llm_worker, "_llm_client", None)
-        if llm_client is None:
-            logger.error("LLM Client 未找到")
-            return LLMTestResult(
-                status="error",
-                message="LLM Client 未找到",
-                response=None
-            )
+        # 使用当前运行时配置创建临时 LLM 客户端，不触发 worker 懒初始化。
+        runtime_config = llm_provider_manager.get_runtime_config()
+        llm_client = get_llm(runtime_config)
 
         # 记录当前配置
-        config = getattr(llm_client, "config", None)
-        if config:
-            logger.info(f"使用 LLM 配置: provider={config.provider}, base_url={config.base_url}, model={config.model_id}")
+        llm_client_config = getattr(llm_client, "config", None)
+        if llm_client_config:
+            logger.info(
+                "使用 LLM 配置: "
+                f"provider={llm_client_config.provider}, "
+                f"base_url={llm_client_config.base_url}, "
+                f"model={llm_client_config.model_id}"
+            )
         else:
             logger.warning("无法获取 LLM 配置信息")
 
@@ -1056,6 +1191,9 @@ async def update_transcription_settings(payload: TranscriptionSettingsUpdate):
     try:
         settings = transcription_settings_manager.update_settings(
             device=payload.device,
+            model_source=payload.model_source,
+            model_size=payload.model_size,
+            model_path=payload.model_path,
             enable_bilibili_subtitle_fetch=payload.enable_bilibili_subtitle_fetch,
             bilibili_sessdata=payload.bilibili_sessdata,
             clear_bilibili_sessdata=payload.clear_bilibili_sessdata,
@@ -1113,5 +1251,4 @@ async def websocket_endpoint(websocket: WebSocket):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
 

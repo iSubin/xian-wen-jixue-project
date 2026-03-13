@@ -78,6 +78,9 @@ const emit = defineEmits<{
   }]
   updateTranscriptionSettings: [payload: {
     device?: 'cpu' | 'cuda'
+    model_source?: 'auto_download' | 'manual_path'
+    model_size?: 'tiny' | 'base' | 'small' | 'medium' | 'large'
+    model_path?: string
     enable_bilibili_subtitle_fetch?: boolean
     bilibili_sessdata?: string
     clear_bilibili_sessdata?: boolean
@@ -108,6 +111,9 @@ const llmTemperature = ref(0.7)
 const appVersion = __APP_VERSION__
 
 const transcriptionDevice = ref<'cpu' | 'cuda'>('cpu')
+const transcriptionModelSource = ref<'auto_download' | 'manual_path'>('auto_download')
+const transcriptionModelSize = ref<'tiny' | 'base' | 'small' | 'medium' | 'large'>('tiny')
+const transcriptionModelPathInput = ref('')
 const enableBilibiliSubtitleFetch = ref(true)
 const globalBilibiliSessdataInput = ref('')
 const chunkTargetDurationSec = ref(20)
@@ -255,6 +261,9 @@ const syncLlmSettings = (settings: LLMSettings | null) => {
 const syncTranscriptionSettings = (settings: TranscriptionSettings | null) => {
   if (!settings) return
   transcriptionDevice.value = settings.device
+  transcriptionModelSource.value = settings.model_source
+  transcriptionModelSize.value = settings.model_size
+  transcriptionModelPathInput.value = settings.model_path
   enableBilibiliSubtitleFetch.value = settings.enable_bilibili_subtitle_fetch
 }
 
@@ -275,6 +284,12 @@ const bilibiliCookieSourceLabel = computed(() => {
   if (source === 'global') return '全局配置'
   if (source === 'env') return '环境变量'
   return '未设置'
+})
+
+const requiredModelFilesLabel = computed(() => {
+  const files = props.transcriptionSettings?.required_model_files || []
+  if (!files.length) return 'config.json, model.bin, tokenizer.json, vocabulary.txt'
+  return files.join(', ')
 })
 
 const handleProviderPresetChange = () => {
@@ -311,10 +326,16 @@ const submitLlmSettings = () => {
 const submitTranscriptionSettings = () => {
   const payload: {
     device?: 'cpu' | 'cuda'
+    model_source?: 'auto_download' | 'manual_path'
+    model_size?: 'tiny' | 'base' | 'small' | 'medium' | 'large'
+    model_path?: string
     enable_bilibili_subtitle_fetch?: boolean
     bilibili_sessdata?: string
   } = {
     device: transcriptionDevice.value,
+    model_source: transcriptionModelSource.value,
+    model_size: transcriptionModelSize.value,
+    model_path: transcriptionModelPathInput.value.trim(),
     enable_bilibili_subtitle_fetch: enableBilibiliSubtitleFetch.value
   }
   const cookie = globalBilibiliSessdataInput.value.trim()
@@ -815,6 +836,77 @@ watch(() => props.summarizationSettings, (settings) => {
                 >
                   CUDA 转录
                 </button>
+
+                <div class="rounded-xl border border-gray-200 bg-gray-50/60 px-3 py-3 space-y-2.5">
+                  <div class="flex items-center justify-between gap-2">
+                    <p class="text-sm font-medium text-slate-700">转录模型来源</p>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full border border-slate-200 bg-white text-slate-500">
+                      {{ transcriptionModelSource === 'auto_download' ? '自动下载' : '手动目录' }}
+                    </span>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2">
+                    <button
+                      @click="transcriptionModelSource = 'auto_download'"
+                      :class="[
+                        'px-3 py-2 rounded-lg border text-xs text-left transition-colors',
+                        transcriptionModelSource === 'auto_download'
+                          ? 'border-primary/40 bg-blue-50 text-slate-800'
+                          : 'border-gray-200 bg-white text-slate-600 hover:bg-gray-100'
+                      ]"
+                    >
+                      自动下载
+                    </button>
+                    <button
+                      @click="transcriptionModelSource = 'manual_path'"
+                      :class="[
+                        'px-3 py-2 rounded-lg border text-xs text-left transition-colors',
+                        transcriptionModelSource === 'manual_path'
+                          ? 'border-primary/40 bg-blue-50 text-slate-800'
+                          : 'border-gray-200 bg-white text-slate-600 hover:bg-gray-100'
+                      ]"
+                    >
+                      手动目录
+                    </button>
+                  </div>
+
+                  <div>
+                    <label class="block text-[11px] text-slate-500 mb-1">模型大小（自动下载）</label>
+                    <select
+                      v-model="transcriptionModelSize"
+                      :disabled="transcriptionModelSource !== 'auto_download'"
+                      class="w-full px-2.5 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-60"
+                    >
+                      <option value="tiny">tiny</option>
+                      <option value="base">base</option>
+                      <option value="small">small</option>
+                      <option value="medium">medium</option>
+                      <option value="large">large</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label class="block text-[11px] text-slate-500 mb-1">模型目录（手动指定）</label>
+                    <input
+                      v-model="transcriptionModelPathInput"
+                      type="text"
+                      placeholder="E:/models/faster-whisper/tiny"
+                      :disabled="transcriptionModelSource !== 'manual_path'"
+                      class="w-full px-2.5 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-60"
+                    >
+                    <p class="mt-1 text-[11px] text-slate-500">
+                      需包含: {{ requiredModelFilesLabel }}
+                    </p>
+                  </div>
+
+                  <p
+                    v-if="transcriptionModelSource === 'manual_path'"
+                    class="text-[11px] whitespace-pre-line"
+                    :class="props.transcriptionSettings?.model_path_valid ? 'text-emerald-700' : 'text-amber-700'"
+                  >
+                    {{ props.transcriptionSettings?.model_path_message || '手动模式将校验目录完整性。' }}
+                  </p>
+                </div>
 
                 <div class="flex items-center justify-between gap-3 px-3 py-3 rounded-xl border border-gray-200 bg-gray-50/50">
                   <div class="flex-1 min-w-0">

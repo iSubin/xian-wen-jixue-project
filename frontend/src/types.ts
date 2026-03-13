@@ -74,6 +74,13 @@ export interface UpdateLLMSettingsRequest {
 
 export interface TranscriptionSettings {
   device: "cpu" | "cuda";
+  model_source: "auto_download" | "manual_path";
+  model_size: "tiny" | "base" | "small" | "medium" | "large";
+  model_path: string;
+  model_path_valid: boolean;
+  model_path_message: string;
+  model_path_resolved: string;
+  required_model_files: string[];
   cuda_available: boolean;
   available_devices: string[];
   has_nvidia_gpu: boolean;
@@ -91,6 +98,9 @@ export interface TranscriptionSettings {
 
 export interface UpdateTranscriptionSettingsRequest {
   device?: "cpu" | "cuda";
+  model_source?: "auto_download" | "manual_path";
+  model_size?: "tiny" | "base" | "small" | "medium" | "large";
+  model_path?: string;
   enable_bilibili_subtitle_fetch?: boolean;
   bilibili_sessdata?: string;
   clear_bilibili_sessdata?: boolean;

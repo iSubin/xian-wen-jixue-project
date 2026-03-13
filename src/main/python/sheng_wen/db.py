@@ -70,42 +70,24 @@ class TaskModel(Base):
 class TaskDB:
     def __init__(
         self,
-        database_url: Optional[str] = None,
         file_path: str = "tasks.json",
         sqlite_path: str = "ShengWen.db",
     ):
         self.file_path = file_path
         self.use_db = False
-        
-        # 优先使用配置中的 database_url（可切换到 PostgreSQL 等）
-        if database_url:
-            try:
-                self.engine = create_engine(database_url, echo=False)
-                Base.metadata.create_all(self.engine)
-                self._ensure_schema()
-                self.SessionLocal = sessionmaker(bind=self.engine)
-                self.use_db = True
-                db_type = "PostgreSQL" if database_url.startswith("postgresql") else "database"
-                logger.info(f"Connected to {db_type}")
-                self._migrate_from_file_if_needed()
-            except Exception as e:
-                logger.warning(f"Failed to connect to database: {e}. Falling back to SQLite.")
-                self.use_db = False
-        
-        # 若未配置 database_url，则默认使用 SQLite
-        if not self.use_db:
-            try:
-                self.engine = create_engine(f"sqlite:///{sqlite_path}", echo=False)
-                Base.metadata.create_all(self.engine)
-                self._ensure_schema()
-                self.SessionLocal = sessionmaker(bind=self.engine)
-                self.use_db = True
-                logger.info(f"Using SQLite database: {sqlite_path}")
-                self._migrate_from_file_if_needed()
-            except Exception as e:
-                logger.error(f"Failed to initialize SQLite: {e}. Falling back to JSON file storage.")
-                self.use_db = False
-                self._load_from_file()
+
+        try:
+            self.engine = create_engine(f"sqlite:///{sqlite_path}", echo=False)
+            Base.metadata.create_all(self.engine)
+            self._ensure_schema()
+            self.SessionLocal = sessionmaker(bind=self.engine)
+            self.use_db = True
+            logger.info(f"Using SQLite database: {sqlite_path}")
+            self._migrate_from_file_if_needed()
+        except Exception as e:
+            logger.error(f"Failed to initialize SQLite: {e}. Falling back to JSON file storage.")
+            self.use_db = False
+            self._load_from_file()
 
     def _ensure_schema(self):
         """Add backward-compatible columns for existing databases."""
@@ -173,7 +155,7 @@ class TaskDB:
             logger.error(f"Failed to save tasks to file: {e}")
 
     def _migrate_from_file_if_needed(self):
-        """Migrate data from tasks.json to PostgreSQL if file exists and DB is empty"""
+        """Migrate data from tasks.json to SQLite if file exists and DB is empty"""
         if not os.path.exists(self.file_path):
             return
         
@@ -363,7 +345,6 @@ class TaskDB:
 
 # Global instance
 db = TaskDB(
-    database_url=config.database.effective_url,
     file_path=config.database.json_file_path,
     sqlite_path=config.database.sqlite_path,
 )
