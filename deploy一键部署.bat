@@ -155,11 +155,25 @@ if defined REBUILD_VENV (
     if exist "%VENV_DIR%" rmdir /s /q "%VENV_DIR%"
 )
 if not exist "%VENV_DIR%\Scripts\python.exe" (
-    "%PYTHON_EXE%" %PYTHON_ARGS% -m venv "%VENV_DIR%"
+    "%PYTHON_EXE%" %PYTHON_ARGS% -m venv "%VENV_DIR%" >nul 2>nul
     if errorlevel 1 (
-        echo ❌ 创建虚拟环境失败
-        pause
-        exit /b 1
+        echo ⚠️ venv 模块不可用，尝试使用 virtualenv...
+        "%PYTHON_EXE%" %PYTHON_ARGS% -m pip show virtualenv >nul 2>nul
+        if errorlevel 1 (
+            echo 📦 正在安装 virtualenv...
+            "%PYTHON_EXE%" %PYTHON_ARGS% -m pip install virtualenv
+            if errorlevel 1 (
+                echo ❌ 安装 virtualenv 失败
+                pause
+                exit /b 1
+            )
+        )
+        "%PYTHON_EXE%" %PYTHON_ARGS% -m virtualenv "%VENV_DIR%"
+        if errorlevel 1 (
+            echo ❌ 创建虚拟环境失败
+            pause
+            exit /b 1
+        )
     )
 )
 set "VENV_PYTHON=%CD%\%VENV_DIR%\Scripts\python.exe"
