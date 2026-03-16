@@ -648,7 +648,10 @@ const handleSaveSummarizationSettings = () => {
                 <h3 class="text-sm font-semibold text-slate-800">使用说明</h3>
               </div>
               <p class="text-xs text-slate-600 leading-relaxed">
-                长视频会先切成几段再总结。先调"每块目标时长"，推荐 15~25 分钟。
+                长视频会分块总结后拼接。三个参数控制分块大小：<br>
+                • 目标时长：期望每块的长度（如30分钟）<br>
+                • 最短时长：最后一块的最小长度，太短会合并到前一块（建议为目标的一半）<br>
+                • 最长时长：单块的硬性上限（建议为目标的1.3-1.5倍）
               </p>
             </div>
 

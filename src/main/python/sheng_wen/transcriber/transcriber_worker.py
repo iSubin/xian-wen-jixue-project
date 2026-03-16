@@ -234,9 +234,9 @@ class TranscriberWorker(Worker):
             error_msg = "payload 中缺少 'audio_file' 或 'output_file'"
             logger.error(f"[{self.name}] 错误: {error_msg}")
             if task_id:
-                from ..db import db, TaskStatus
-                db.update_task(task_id, {"status": TaskStatus.FAILED, "error_message": error_msg})
-                self._submit_coro(notify_task_update(task_id))
+                from ..db import TaskStatus
+                from ..task_updater import update_and_notify
+                self._submit_coro(update_and_notify(task_id, {"status": TaskStatus.FAILED, "error_message": error_msg}))
             return
 
         # 如果提供了视频文件，则先提取音频
@@ -245,9 +245,9 @@ class TranscriberWorker(Worker):
                 if not self._extract_audio(video_file, audio_file, task_id=task_id):
                     # 如果提取失败，则终止该任务
                     if task_id:
-                        from ..db import db, TaskStatus
-                        db.update_task(task_id, {"status": TaskStatus.FAILED, "error_message": "音频提取失败"})
-                        self._submit_coro(notify_task_update(task_id))
+                        from ..db import TaskStatus
+                        from ..task_updater import update_and_notify
+                        self._submit_coro(update_and_notify(task_id, {"status": TaskStatus.FAILED, "error_message": "音频提取失败"}))
                     return
             except TaskCancelledError:
                 logger.info(f"[{self.name}] 任务已取消，停止音频提取: {task_id}")
@@ -258,15 +258,16 @@ class TranscriberWorker(Worker):
             error_msg = f"找不到要转录的音频文件: {audio_file}"
             logger.error(f"[{self.name}] 错误: {error_msg}")
             if task_id:
-                from ..db import db, TaskStatus
-                db.update_task(task_id, {"status": TaskStatus.FAILED, "error_message": error_msg})
-                self._submit_coro(notify_task_update(task_id))
+                from ..db import TaskStatus
+                from ..task_updater import update_and_notify
+                self._submit_coro(update_and_notify(task_id, {"status": TaskStatus.FAILED, "error_message": error_msg}))
             return
 
         try:
             if task_id:
-                from ..db import db, TaskStatus
-                db.update_task(task_id, {"status": TaskStatus.TRANSCRIBING})
+                from ..db import TaskStatus
+                from ..task_updater import update_and_notify
+                self._submit_coro(update_and_notify(task_id, {"status": TaskStatus.TRANSCRIBING}))
                 self._submit_coro(notify_task_update(task_id))
 
             logger.info(f"[{self.name}] 开始转录: {audio_file}")
@@ -292,8 +293,8 @@ class TranscriberWorker(Worker):
                     if progress_percent == last_progress_percent:
                         return
                     last_progress_percent = progress_percent
-                    db.update_task(task_id, {"progress": progress_percent})
-                    self._submit_coro(notify_task_update(task_id))
+                    from ..task_updater import update_and_notify
+                    self._submit_coro(update_and_notify(task_id, {"progress": progress_percent}))
 
                     # 每 10% 打点一次，便于快速判断是后端卡住还是前端未刷新。
                     progress_bucket = progress_percent // 10
@@ -327,7 +328,14 @@ class TranscriberWorker(Worker):
                 with open(intermediate_file_path, "r", encoding="utf-8") as f:
                     transcript = f.read()
                 summary_mode = str(payload.get("summary_mode") or "").strip().lower()
-                
+
+                # 转录完成，准备进入总结阶段
+                logger.info(
+                    f"[TranscriberWorker] Transcription completed: task_id={task_id}, "
+                    f"status: TRANSCRIBING→SUMMARIZING, "
+                    f"duration={result.transcription_time:.2f}s, audio_duration={result.audio_duration:.2f}s"
+                )
+
                 update_data = {
                     "status": TaskStatus.SUMMARIZING,
                     "progress": 0.0,
@@ -340,8 +348,8 @@ class TranscriberWorker(Worker):
                 }
                 if summary_mode in {"auto", "standard", "agent"}:
                     update_data["summary_mode"] = summary_mode
-                db.update_task(task_id, update_data)
-                self._submit_coro(notify_task_update(task_id))
+                from ..task_updater import update_and_notify
+                self._submit_coro(update_and_notify(task_id, update_data))
 
             next_payload = {
                 "intermediate_file_path": intermediate_file_path,
@@ -355,13 +363,13 @@ class TranscriberWorker(Worker):
         except Exception as e:
             logger.error(f"[{self.name}] 转录过程中发生错误: {e}", exc_info=True)
             if task_id:
-                from ..db import db, TaskStatus
-                db.update_task(
+                from ..db import TaskStatus
+                from ..task_updater import update_and_notify
+                self._submit_coro(update_and_notify(
                     task_id,
                     {
                         "status": TaskStatus.FAILED,
                         "error_message": _build_actionable_transcription_error(str(e)),
                     },
-                )
-                self._submit_coro(notify_task_update(task_id))
+                ))
 

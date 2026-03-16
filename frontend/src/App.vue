@@ -617,7 +617,7 @@ watch(
     />
 
     <!-- 右侧内容区 -->
-    <main class="flex-1 flex flex-col h-full bg-gray-50 relative w-full">
+    <main class="flex-1 flex flex-col h-full bg-gray-50 relative w-full overflow-hidden">
       <template v-if="selectedTask">
         <!-- 悬浮气泡工具栏 -->
         <FloatingToolbar
