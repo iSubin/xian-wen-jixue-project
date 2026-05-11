@@ -3,6 +3,7 @@ import asyncio
 import json
 import glob
 import ipaddress
+import yt_dlp
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Request
 from fastapi import Form
 from fastapi.responses import JSONResponse
@@ -137,6 +138,29 @@ class Task(BaseModel):
     summary_chunk_total: Optional[int] = None
     summary_chunk_done: Optional[int] = None
     summary_meta: Optional[str] = None
+    folder_id: Optional[str] = None
+
+
+class FolderCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=200)
+    parent_id: Optional[str] = Field(default=None, description="父文件夹ID，NULL为顶层")
+
+class FolderUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    parent_id: Optional[str] = Field(default=None, description="移动到新父文件夹")
+    sort_order: Optional[int] = None
+
+class TaskFolderAssign(BaseModel):
+    folder_id: Optional[str] = Field(default=None, description="分配到文件夹，NULL为取消分配")
+
+class Folder(BaseModel):
+    id: str
+    name: str
+    parent_id: Optional[str] = None
+    folder_type: str = "manual"
+    source_video_url: Optional[str] = None
+    sort_order: int = 0
+    created_at: Optional[datetime] = None
 
 
 class ReSummarizeRequest(BaseModel):
@@ -161,7 +185,9 @@ class LLMProviderInfo(BaseModel):
     description: str
 
 
-class LLMSettings(BaseModel):
+class LLMProfileInfo(BaseModel):
+    id: str
+    name: str
     provider: str
     base_url: str
     model_id: str
@@ -171,13 +197,33 @@ class LLMSettings(BaseModel):
     api_key_hint: str
 
 
-class LLMSettingsUpdate(BaseModel):
-    provider: str
+class LLMProfilesSettings(BaseModel):
+    active_profile_id: str
+    profiles: List[LLMProfileInfo]
+
+
+class LLMProfileCreate(BaseModel):
+    name: str = Field(..., description="Profile 名称")
+    provider: str = Field(..., description="供应商类型")
+    base_url: Optional[str] = None
+    api_key: Optional[str] = Field(default=None, description="API Key（可选）")
+    model_id: Optional[str] = None
+    temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)
+
+
+class LLMProfileUpdate(BaseModel):
+    profile_id: str = Field(..., description="要更新的 Profile ID")
+    name: Optional[str] = None
+    provider: Optional[str] = None
     base_url: Optional[str] = None
     api_key: Optional[str] = Field(default=None, description="不传则保持当前密钥")
     model_id: Optional[str] = None
     temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)
     context_window_size: Optional[int] = Field(default=None, ge=1)
+
+
+class LLMActiveProfileUpdate(BaseModel):
+    profile_id: str
 
 
 class TranscriptionSettings(BaseModel):
@@ -336,6 +382,27 @@ class ConnectionManager:
 manager = ConnectionManager()
 _author_resolution_inflight_task_ids: set[str] = set()
 _author_resolution_attempted_task_ids: set[str] = set()
+_prewarm_ready = False
+
+
+def set_prewarm_ready():
+    """标记预热完成并广播给所有客户端"""
+    global _prewarm_ready
+    _prewarm_ready = True
+    import asyncio
+    asyncio.ensure_future(manager.broadcast(json.dumps({
+        "type": "prewarm_status",
+        "ready": True,
+    })))
+    logger.info("--- [Prewarm] 后台预热完成，已通知前端 ---")
+
+
+async def notify_prewarm_status():
+    """主动推送预热状态给客户端"""
+    await manager.broadcast(json.dumps({
+        "type": "prewarm_status",
+        "ready": _prewarm_ready,
+    }))
 
 async def notify_task_update(task_id: str, task_data: dict = None):
     """
@@ -376,6 +443,20 @@ async def notify_progress_update(task_id: str, progress: float):
     logger.debug(f"{message}")
     await manager.broadcast(message)
 
+
+async def notify_summary_delta(task_id: str, delta: str, chunk_done: int | None = None, chunk_total: int | None = None):
+    """高频增量文本广播。不写DB，不防抖。前端用于实时流式渲染。"""
+    message_dict: dict = {
+        "type": "summary_delta",
+        "task_id": task_id,
+        "delta": delta,
+    }
+    if chunk_done is not None:
+        message_dict["chunk_done"] = chunk_done
+    if chunk_total is not None:
+        message_dict["chunk_total"] = chunk_total
+    await manager.broadcast(json.dumps(message_dict))
+
 # --- 接口定义 ---
 
 # 全局 Worker 引用（懒加载模式 - 由 Worker 基类管理初始化）
@@ -392,6 +473,11 @@ async def get_version():
     return {"version": APP_VERSION}
 
 
+@app.get("/prewarm/status")
+async def get_prewarm_status():
+    return {"ready": _prewarm_ready}
+
+
 llm_cfg = config.llm
 initial_llm_config = LLMConfig(
     base_url=llm_cfg.base_url,
@@ -402,6 +488,17 @@ initial_llm_config = LLMConfig(
     provider=llm_cfg.provider,
 )
 initial_provider_id = llm_cfg.provider.strip() if llm_cfg.provider.strip() else None
+
+llm_provider_manager = LLMProviderManager(
+    initial_config=initial_llm_config,
+    initial_provider_id=initial_provider_id,
+)
+# Load all profiles from settings.json into the manager
+llm_profiles_config = config_manager.get_llm_profiles_config()
+llm_provider_manager.load_profiles(
+    [{"id": p.id, "name": p.name, "provider": p.provider, "base_url": p.base_url, "api_key": p.api_key, "model_id": p.model_id, "temperature": p.temperature, "context_window_size": p.context_window_size} for p in llm_profiles_config.profiles],
+    llm_profiles_config.active_profile_id,
+)
 
 whisper_cfg = config.whisper
 initial_transcription_device = str(whisper_cfg.device).lower()
@@ -417,10 +514,6 @@ transcription_settings_manager = TranscriptionSettingsManager(
     model_path=whisper_cfg.configured_model_path,
     initial_enable_bilibili_subtitle_fetch=initial_enable_bilibili_subtitle_fetch,
     initial_bilibili_sessdata=initial_bilibili_sessdata,
-)
-llm_provider_manager = LLMProviderManager(
-    initial_config=initial_llm_config,
-    initial_provider_id=initial_provider_id,
 )
 
 
@@ -758,6 +851,81 @@ async def upload_file(
         raise HTTPException(status_code=500, detail=f"文件上传失败: {str(e)}")
 
 
+@app.get("/local-path/check")
+async def check_local_path(file_path: str, request: Request):
+    """
+    检查本地路径类型（仅允许 localhost）。
+    返回: { "type": "file" | "folder" | "not_found", "path": "..." }
+    """
+    if not _is_loopback_client(request):
+        raise HTTPException(
+            status_code=403,
+            detail="仅允许本机 localhost 请求。"
+        )
+
+    raw_path = (file_path or "").strip().strip('"').strip("'")
+    if not raw_path:
+        return {"type": "not_found", "path": ""}
+
+    local_path = os.path.abspath(os.path.expandvars(os.path.expanduser(raw_path)))
+
+    if not os.path.exists(local_path):
+        return {"type": "not_found", "path": local_path}
+
+    if os.path.isfile(local_path):
+        return {"type": "file", "path": local_path}
+
+    if os.path.isdir(local_path):
+        return {"type": "folder", "path": local_path}
+
+    return {"type": "not_found", "path": local_path}
+
+
+@app.get("/local-folder/scan")
+async def scan_local_folder(folder_path: str, request: Request):
+    """
+    扫描本地文件夹，返回支持的视频/音频文件列表（仅允许 localhost）。
+    """
+    if not _is_loopback_client(request):
+        raise HTTPException(
+            status_code=403,
+            detail="仅允许本机 localhost 请求。"
+        )
+
+    raw_path = (folder_path or "").strip().strip('"').strip("'")
+    if not raw_path:
+        raise HTTPException(status_code=400, detail="folder_path 不能为空")
+
+    local_path = os.path.abspath(os.path.expandvars(os.path.expanduser(raw_path)))
+    if not os.path.exists(local_path) or not os.path.isdir(local_path):
+        raise HTTPException(status_code=400, detail=f"文件夹不存在: {local_path}")
+
+    files = []
+    try:
+        for entry in os.scandir(local_path):
+            if not entry.is_file():
+                continue
+            ext = os.path.splitext(entry.name)[1].lower()
+            if ext not in SUPPORTED_MEDIA_EXTENSIONS:
+                continue
+            try:
+                size = entry.stat().st_size
+            except OSError:
+                size = 0
+            files.append({
+                "name": entry.name,
+                "path": entry.path,
+                "size": size,
+            })
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"扫描文件夹失败: {e}")
+
+    # 按文件名排序
+    files.sort(key=lambda x: x["name"].lower())
+
+    return {"folder_path": local_path, "files": files, "total": len(files)}
+
+
 @app.post("/upload/local-path", response_model=Task, status_code=201)
 async def upload_local_path(payload: LocalPathTaskCreate, request: Request):
     """
@@ -873,6 +1041,20 @@ async def create_task(task_in: TaskCreate):
             video_title = "未知标题"
             parts_info = []
 
+        # 自动创建文件夹，将所有分P任务归入
+        folder_id = str(uuid.uuid4())
+        folder_data = {
+            "id": folder_id,
+            "name": video_title,
+            "parent_id": None,
+            "folder_type": "auto",
+            "source_video_url": str(task_in.video_url),
+            "sort_order": 0,
+            "created_at": datetime.utcnow(),
+        }
+        db.create_folder(folder_data)
+        await manager.broadcast(json.dumps({"type": "folder_created", "folder": db.get_folder(folder_id)}))
+
         # 为每个选中的分P创建独立任务
         first_task_data = None
         for part_index in task_in.bilibili_parts.indices:
@@ -899,6 +1081,7 @@ async def create_task(task_in: TaskCreate):
                 "latest_modified_at": datetime.utcnow(),
                 "progress": 0.0,
                 "title": task_title,
+                "folder_id": folder_id,
                 "author_name": None,
                 "author_url": None,
                 "summary_mode": resolved_summary_mode,
@@ -1231,23 +1414,183 @@ async def delete_task(task_id: str):
     return None
 
 
+# ── Folder API ──
+
+@app.post("/folders/", response_model=Folder, status_code=201)
+async def create_folder(folder_in: FolderCreate):
+    folder_id = str(uuid.uuid4())
+    folder_data = {
+        "id": folder_id,
+        "name": folder_in.name,
+        "parent_id": folder_in.parent_id,
+        "folder_type": "manual",
+        "source_video_url": None,
+        "sort_order": 0,
+        "created_at": datetime.utcnow(),
+    }
+    result = db.create_folder(folder_data)
+    await manager.broadcast(json.dumps({"type": "folder_created", "folder": result}))
+    return result
+
+
+@app.get("/folders/", response_model=List[Folder])
+async def list_folders(include_tasks: bool = False):
+    folders = db.list_folders()
+    if include_tasks:
+        for folder in folders:
+            folder["task_ids"] = [t["id"] for t in db.list_tasks_in_folder(folder["id"])]
+    return folders
+
+
+@app.get("/folders/{folder_id}", response_model=Folder)
+async def get_folder(folder_id: str):
+    folder = db.get_folder(folder_id)
+    if not folder:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    return folder
+
+
+@app.patch("/folders/{folder_id}", response_model=Folder)
+async def update_folder(folder_id: str, folder_update: FolderUpdate):
+    folder = db.get_folder(folder_id)
+    if not folder:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    updates = folder_update.dict(exclude_unset=True)
+    result = db.update_folder(folder_id, updates)
+    await manager.broadcast(json.dumps({"type": "folder_updated", "folder": result}))
+    return result
+
+
+@app.delete("/folders/{folder_id}", status_code=204)
+async def delete_folder(folder_id: str):
+    folder = db.get_folder(folder_id)
+    if not folder:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    db.delete_folder(folder_id)
+    await manager.broadcast(json.dumps({"type": "folder_deleted", "folder_id": folder_id}))
+    return None
+
+
+@app.patch("/tasks/{task_id}/folder", response_model=Task)
+async def assign_task_folder(task_id: str, payload: TaskFolderAssign):
+    task = db.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    db.assign_task_to_folder(task_id, payload.folder_id)
+    updated = db.get_task(task_id)
+    await notify_task_update(task_id, updated)
+    return updated
+
+
+@app.post("/folders/backfill-multi-p")
+async def backfill_multi_p_folders():
+    """一键迁移历史多P任务到文件夹：扫描 title 匹配 "XXX - Pn" 的任务并自动建文件夹。"""
+    import re
+    tasks = db.list_tasks()
+    pattern = re.compile(r"(.+?) - P\d+")
+    groups: Dict[str, List[Dict[str, Any]]] = {}
+    ungrouped = []
+
+    for task in tasks:
+        title = str(task.get("title") or "")
+        m = pattern.match(title)
+        if m:
+            prefix = m.group(1)
+            if prefix not in groups:
+                groups[prefix] = []
+            groups[prefix].append(task)
+        else:
+            ungrouped.append(task)
+
+    created_folders = 0
+    assigned_tasks = 0
+
+    for prefix, group_tasks in groups.items():
+        if len(group_tasks) < 2:
+            continue
+        # Check if a folder for this prefix already exists
+        existing_folders = db.list_folders()
+        existing = next(
+            (f for f in existing_folders if f["name"] == prefix and f["folder_type"] == "auto"),
+            None,
+        )
+        if existing:
+            folder_id = existing["id"]
+        else:
+            folder_id = str(uuid.uuid4())
+            db.create_folder({
+                "id": folder_id,
+                "name": prefix,
+                "parent_id": None,
+                "folder_type": "auto",
+                "source_video_url": group_tasks[0].get("video_url"),
+                "sort_order": 0,
+                "created_at": datetime.utcnow(),
+            })
+            created_folders += 1
+
+        for task in group_tasks:
+            if not task.get("folder_id"):
+                db.assign_task_to_folder(task["id"], folder_id)
+                assigned_tasks += 1
+
+    return {
+        "created_folders": created_folders,
+        "assigned_tasks": assigned_tasks,
+        "groups_found": len(groups),
+        "ungrouped_tasks": len(ungrouped),
+    }
+
+
+@app.post("/tasks/backfill-titles")
+async def backfill_task_titles():
+    """回填所有 title 为空的任务：使用 yt-dlp 从视频 URL 提取标题。"""
+    tasks = db.list_tasks()
+    null_title_tasks = [t for t in tasks if not t.get("title")]
+    updated = 0
+    skipped = 0
+
+    for task in null_title_tasks:
+        video_url = task.get("video_url", "")
+        if not video_url:
+            skipped += 1
+            continue
+        try:
+            with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True, 'extract_flat': True}) as ydl:
+                info = ydl.extract_info(video_url, download=False)
+            title = info.get("title")
+            if title:
+                from .task_updater import update_and_notify
+                await update_and_notify(task["id"], {"title": str(title)})
+                updated += 1
+            else:
+                skipped += 1
+        except Exception as e:
+            logger.warning(f"回填标题失败 (task={task['id']}, url={video_url}): {e}")
+            skipped += 1
+
+    return {"updated": updated, "skipped": skipped, "total_null_titles": len(null_title_tasks)}
+
+
 @app.get("/llm/providers", response_model=List[LLMProviderInfo])
 async def list_llm_providers():
     """获取可选 LLM 供应商列表。"""
     return llm_provider_manager.list_providers()
 
 
-@app.get("/llm/settings", response_model=LLMSettings)
+@app.get("/llm/settings", response_model=LLMProfilesSettings)
 async def get_llm_settings():
-    """获取当前生效的 LLM 运行时配置（API Key 仅返回掩码）。"""
+    """获取所有 Profile 的 LLM 配置（API Key 仅返回掩码）。"""
     return llm_provider_manager.get_settings()
 
 
-@app.put("/llm/settings", response_model=LLMSettings)
-async def update_llm_settings(payload: LLMSettingsUpdate):
-    """更新 LLM 运行时配置并立即应用到工作单元。"""
+@app.put("/llm/settings", response_model=LLMProfilesSettings)
+async def update_llm_profile(payload: LLMProfileUpdate):
+    """更新指定 Profile 的配置并设为活跃。"""
     try:
-        settings = llm_provider_manager.update_settings(
+        settings = llm_provider_manager.update_profile(
+            profile_id=payload.profile_id,
+            name=payload.name,
             provider=payload.provider,
             base_url=payload.base_url,
             api_key=payload.api_key,
@@ -1255,7 +1598,54 @@ async def update_llm_settings(payload: LLMSettingsUpdate):
             temperature=payload.temperature,
             context_window_size=payload.context_window_size,
         )
-        config_manager.save_llm_config(llm_provider_manager.export_runtime_config())
+        # Persist to settings.json
+        config_manager.update_profile(payload.profile_id, payload.model_dump(exclude_none=True, exclude={"profile_id"}))
+        return settings
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/llm/profiles", response_model=LLMProfilesSettings)
+async def create_llm_profile(payload: LLMProfileCreate):
+    """创建新的 LLM Profile。"""
+    try:
+        result = llm_provider_manager.add_profile(
+            name=payload.name,
+            provider=payload.provider,
+            base_url=payload.base_url,
+            api_key=payload.api_key,
+            model_id=payload.model_id,
+            temperature=payload.temperature,
+        )
+        new_profile_id = result.pop("new_profile_id")
+        # Persist to settings.json with the same profile_id
+        config_manager.add_profile(
+            payload.name, payload.provider,
+            payload.model_dump(exclude_none=True, exclude={"name", "provider"}),
+            profile_id=new_profile_id,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.delete("/llm/profiles/{profile_id}", response_model=LLMProfilesSettings)
+async def delete_llm_profile(profile_id: str):
+    """删除 LLM Profile。不能删除最后一个。"""
+    try:
+        settings = llm_provider_manager.delete_profile(profile_id)
+        config_manager.delete_profile(profile_id)
+        return settings
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.put("/llm/active-profile", response_model=LLMProfilesSettings)
+async def set_active_llm_profile(payload: LLMActiveProfileUpdate):
+    """切换活跃 LLM Profile（不修改配置）。"""
+    try:
+        settings = llm_provider_manager.switch_profile(payload.profile_id)
+        config_manager.set_active_profile(payload.profile_id)
         return settings
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -1516,6 +1906,12 @@ async def update_summarization_settings(payload: SummarizationSettingsUpdate):
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
+    # 连接时推送预热状态，避免客户端需要轮询
+    if _prewarm_ready:
+        await websocket.send_text(json.dumps({
+            "type": "prewarm_status",
+            "ready": True,
+        }))
     try:
         while True:
             await websocket.receive_text()

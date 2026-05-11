@@ -17,12 +17,19 @@
     "faster_whisper_model_path": null
   },
   "llm": {
-    "provider": "openai_compatible",
-    "base_url": "",
-    "api_key": "",
-    "model_id": "",
-    "temperature": 0.7,
-    "context_window_size": 1000000
+    "active_profile_id": "ff831a93",
+    "profiles": [
+      {
+        "id": "ff831a93",
+        "name": "OpenAI 兼容接口",
+        "provider": "openai_compatible",
+        "base_url": "https://api.openai.com/v1",
+        "api_key": "",
+        "model_id": "gpt-4o-mini",
+        "temperature": 0.7,
+        "context_window_size": 1000000
+      }
+    ]
   },
   "database": {
     "sqlite_path": "ShengWen.db",

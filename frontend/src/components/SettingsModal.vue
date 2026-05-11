@@ -9,6 +9,12 @@ import {
   PhBrain,
   PhMicrophone,
   PhGitBranch,
+  PhCheckCircle,
+  PhLightning,
+  PhRocket,
+  PhDesktop,
+  PhPlus,
+  PhTrash,
 } from '@phosphor-icons/vue'
 import type { LLMProvider, LLMSettings, TranscriptionSettings, SummarizationSettings } from '../types'
 
@@ -16,8 +22,13 @@ const props = defineProps<{
   isOpen: boolean
   llmProviders: LLMProvider[]
   llmSettings: LLMSettings | null
+  activeProfileId: string
+  editingProfileId: string
+  profileFormState: { name: string; provider: string; base_url: string; model_id: string; temperature: number; api_key: string }
   isUpdatingLlmSettings: boolean
   isTestingLlm: boolean
+  isSwitchingProfile: boolean
+  isPrewarming: boolean
   transcriptionSettings: TranscriptionSettings | null
   isUpdatingTranscriptionSettings: boolean
   summarizationSettings: SummarizationSettings | null
@@ -27,16 +38,23 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
+  switchActiveProfile: [profileId: string]
+  editProfile: [profileId: string]
+  createProfile: [name: string, provider: string]
+  deleteProfile: [profileId: string]
   updateLlmSettings: [payload: {
-    provider: string
+    profile_id: string
+    name?: string
+    provider?: string
     base_url?: string
     api_key?: string
     model_id?: string
     temperature?: number
   }]
-  testLlm: []
   updateLlmSettingsAndTest: [payload: {
-    provider: string
+    profile_id: string
+    name?: string
+    provider?: string
     base_url?: string
     api_key?: string
     model_id?: string
@@ -66,12 +84,67 @@ const emit = defineEmits<{
 
 const settingsTab = ref<'llm' | 'transcription' | 'summarization'>('llm')
 
-// LLM 设置
-const llmProvider = ref('')
-const llmBaseUrl = ref('')
-const llmModelId = ref('')
-const llmTemperature = ref(0.7)
+// LLM Profile form — bound to profileFormState prop
+const llmProfileName = computed({
+  get: () => props.profileFormState.name,
+  set: (v: string) => { props.profileFormState.name = v },
+})
+const llmBaseUrl = computed({
+  get: () => props.profileFormState.base_url,
+  set: (v: string) => { props.profileFormState.base_url = v },
+})
+const llmModelId = computed({
+  get: () => props.profileFormState.model_id,
+  set: (v: string) => { props.profileFormState.model_id = v },
+})
+const llmTemperature = computed({
+  get: () => props.profileFormState.temperature,
+  set: (v: number) => { props.profileFormState.temperature = v },
+})
 const llmApiKey = ref('')
+
+// Editing profile info
+const editingProfile = computed(() => {
+  if (!props.llmSettings) return null
+  return props.llmSettings.profiles.find(p => p.id === props.editingProfileId)
+})
+
+
+const providerIcon = (providerId: string) => {
+  switch (providerId) {
+    case 'openai_compatible': return PhRocket
+    case 'openai': return PhLightning
+    case 'openrouter': return PhGitBranch
+    case 'ollama': return PhDesktop
+    case 'deepseek': return PhBrain
+    default: return PhCpu
+  }
+}
+
+// New profile creation dialog
+const isCreatingProfile = ref(false)
+const newProfileName = ref('')
+const newProfileProvider = ref('openai_compatible')
+
+const openCreateProfileDialog = () => {
+  newProfileName.value = ''
+  newProfileProvider.value = 'openai_compatible'
+  isCreatingProfile.value = true
+}
+
+const handleCreateProfile = () => {
+  if (!newProfileName.value.trim()) return
+  emit('createProfile', newProfileName.value.trim(), newProfileProvider.value)
+  isCreatingProfile.value = false
+}
+
+const handleSelectProfile = (profileId: string) => {
+  emit('switchActiveProfile', profileId)
+}
+
+const handleDeleteProfile = (profileId: string) => {
+  emit('deleteProfile', profileId)
+}
 
 // 转录设置
 const transcriptionDevice = ref<'cpu' | 'cuda'>('cpu')
@@ -112,16 +185,6 @@ const requiredModelFilesLabel = computed(() => {
   return files.join(', ')
 })
 
-watch(() => props.llmSettings, (settings) => {
-  if (settings) {
-    llmProvider.value = settings.provider || ''
-    llmBaseUrl.value = settings.base_url || ''
-    llmModelId.value = settings.model_id || ''
-    llmTemperature.value = settings.temperature ?? 0.7
-    llmApiKey.value = ''
-  }
-}, { immediate: true })
-
 watch(() => props.transcriptionSettings, (settings) => {
   if (settings) {
     transcriptionDevice.value = settings.device || 'cpu'
@@ -145,23 +208,19 @@ watch(() => props.summarizationSettings, (settings) => {
   }
 }, { immediate: true })
 
-const handleProviderPresetChange = () => {
-  const provider = props.llmProviders.find(p => p.id === llmProvider.value)
-  if (provider) {
-    llmBaseUrl.value = provider.default_base_url || ''
-    llmModelId.value = provider.default_model_id || ''
-  }
-}
-
 const handleSaveLlmSettings = () => {
   const payload: {
-    provider: string
+    profile_id: string
+    name?: string
+    provider?: string
     base_url?: string
     api_key?: string
     model_id?: string
     temperature?: number
   } = {
-    provider: llmProvider.value,
+    profile_id: props.editingProfileId,
+    name: llmProfileName.value.trim(),
+    provider: props.profileFormState.provider,
     base_url: llmBaseUrl.value.trim(),
     model_id: llmModelId.value.trim(),
     temperature: llmTemperature.value,
@@ -176,15 +235,18 @@ const handleSaveLlmSettings = () => {
 }
 
 const handleTestLlm = () => {
-  // 构建配置 payload
   const payload: {
-    provider: string
+    profile_id: string
+    name?: string
+    provider?: string
     base_url?: string
     api_key?: string
     model_id?: string
     temperature?: number
   } = {
-    provider: llmProvider.value,
+    profile_id: props.editingProfileId,
+    name: llmProfileName.value.trim(),
+    provider: props.profileFormState.provider,
     base_url: llmBaseUrl.value.trim(),
     model_id: llmModelId.value.trim(),
     temperature: llmTemperature.value,
@@ -194,10 +256,7 @@ const handleTestLlm = () => {
     payload.api_key = llmApiKey.value.trim()
   }
 
-  // 触发保存并测试
   emit('updateLlmSettingsAndTest', payload)
-
-  // 清空 API Key 输入框
   llmApiKey.value = ''
 }
 
@@ -320,29 +379,125 @@ const handleSaveSummarizationSettings = () => {
           <div class="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6 custom-scrollbar min-h-0">
             <!-- LLM 设置 -->
             <div v-if="settingsTab === 'llm'" class="space-y-4">
-              <!-- 基础配置 -->
-              <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-4">
+              <!-- 配置列表 -->
+              <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div class="flex items-center gap-2">
+                    <PhCpu :size="18" class="text-blue-500" />
+                    <h3 class="text-sm font-semibold text-slate-800">配置列表</h3>
+                  </div>
+                  <button
+                    @click="openCreateProfileDialog"
+                    class="flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  >
+                    <PhPlus :size="14" />
+                    <span>新建</span>
+                  </button>
+                </div>
+                <div class="space-y-2">
+                  <button
+                    v-for="profile in llmSettings?.profiles || []"
+                    :key="profile.id"
+                    @click="handleSelectProfile(profile.id)"
+                    :class="[
+                      'flex items-center justify-between gap-2 w-full px-3 py-2.5 rounded-lg border text-left transition-all',
+                      activeProfileId === profile.id
+                        ? 'border-blue-500 bg-blue-50'
+                        : editingProfileId === profile.id
+                          ? 'border-slate-300 bg-slate-50'
+                          : 'border-slate-200 bg-white hover:border-slate-300'
+                    ]"
+                  >
+                    <div class="flex items-center gap-2 min-w-0">
+                      <component :is="providerIcon(profile.provider)" :size="16" :weight="activeProfileId === profile.id ? 'fill' : 'regular'" :class="activeProfileId === profile.id ? 'text-blue-600' : 'text-slate-500'" />
+                      <span class="text-sm font-medium truncate" :class="activeProfileId === profile.id ? 'text-blue-700' : 'text-slate-700'">{{ profile.name }}</span>
+                      <span v-if="profile.has_api_key" class="shrink-0">
+                        <PhCheckCircle :size="12" class="text-emerald-500" weight="fill" />
+                      </span>
+                      <span v-if="activeProfileId === profile.id" class="shrink-0 text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 font-medium">活跃</span>
+                    </div>
+                    <button
+                      v-if="(llmSettings?.profiles?.length || 0) > 1"
+                      @click.stop="handleDeleteProfile(profile.id)"
+                      class="shrink-0 p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                    >
+                      <PhTrash :size="14" />
+                    </button>
+                  </button>
+                </div>
+
+                <!-- 创建配置对话框 -->
+                <div v-if="isCreatingProfile" class="mt-3 p-3 rounded-lg border border-blue-200 bg-blue-50 space-y-3">
+                  <p class="text-sm font-medium text-blue-700">新建配置</p>
+                  <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">配置名称</label>
+                    <input
+                      v-model="newProfileName"
+                      type="text"
+                      placeholder="例如：中转站-GPT4o"
+                      class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    >
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">供应商类型</label>
+                    <div class="grid grid-cols-2 gap-2">
+                      <button
+                        v-for="provider in llmProviders"
+                        :key="provider.id"
+                        @click="newProfileProvider = provider.id"
+                        :class="[
+                          'flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-xs transition-all',
+                          newProfileProvider === provider.id
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                        ]"
+                      >
+                        <component :is="providerIcon(provider.id)" :size="14" />
+                        <span>{{ provider.label }}</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="flex gap-2">
+                    <button
+                      @click="handleCreateProfile"
+                      :disabled="!newProfileName.trim()"
+                      class="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-600 transition-colors"
+                    >创建</button>
+                    <button
+                      @click="isCreatingProfile = false"
+                      class="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-200 transition-colors"
+                    >取消</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 配置编辑 -->
+              <div v-if="editingProfile" class="rounded-xl border border-slate-200 bg-white p-4 space-y-4">
                 <div class="flex items-center gap-2 pb-2 border-b border-slate-100">
-                  <PhBrain :size="18" class="text-blue-500" />
-                  <h3 class="text-sm font-semibold text-slate-800">基础配置</h3>
+                  <component :is="providerIcon(editingProfile.provider)" :size="18" class="text-blue-500" />
+                  <h3 class="text-sm font-semibold text-slate-800">{{ llmProfileName || editingProfile.name }} 配置</h3>
                 </div>
 
                 <div>
-                  <label class="block text-xs font-medium text-slate-700 mb-2">LLM 供应商</label>
-                  <div class="relative">
-                    <PhCpu :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <select
-                      v-model="llmProvider"
-                      :disabled="isTestingLlm || isUpdatingLlmSettings"
-                      class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      @change="handleProviderPresetChange"
-                    >
-                      <option value="" disabled>选择 LLM 供应商</option>
-                      <option v-for="provider in llmProviders" :key="provider.id" :value="provider.id">
-                        {{ provider.label }}
-                      </option>
-                    </select>
-                  </div>
+                  <label class="block text-xs font-medium text-slate-700 mb-2">配置名称</label>
+                  <input
+                    v-model="llmProfileName"
+                    type="text"
+                    placeholder="配置名称"
+                    :disabled="isTestingLlm || isUpdatingLlmSettings || isSwitchingProfile"
+                    class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-slate-700 mb-2">供应商类型</label>
+                  <select
+                    v-model="props.profileFormState.provider"
+                    :disabled="isTestingLlm || isUpdatingLlmSettings || isSwitchingProfile"
+                    class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <option v-for="provider in llmProviders" :key="provider.id" :value="provider.id">{{ provider.label }}</option>
+                  </select>
                 </div>
 
                 <div>
@@ -351,7 +506,7 @@ const handleSaveSummarizationSettings = () => {
                     v-model="llmBaseUrl"
                     type="text"
                     placeholder="https://api.example.com/v1"
-                    :disabled="isTestingLlm || isUpdatingLlmSettings"
+                    :disabled="isTestingLlm || isUpdatingLlmSettings || isSwitchingProfile"
                     class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                 </div>
@@ -361,8 +516,8 @@ const handleSaveSummarizationSettings = () => {
                   <input
                     v-model="llmModelId"
                     type="text"
-                    placeholder="example-model-id"
-                    :disabled="isTestingLlm || isUpdatingLlmSettings"
+                    placeholder="model-id"
+                    :disabled="isTestingLlm || isUpdatingLlmSettings || isSwitchingProfile"
                     class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                 </div>
@@ -375,18 +530,10 @@ const handleSaveSummarizationSettings = () => {
                     min="0"
                     max="2"
                     step="0.1"
-                    :disabled="isTestingLlm || isUpdatingLlmSettings"
+                    :disabled="isTestingLlm || isUpdatingLlmSettings || isSwitchingProfile"
                     class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                   <p class="text-xs text-slate-500 mt-1">控制输出的随机性，0 = 确定性，2 = 最随机</p>
-                </div>
-              </div>
-
-              <!-- API 密钥 -->
-              <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-4">
-                <div class="flex items-center gap-2 pb-2 border-b border-slate-100">
-                  <PhKey :size="18" class="text-blue-500" />
-                  <h3 class="text-sm font-semibold text-slate-800">API 密钥</h3>
                 </div>
 
                 <div>
@@ -396,22 +543,22 @@ const handleSaveSummarizationSettings = () => {
                     <input
                       v-model="llmApiKey"
                       type="password"
-                      placeholder="sk-..."
-                      :disabled="isTestingLlm || isUpdatingLlmSettings"
+                      placeholder="留空则保持当前密钥"
+                      :disabled="isTestingLlm || isUpdatingLlmSettings || isSwitchingProfile"
                       class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                   </div>
-                  <p v-if="llmSettings?.has_api_key" class="text-xs text-emerald-600 mt-2">
-                    ✓ 已配置 API Key ({{ llmSettings.api_key_hint }})
+                  <p v-if="editingProfile?.has_api_key" class="text-xs text-emerald-600 mt-2">
+                    ✓ 已配置 API Key ({{ editingProfile?.api_key_hint }})
                   </p>
                 </div>
               </div>
 
               <!-- 操作按钮 -->
-              <div class="flex gap-3">
+              <div v-if="editingProfile" class="flex gap-3">
                 <button
                   @click="handleSaveLlmSettings"
-                  :disabled="isTestingLlm || isUpdatingLlmSettings"
+                  :disabled="isTestingLlm || isUpdatingLlmSettings || isSwitchingProfile"
                   class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <PhSpinner v-if="isUpdatingLlmSettings" :size="16" class="animate-spin" />
@@ -419,11 +566,12 @@ const handleSaveSummarizationSettings = () => {
                 </button>
                 <button
                   @click="handleTestLlm"
-                  :disabled="isTestingLlm || isUpdatingLlmSettings"
+                  :disabled="isPrewarming || isTestingLlm || isUpdatingLlmSettings || isSwitchingProfile"
                   class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <PhFlask :size="16" />
-                  <span>{{ isTestingLlm ? '测试中...' : '测试连接' }}</span>
+                  <PhSpinner v-if="isPrewarming" :size="16" class="animate-spin" />
+                  <PhFlask v-else :size="16" />
+                  <span>{{ isPrewarming ? '初始化中...' : isTestingLlm ? '测试中...' : '测试连接' }}</span>
                 </button>
               </div>
             </div>

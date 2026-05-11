@@ -11,10 +11,8 @@ import {
   PhX,
   PhTrash,
   PhInfo,
-  PhCpu,
   PhKey,
   PhGearSix,
-  // PhList,
   PhMagnifyingGlass,
   PhFolder,
   PhFloppyDisk,
@@ -22,6 +20,8 @@ import {
   PhPlayCircle,
   PhLightning,
   PhBrain,
+  PhFile,
+  PhQuestion,
 } from '@phosphor-icons/vue'
 import {
   TaskStatus,
@@ -30,9 +30,12 @@ import {
   type LLMProvider,
   type LLMSettings,
   type TranscriptionSettings,
-  type SummarizationSettings
+  type SummarizationSettings,
+  type Folder,
+  type FolderTreeNode,
 } from '../types'
 import ThemeSelector from './ThemeSelector.vue'
+import FolderBrowser from './FolderBrowser/FolderBrowser.vue'
 
 const videoUrl = defineModel<string>('videoUrl', { required: true })
 const selectedFile = defineModel<File | null>('selectedFile', { default: null })
@@ -43,17 +46,26 @@ const isSidebarOpen = defineModel<boolean>('isSidebarOpen', { required: true })
 
 const props = defineProps<{
   isLocalClient: boolean
+  isPrewarming: boolean
   tasks: Task[]
   selectedTask: Task | null
   isSubmitting: boolean
   llmProviders: LLMProvider[]
   llmSettings: LLMSettings | null
+  activeProfileId: string
+  editingProfileId: string
+  profileFormState: { name: string; provider: string; base_url: string; model_id: string; temperature: number; api_key: string }
   isUpdatingLlmSettings: boolean
   isTestingLlm: boolean
+  isSwitchingProfile: boolean
   transcriptionSettings: TranscriptionSettings | null
   isUpdatingTranscriptionSettings: boolean
   summarizationSettings: SummarizationSettings | null
   isUpdatingSummarizationSettings: boolean
+  folders: Folder[]
+  folderTree: FolderTreeNode[]
+  isMultiSelectMode: boolean
+  selectedTaskIds: Set<string>
 }>()
 
 const emit = defineEmits<{
@@ -63,6 +75,20 @@ const emit = defineEmits<{
   deleteTask: [taskId: string]
   showInfo: [task: Task]
   openSettings: []
+  createFolder: [name: string, parentId: string | null]
+  renameFolder: [folderId: string, newName: string]
+  deleteFolder: [folderId: string]
+  assignTaskToFolder: [taskId: string, folderId: string | null]
+  moveFolder: [folderId: string, newParentId: string | null]
+  toggleMultiSelectMode: []
+  toggleTaskSelection: [taskId: string]
+  selectAllTasks: []
+  clearSelection: []
+  batchReSummarize: [taskIds: string[]]
+  batchReTranscribe: [taskIds: string[]]
+  batchDownloadMarkdown: [taskIds: string[]]
+  batchDelete: [taskIds: string[]]
+  toggleFolderSelection: [taskIds: string[], selected: boolean]
   focusSearchMatch: [payload: {
     taskId: string
     keyword: string
@@ -70,12 +96,18 @@ const emit = defineEmits<{
     requestId: number
   }]
   updateLlmSettings: [payload: {
-    provider: string
+    profile_id: string
+    name?: string
+    provider?: string
     base_url?: string
     api_key?: string
     model_id?: string
     temperature?: number
   }]
+  switchActiveProfile: [profileId: string]
+  editProfile: [profileId: string]
+  createProfile: [name: string, provider: string]
+  deleteProfile: [profileId: string]
   updateTranscriptionSettings: [payload: {
     device?: 'cpu' | 'cuda'
     model_source?: 'auto_download' | 'manual_path'
@@ -102,12 +134,21 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const isSettingsPanelOpen = ref(false)
 const settingsTab = ref<'llm' | 'transcription' | 'summarization'>('llm')
 const sidebarTab = ref<'quick' | 'manage' | 'theme'>('quick')
+const showLocalPathHelp = ref(false)
 
-const llmProvider = ref('')
-const llmBaseUrl = ref('')
-const llmModelId = ref('')
 const llmApiKey = ref('')
-const llmTemperature = ref(0.7)
+const llmBaseUrl = computed({
+  get: () => props.profileFormState.base_url,
+  set: (v: string) => { props.profileFormState.base_url = v },
+})
+const llmModelId = computed({
+  get: () => props.profileFormState.model_id,
+  set: (v: string) => { props.profileFormState.model_id = v },
+})
+const llmTemperature = computed({
+  get: () => props.profileFormState.temperature,
+  set: (v: number) => { props.profileFormState.temperature = v },
+})
 const appVersion = __APP_VERSION__
 
 const transcriptionDevice = ref<'cpu' | 'cuda'>('cpu')
@@ -196,9 +237,25 @@ const handleFileChange = (event: Event) => {
   }
 }
 
-const handleLocalPathInput = () => {
+const handleLocalPathInput = (event: Event) => {
   selectedFile.value = null
   videoUrl.value = ''
+
+  // 自动清理路径格式
+  const input = event.target as HTMLInputElement
+  let value = input.value
+
+  // 去除首尾空格和引号
+  value = value.trim()
+  if ((value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))) {
+    value = value.slice(1, -1)
+  }
+
+  // 更新清理后的值
+  if (value !== input.value) {
+    localFilePath.value = value
+  }
 }
 
 const handleClearSelectedFile = () => {
@@ -249,12 +306,12 @@ const buildMatchPreview = (text: string, keyword: string, context = 18): MatchPr
   }
 }
 
-const syncLlmSettings = (settings: LLMSettings | null) => {
-  if (!settings) return
-  llmProvider.value = settings.provider
-  llmBaseUrl.value = settings.base_url
-  llmModelId.value = settings.model_id
-  llmTemperature.value = settings.temperature
+const editingProfile = computed(() => {
+  if (!props.llmSettings) return null
+  return props.llmSettings.profiles.find(p => p.id === props.editingProfileId)
+})
+
+const syncLlmSettings = (_settings: LLMSettings | null) => {
   llmApiKey.value = ''
 }
 
@@ -292,24 +349,20 @@ const requiredModelFilesLabel = computed(() => {
   return files.join(', ')
 })
 
-const handleProviderPresetChange = () => {
-  const provider = props.llmProviders.find((item) => item.id === llmProvider.value)
-  if (!provider) return
-  llmBaseUrl.value = provider.default_base_url
-  llmModelId.value = provider.default_model_id
-}
-
 const submitLlmSettings = () => {
-  if (!llmProvider.value || !llmBaseUrl.value || !llmModelId.value) return
+  if (!llmBaseUrl.value || !llmModelId.value) return
 
   const payload: {
-    provider: string
+    profile_id: string
+    name?: string
+    provider?: string
     base_url?: string
     api_key?: string
     model_id?: string
     temperature?: number
   } = {
-    provider: llmProvider.value,
+    profile_id: props.editingProfileId,
+    provider: props.profileFormState.provider,
     base_url: llmBaseUrl.value.trim(),
     model_id: llmModelId.value.trim(),
     temperature: llmTemperature.value,
@@ -408,17 +461,6 @@ const getTaskStatusLabel = (task: Task) => {
     return `总结中 (${Math.min(done, total)}/${total})`
   }
   return '总结中'
-}
-
-const getTaskProgress = (task: Task) => {
-  if (task.status === TaskStatus.SUMMARIZING) {
-    const total = Number(task.summary_chunk_total || 0)
-    const done = Number(task.summary_chunk_done || 0)
-    if (total > 0) {
-      return Math.max(0, Math.min(100, (done / total) * 100))
-    }
-  }
-  return Math.max(0, Math.min(100, Number(task.progress || 0)))
 }
 
 const getStatusClass = (status: TaskStatus) => {
@@ -566,19 +608,6 @@ const handleManagedResultClick = (result: ManagedTaskResult) => {
   })
 }
 
-// 进度条动画控制逻辑
-const prevProgressMap = ref<Record<string, number>>({})
-const shouldAnimateMap = ref<Record<string, boolean>>({})
-
-watch(() => props.tasks, (newTasks) => {
-  if (!newTasks) return
-  newTasks.forEach(task => {
-    const prevProgress = prevProgressMap.value[task.id] ?? 0
-    shouldAnimateMap.value[task.id] = task.progress >= prevProgress
-    prevProgressMap.value[task.id] = task.progress
-  })
-}, { deep: true, immediate: true })
-
 watch(() => props.llmSettings, (settings) => {
   syncLlmSettings(settings)
 }, { immediate: true })
@@ -643,7 +672,7 @@ watch(() => props.summarizationSettings, (settings) => {
               <div class="min-w-0">
                 <h1 class="text-lg font-bold text-slate-900 tracking-tight truncate">声文智汇</h1>
                 <p class="text-[11px] text-slate-500">
-                  {{ sidebarTab === 'quick' ? '新建任务与快速浏览' : sidebarTab === 'manage' ? '全部任务搜索视图' : 'Markdown 样式主题' }} · v{{ appVersion }}
+                  {{ sidebarTab === 'quick' ? '快速提交与任务浏览' : sidebarTab === 'manage' ? '全部任务搜索视图' : 'Markdown 样式主题' }} · v{{ appVersion }}
                 </p>
               </div>
             </div>
@@ -698,26 +727,30 @@ watch(() => props.summarizationSettings, (settings) => {
               </div>
 
               <div v-if="settingsTab === 'llm'" class="space-y-2.5">
-                <div class="relative">
-                  <PhCpu :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <select
-                    v-model="llmProvider"
-                    :disabled="props.isTestingLlm || props.isUpdatingLlmSettings"
-                    class="w-full pl-10 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                    @change="handleProviderPresetChange"
+                <!-- Profile selector (compact) -->
+                <div class="flex gap-1.5 overflow-x-auto">
+                  <button
+                    v-for="profile in llmSettings?.profiles || []"
+                    :key="profile.id"
+                    @click="emit('switchActiveProfile', profile.id)"
+                    :disabled="props.isSwitchingProfile || props.isTestingLlm || props.isUpdatingLlmSettings"
+                    :class="[
+                      'px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all whitespace-nowrap flex items-center gap-1.5',
+                      props.activeProfileId === profile.id
+                        ? 'border-blue-300 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 bg-white text-slate-500 hover:border-gray-300'
+                    ]"
                   >
-                    <option value="" disabled>选择 LLM 供应商</option>
-                    <option v-for="provider in llmProviders" :key="provider.id" :value="provider.id">
-                      {{ provider.label }}
-                    </option>
-                  </select>
+                    <span>{{ profile.name }}</span>
+                    <span v-if="profile.has_api_key" class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
+                  </button>
                 </div>
 
                 <input
                   v-model="llmBaseUrl"
                   type="text"
                   placeholder="Base URL"
-                  :disabled="props.isTestingLlm || props.isUpdatingLlmSettings"
+                  :disabled="props.isTestingLlm || props.isUpdatingLlmSettings || props.isSwitchingProfile"
                   class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
 
@@ -725,7 +758,7 @@ watch(() => props.summarizationSettings, (settings) => {
                   v-model="llmModelId"
                   type="text"
                   placeholder="模型 ID"
-                  :disabled="props.isTestingLlm || props.isUpdatingLlmSettings"
+                  :disabled="props.isTestingLlm || props.isUpdatingLlmSettings || props.isSwitchingProfile"
                   class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
 
@@ -736,7 +769,7 @@ watch(() => props.summarizationSettings, (settings) => {
                   max="2"
                   step="0.1"
                   placeholder="Temperature"
-                  :disabled="props.isTestingLlm || props.isUpdatingLlmSettings"
+                  :disabled="props.isTestingLlm || props.isUpdatingLlmSettings || props.isSwitchingProfile"
                   class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
 
@@ -746,19 +779,19 @@ watch(() => props.summarizationSettings, (settings) => {
                     v-model="llmApiKey"
                     type="password"
                     placeholder="留空则保持当前 API Key"
-                    :disabled="props.isTestingLlm || props.isUpdatingLlmSettings"
+                    :disabled="props.isTestingLlm || props.isUpdatingLlmSettings || props.isSwitchingProfile"
                     class="w-full pl-10 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                 </div>
 
-                <p v-if="llmSettings?.has_api_key" class="text-[11px] text-slate-500">
-                  当前 API Key: {{ llmSettings.api_key_hint }}
+                <p v-if="editingProfile?.has_api_key" class="text-[11px] text-slate-500">
+                  当前 API Key: {{ editingProfile?.api_key_hint }}
                 </p>
 
                 <div class="space-y-2 pt-1">
                   <button
                     @click="submitLlmSettings"
-                    :disabled="props.isTestingLlm || props.isUpdatingLlmSettings || !llmProvider || !llmBaseUrl || !llmModelId"
+                    :disabled="props.isTestingLlm || props.isUpdatingLlmSettings || props.isSwitchingProfile || !llmBaseUrl || !llmModelId"
                     class="w-full bg-slate-800 hover:bg-slate-700 text-white py-2.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     <PhFloppyDisk :size="16" weight="fill" />
@@ -767,12 +800,14 @@ watch(() => props.summarizationSettings, (settings) => {
                   </button>
                   <button
                     @click="handleTestLlm"
-                    :disabled="props.isTestingLlm || props.isUpdatingLlmSettings || !llmProvider || !llmBaseUrl || !llmModelId"
+                    :disabled="props.isPrewarming || props.isTestingLlm || props.isUpdatingLlmSettings || props.isSwitchingProfile || !llmBaseUrl || !llmModelId"
                     class="w-full bg-blue-500 hover:bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    <PhSpinner v-if="props.isTestingLlm" :size="16" class="animate-spin" />
+                    <PhSpinner v-if="props.isPrewarming" :size="16" class="animate-spin" />
+                    <PhSpinner v-else-if="props.isTestingLlm" :size="16" class="animate-spin" />
                     <PhFlask v-else :size="16" weight="fill" />
-                    <span v-if="props.isTestingLlm">测试中...</span>
+                    <span v-if="props.isPrewarming">初始化中...</span>
+                    <span v-else-if="props.isTestingLlm">测试中...</span>
                     <span v-else>测试模型</span>
                   </button>
                 </div>
@@ -1109,8 +1144,6 @@ watch(() => props.summarizationSettings, (settings) => {
         <template v-if="sidebarTab === 'quick'">
           <!-- 提交新任务 -->
           <div class="p-3 pb-2">
-            <h2 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">新建任务</h2>
-
             <div class="space-y-2.5">
               <div class="relative">
                 <PhLink :size="18" class="absolute left-3 top-3 text-slate-400" />
@@ -1142,18 +1175,33 @@ watch(() => props.summarizationSettings, (settings) => {
 
               <div
                 v-if="props.isLocalClient"
-                class="flex items-center gap-2 px-1"
+                class="flex items-center gap-1.5 px-1 mt-3 mb-1"
               >
-                <div class="h-px flex-1 bg-slate-200"></div>
-                <span class="text-[11px] font-medium text-slate-400"> 或 </span>
-                <div class="h-px flex-1 bg-slate-200"></div>
+                <span class="text-xs font-medium text-slate-600">根据本地文件路径创建</span>
+                <button
+                  @click="showLocalPathHelp = !showLocalPathHelp"
+                  class="p-0.5 text-slate-400 hover:text-primary hover:bg-blue-50 rounded transition-colors"
+                  title="如何复制本地文件路径"
+                >
+                  <PhQuestion :size="14" weight="bold" />
+                </button>
+              </div>
+
+              <!-- 帮助提示 -->
+              <div
+                v-if="props.isLocalClient && showLocalPathHelp"
+                class="mx-1 mb-2 p-2.5 bg-blue-50 border border-blue-100 rounded-lg text-xs text-slate-600 space-y-1"
+              >
+                <p class="font-medium text-slate-700">快速复制文件路径：</p>
+                <p>• Windows: 按住 <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded text-[10px] font-mono">Shift</kbd> + 右键文件 → "复制为路径"</p>
+                <p>• 或直接从文件管理器地址栏复制完整路径</p>
               </div>
 
               <div
                 v-if="props.isLocalClient"
                 class="relative"
               >
-                <PhUpload :size="18" class="absolute left-3 top-3 text-slate-400" />
+                <PhFile :size="18" class="absolute left-3 top-3 text-slate-400" />
                 <input
                   v-model="localFilePath"
                   type="text"
@@ -1223,64 +1271,43 @@ watch(() => props.summarizationSettings, (settings) => {
 
               <button
                 @click="handleSubmitAction"
-                :disabled="!isSubmitting && (!videoUrl && (!props.isLocalClient ? !selectedFile : !localFilePath))"
+                :disabled="props.isPrewarming || (!isSubmitting && (!videoUrl && (!props.isLocalClient ? !selectedFile : !localFilePath)))"
                 class="w-full bg-primary hover:bg-secondary text-white py-2.5 rounded-xl font-semibold transition-all shadow-sm shadow-blue-100 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
               >
-                <PhSpinner v-if="isSubmitting" :size="18" class="animate-spin" />
+                <PhSpinner v-if="props.isPrewarming" :size="18" class="animate-spin" />
+                <PhSpinner v-else-if="isSubmitting" :size="18" class="animate-spin" />
                 <PhPlayCircle v-else :size="18" />
-                {{ isSubmitting ? '取消提交' : '开始处理' }}
+                {{ props.isPrewarming ? '正在初始化...' : isSubmitting ? '取消提交' : '开始处理' }}
               </button>
             </div>
           </div>
 
           <div class="flex-1 overflow-y-auto p-4 custom-scrollbar">
-            <h2 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-2">任务管理</h2>
-            <div class="space-y-2">
-              <div
-                v-for="task in tasks"
-                :key="task.id"
-                @click="() => { emit('selectTask', task); isSidebarOpen = false; }"
-                :class="['p-3 rounded-2xl border cursor-pointer transition-all hover:shadow-sm active:scale-[0.98] group relative',
-                         selectedTask?.id === task.id ? 'border-blue-200 bg-blue-50/60 ring-1 ring-primary/20 shadow-sm' : 'border-transparent hover:bg-white hover:border-gray-100']"
-              >
-                <div class="flex justify-between items-start mb-1">
-                  <span :class="['text-xs font-medium px-2 py-0.5 rounded-full flex items-center gap-1', getStatusClass(task.status)]">
-                    <component :is="getStatusIcon(task.status)" :size="12" :class="task.status !== TaskStatus.COMPLETED && task.status !== TaskStatus.FAILED && task.status !== TaskStatus.PENDING ? 'animate-spin' : ''" />
-                    {{ getTaskStatusLabel(task) }}
-                  </span>
-                  <div class="flex items-center gap-2">
-                    <span class="text-[10px] text-slate-400">{{ formatTaskDate(task.created_at) }}</span>
-                    <div :class="['flex items-center gap-1', 'md:opacity-0 md:group-hover:opacity-100', 'md:transition-opacity']">
-                      <button
-                        @click.stop="emit('showInfo', task)"
-                        class="text-slate-400 hover:text-blue-500 p-1"
-                        title="查看信息"
-                      >
-                        <PhInfo :size="14" />
-                      </button>
-                      <button
-                        @click.stop="emit('deleteTask', task.id)"
-                        class="text-slate-400 hover:text-red-500 p-1"
-                        title="删除任务"
-                      >
-                        <PhTrash :size="14" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                <div class="text-sm font-medium text-slate-700 truncate" :title="resolveTaskTopic(task)">
-                  {{ resolveTaskTopic(task) }}
-                </div>
-                <div v-if="task.status === TaskStatus.DOWNLOADING || task.status === TaskStatus.UPLOADING || task.status === TaskStatus.TRANSCRIBING || task.status === TaskStatus.SUMMARIZING" class="w-full bg-blue-100 h-1 rounded-full mt-2 overflow-hidden">
-                  <div
-                    class="bg-blue-500 h-full rounded-full"
-                    :class="{ 'transition-all duration-500': shouldAnimateMap[task.id] }"
-                    :style="{ width: getTaskProgress(task) + '%' }"
-                  ></div>
-                </div>
-              </div>
-              <p v-if="tasks.length === 0" class="text-center text-gray-400 py-8 text-sm">暂无任务记录</p>
-            </div>
+            <FolderBrowser
+              :tasks="tasks"
+              :folders="folders"
+              :folderTree="folderTree"
+              :selectedTask="selectedTask"
+              :multiSelectMode="isMultiSelectMode"
+              :selectedTaskIds="selectedTaskIds"
+              @selectTask="(task) => { emit('selectTask', task); if (!isMultiSelectMode) isSidebarOpen = false; }"
+              @deleteTask="emit('deleteTask', $event)"
+              @showInfo="emit('showInfo', $event)"
+              @createFolder="(name: any, parentId: any) => emit('createFolder', name, parentId)"
+              @renameFolder="(folderId: any, newName: any) => emit('renameFolder', folderId, newName)"
+              @deleteFolder="emit('deleteFolder', $event)"
+              @assignTaskToFolder="(taskId: any, folderId: any) => emit('assignTaskToFolder', taskId, folderId)"
+              @moveFolder="(folderId: any, newParentId: any) => emit('moveFolder', folderId, newParentId)"
+              @toggleMultiSelectMode="emit('toggleMultiSelectMode')"
+              @toggleTaskSelection="emit('toggleTaskSelection', $event)"
+              @selectAllTasks="emit('selectAllTasks')"
+              @clearSelection="emit('clearSelection')"
+              @batchReSummarize="emit('batchReSummarize', $event)"
+              @batchReTranscribe="emit('batchReTranscribe', $event)"
+              @batchDownloadMarkdown="emit('batchDownloadMarkdown', $event)"
+              @batchDelete="emit('batchDelete', $event)"
+              @toggleFolderSelection="(ids: any, selected: any) => emit('toggleFolderSelection', ids, selected)"
+            />
           </div>
         </template>
 
@@ -1343,8 +1370,11 @@ watch(() => props.summarizationSettings, (settings) => {
                     </span>
                   </div>
                 </div>
-                <div class="text-[13px] leading-5 font-medium text-slate-700 line-clamp-2" :title="resolveTaskTopic(result.task)">
-                  {{ resolveTaskTopic(result.task) }}
+                <div class="text-[13px] leading-5 font-medium text-slate-700 line-clamp-2" :title="result.task.title || result.task.video_url">
+                  {{ result.task.title || result.task.video_url }}
+                </div>
+                <div v-if="result.task.topic" class="text-[11px] text-slate-400 truncate mt-0.5" :title="result.task.topic">
+                  {{ result.task.topic }}
                 </div>
 
                 <div v-if="manageKeyword.trim()" class="mt-1.5 space-y-0.5">

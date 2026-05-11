@@ -519,10 +519,18 @@ class VideoDownloaderWorker(Worker):
 
             # 构建标题（包含分P信息）
             title = video_info.get("title", "")
-            if len(subtitle_results) < len(part_indices):
-                title_suffix = f" (已合并 {len(subtitle_results)}/{len(part_indices)} 个分P)"
+            if len(part_indices) == 1:
+                # 单分P（拆分模式）：使用分P标题，不走合并标题逻辑
+                part_idx = part_indices[0]
+                part_title = subtitle_results[0].get("part_title") if subtitle_results else None
+                if part_title:
+                    title = f"{title} - P{part_idx + 1}: {part_title}"
+                else:
+                    title = f"{title} - P{part_idx + 1}"
+            elif len(subtitle_results) < len(part_indices):
+                title = f"{title} (已合并 {len(subtitle_results)}/{len(part_indices)} 个分P)"
             else:
-                title_suffix = f" (已合并 {len(part_indices)} 个分P)"
+                title = f"{title} (已合并 {len(part_indices)} 个分P)"
 
             intermediate_file_path = os.path.join(self.output_dir, f"{task_id}_subtitle.txt")
             output_file = os.path.join(self.output_dir, f"{task_id}_summary.md")
@@ -538,7 +546,7 @@ class VideoDownloaderWorker(Worker):
                 raise TaskCancelledError(f"任务已取消，停止字幕分支: {task_id}")
 
             update_data = {
-                "title": title + title_suffix,
+                "title": title,
                 "status": TaskStatus.SUMMARIZING,
                 "progress": 0.0,
                 "transcript": merged_transcript,
@@ -699,7 +707,11 @@ class VideoDownloaderWorker(Worker):
 
                 from ..db import TaskStatus
                 from ..task_updater import update_and_notify
-                self._submit_coro(update_and_notify(task_id, {"status": TaskStatus.TRANSCRIBING}))
+                updates = {"status": TaskStatus.TRANSCRIBING}
+                video_title = info_dict.get("title")
+                if video_title:
+                    updates["title"] = str(video_title)
+                self._submit_coro(update_and_notify(task_id, updates))
 
             if self.next_worker:
                 next_payload = payload.copy()

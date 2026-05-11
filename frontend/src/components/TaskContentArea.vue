@@ -3,6 +3,7 @@ import { PhXCircle } from '@phosphor-icons/vue'
 import { computed, watch, nextTick, ref, onBeforeUnmount } from 'vue'
 import type { Task, MarkdownHeadingItem } from '../types'
 import { TaskStatus } from '../types'
+import { Incremark } from '@incremark/vue'
 import TaskMetaCard from './TaskMetaCard.vue'
 import { countWords } from '../utils/formatters'
 import { normalizeAccidentalInlineCodeBlocks } from '../utils/markdownNormalizer'
@@ -26,6 +27,9 @@ interface Props {
   topic: string
   isEditingTopic: boolean
   editingTopicValue: string
+  isStreamingSummary: boolean
+  streamingBlocks: any[]
+  compiledResumeSummary: string
 }
 
 const props = defineProps<Props>()
@@ -449,8 +453,8 @@ const renderMermaidBlocks = async () => {
 }
 
 // 监听内容变化并渲染 Mermaid
-watch([() => props.compiledMarkdown, () => props.activeTab], async () => {
-  if (props.activeTab === 'summary' && props.compiledMarkdown) {
+watch([() => props.compiledMarkdown, () => props.activeTab, () => props.isStreamingSummary], async () => {
+  if (props.activeTab === 'summary' && props.compiledMarkdown && !props.isStreamingSummary) {
     await nextTick()
     try {
       await renderMermaidBlocks()
@@ -499,6 +503,18 @@ watch(
 onBeforeUnmount(() => {
   clearMarkdownHeadings()
 })
+
+watch(() => props.streamingBlocks, () => {
+  if (!props.isStreamingSummary) return
+  nextTick(() => {
+    const container = contentScrollRef.value
+    if (!container) return
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight
+    if (distanceFromBottom < 150) {
+      container.scrollTop = container.scrollHeight
+    }
+  })
+})
 </script>
 
 <template>
@@ -545,8 +561,21 @@ onBeforeUnmount(() => {
             class="prose prose-sm md:prose-base prose-slate prose-headings:font-bold prose-a:text-blue-600 hover:prose-a:underline prose-img:rounded-xl max-w-none px-8 py-8 ss-shared-prose markdown-theme-container"
             :data-theme="currentThemeId"
           >
-            <div v-if="task.summary" data-summary-content v-html="compiledMarkdown"></div>
-            <p v-else class="text-slate-400 italic">暂无总结内容</p>
+            <!-- 快照模式：切回来时有已有内容 + 新 delta 增量 -->
+            <template v-if="compiledResumeSummary">
+              <div data-summary-content v-html="compiledResumeSummary"></div>
+              <div v-if="isStreamingSummary && streamingBlocks.length" data-summary-content class="ss-streaming-content">
+                <Incremark :blocks="streamingBlocks" />
+              </div>
+            </template>
+            <!-- 普通模式 -->
+            <template v-else>
+              <div v-if="isStreamingSummary && streamingBlocks.length" data-summary-content class="ss-streaming-content">
+                <Incremark :blocks="streamingBlocks" />
+              </div>
+              <div v-else-if="task.summary" data-summary-content v-html="compiledMarkdown"></div>
+              <p v-else class="text-slate-400 italic">暂无总结内容</p>
+            </template>
           </article>
         </div>
 
@@ -738,5 +767,9 @@ onBeforeUnmount(() => {
   color: inherit;
   border-radius: 4px;
   padding: 0 0.1em;
+}
+
+.ss-streaming-content {
+  line-height: 1.7;
 }
 </style>

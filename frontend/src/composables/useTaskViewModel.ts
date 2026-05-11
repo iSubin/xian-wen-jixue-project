@@ -1,4 +1,5 @@
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useIncremark } from '@incremark/vue'
 import axios from 'axios'
 import type {
   Task,
@@ -6,14 +7,18 @@ import type {
   SummaryMode,
   LLMProvider,
   LLMSettings,
-  UpdateLLMSettingsRequest,
+  CreateProfileRequest,
+  UpdateProfileRequest,
+  SwitchActiveProfileRequest,
   TranscriptionSettings,
   UpdateTranscriptionSettingsRequest,
   SummarizationSettings,
   UpdateSummarizationSettingsRequest,
   BilibiliCookieFromBrowserResult,
   BilibiliVideoInfo,
-  BilibiliPartsConfig
+  BilibiliPartsConfig,
+  LocalPathCheckResult,
+  LocalFolderScanResult
 } from '../types'
 
 // 传统复制方法（兼容非安全上下文，如局域网 HTTP）
@@ -145,11 +150,64 @@ export function useTaskViewModel() {
   const llmProviders = ref<LLMProvider[]>([])
   const llmSettings = ref<LLMSettings | null>(null)
   const isUpdatingLlmSettings = ref(false)
+  const activeProfileId = ref('')
+  const editingProfileId = ref('')
+  const profileFormState = ref({ name: '', provider: '', base_url: '', model_id: '', temperature: 0.7, api_key: '' })
+  const isSwitchingProfile = ref(false)
   const transcriptionSettings = ref<TranscriptionSettings | null>(null)
   const isUpdatingTranscriptionSettings = ref(false)
   const summarizationSettings = ref<SummarizationSettings | null>(null)
   const isUpdatingSummarizationSettings = ref(false)
   const isReadingBilibiliCookieFromBrowser = ref(false)
+
+  // --- Multi-select State ---
+  const isMultiSelectMode = ref(false)
+  const selectedTaskIds = ref<Set<string>>(new Set())
+
+  // --- Streaming Delta State ---
+  const streamingTaskId = ref<string | null>(null)
+  const isPrewarming = ref(true) // 默认 true，收到 ready 后改为 false
+  const { blocks: streamingBlocks, append: incremarkAppend, finalize: incremarkFinalize, reset: incremarkReset } = useIncremark({
+    typewriter: {
+      enabled: true,
+      charsPerTick: [1, 3],
+      tickInterval: 30,
+      effect: 'typing',
+      cursor: '|',
+    },
+  })
+  const resumeSnapshot = ref<string | null>(null) // 切回来时已有的 summary 文本快照
+  let rafPending = false
+  let deltaBatch: string[] = []
+
+  const takeResumeSnapshot = (summary: string) => {
+    resumeSnapshot.value = summary || null
+  }
+
+  const clearResumeSnapshot = () => {
+    resumeSnapshot.value = null
+  }
+
+  const scheduleRafFlush = () => {
+    if (rafPending) return
+    rafPending = true
+    requestAnimationFrame(flushDeltas)
+  }
+
+  const flushDeltas = () => {
+    rafPending = false
+    if (deltaBatch.length === 0) return
+    const combined = deltaBatch.join('')
+    deltaBatch = []
+    incremarkAppend(combined)
+  }
+
+  const resetStreamingState = () => {
+    streamingTaskId.value = null
+    deltaBatch = []
+    rafPending = false
+    incremarkReset()
+  }
 
   let ws: WebSocket | null = null
   let submitAbortController: AbortController | null = null
@@ -353,7 +411,10 @@ export function useTaskViewModel() {
     
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data)
-      if (data.type === 'task_update') {
+      if (data.type === 'prewarm_status') {
+        isPrewarming.value = !data.ready
+        return
+      } else if (data.type === 'task_update') {
         const updatedTask = data.task
         const index = tasks.value.findIndex(t => t.id === updatedTask.id)
         if (index !== -1) {
@@ -361,10 +422,12 @@ export function useTaskViewModel() {
         } else {
           tasks.value.unshift(updatedTask)
         }
-        
+
         if (selectedTask.value?.id === updatedTask.id) {
-          // Merge updates to preserve details that might not be in the broadcast
-          selectedTask.value = { ...selectedTask.value, ...updatedTask }
+          selectedTask.value = { ...selectedTask.value!, ...updatedTask }
+          if (streamingTaskId.value === updatedTask.id && updatedTask.status === 'COMPLETED') {
+            incremarkFinalize()
+          }
         }
       } else if (data.type === 'progress_update') {
         const { task_id, progress } = data
@@ -375,6 +438,24 @@ export function useTaskViewModel() {
         if (selectedTask.value && selectedTask.value.id === task_id) {
           selectedTask.value.progress = progress
         }
+      } else if (data.type === 'summary_delta') {
+        const { task_id, delta, chunk_done, chunk_total } = data
+        if (selectedTask.value?.id !== task_id) return
+        if (streamingTaskId.value !== task_id) {
+          streamingTaskId.value = task_id
+        }
+        deltaBatch.push(delta)
+        if (chunk_done !== undefined && selectedTask.value) {
+          // 分块完成时更新快照（允许自然边界闪一次，比0.5s刷合理）
+          if (selectedTask.value.summary_chunk_done !== undefined &&
+              chunk_done > selectedTask.value.summary_chunk_done &&
+              selectedTask.value.summary) {
+            takeResumeSnapshot(selectedTask.value.summary)
+          }
+          selectedTask.value.summary_chunk_done = chunk_done
+          selectedTask.value.summary_chunk_total = chunk_total
+        }
+        scheduleRafFlush()
       }
     }
 
@@ -403,28 +484,118 @@ export function useTaskViewModel() {
     try {
       const response = await axios.get(`${apiBaseUrl}/llm/settings`)
       llmSettings.value = response.data
+      syncProfileFormState(response.data)
     } catch (err) {
       console.error('Failed to fetch LLM settings:', err)
       error.value = '获取 LLM 配置失败'
     }
   }
 
-  const updateLlmSettings = async (payload: UpdateLLMSettingsRequest) => {
+  const syncProfileFormState = (settings: LLMSettings) => {
+    activeProfileId.value = settings.active_profile_id
+    if (!editingProfileId.value) {
+      editingProfileId.value = settings.active_profile_id
+    }
+    const profile = settings.profiles.find(p => p.id === editingProfileId.value)
+    if (profile) {
+      profileFormState.value = {
+        name: profile.name,
+        provider: profile.provider,
+        base_url: profile.base_url,
+        model_id: profile.model_id,
+        temperature: profile.temperature,
+        api_key: '',
+      }
+    }
+  }
+
+  const editProfile = (profileId: string) => {
+    editingProfileId.value = profileId
+    const profile = llmSettings.value?.profiles.find(p => p.id === profileId)
+    if (profile) {
+      profileFormState.value = {
+        name: profile.name,
+        provider: profile.provider,
+        base_url: profile.base_url,
+        model_id: profile.model_id,
+        temperature: profile.temperature,
+        api_key: '',
+      }
+    }
+  }
+
+  const createProfile = async (name: string, provider: string) => {
     isUpdatingLlmSettings.value = true
     try {
-      const response = await axios.put(`${apiBaseUrl}/llm/settings`, payload)
+      const payload: CreateProfileRequest = { name, provider }
+      const response = await axios.post(`${apiBaseUrl}/llm/profiles`, payload)
       llmSettings.value = response.data
+      editingProfileId.value = response.data.active_profile_id
+      syncProfileFormState(response.data)
       return response.data as LLMSettings
     } catch (err) {
-      console.error('Failed to update LLM settings:', err)
+      console.error('Failed to create profile:', err)
       if (axios.isAxiosError(err) && err.response) {
-        error.value = err.response.data?.detail || '更新 LLM 配置失败'
+        error.value = err.response.data?.detail || '创建配置失败'
       } else {
-        error.value = '更新 LLM 配置失败'
+        error.value = '创建配置失败'
       }
       throw err
     } finally {
       isUpdatingLlmSettings.value = false
+    }
+  }
+
+  const switchActiveProfile = async (profileId: string) => {
+    isSwitchingProfile.value = true
+    try {
+      const response = await axios.put(`${apiBaseUrl}/llm/active-profile`, { profile_id: profileId } as SwitchActiveProfileRequest)
+      llmSettings.value = response.data
+      activeProfileId.value = profileId
+      editProfile(profileId)
+    } catch (err) {
+      console.error('Failed to switch profile:', err)
+      error.value = '切换配置失败'
+    } finally {
+      isSwitchingProfile.value = false
+    }
+  }
+
+  const updateProfile = async (payload: UpdateProfileRequest) => {
+    isUpdatingLlmSettings.value = true
+    try {
+      const response = await axios.put(`${apiBaseUrl}/llm/settings`, payload)
+      llmSettings.value = response.data
+      syncProfileFormState(response.data)
+      return response.data as LLMSettings
+    } catch (err) {
+      console.error('Failed to update profile:', err)
+      if (axios.isAxiosError(err) && err.response) {
+        error.value = err.response.data?.detail || '更新配置失败'
+      } else {
+        error.value = '更新配置失败'
+      }
+      throw err
+    } finally {
+      isUpdatingLlmSettings.value = false
+    }
+  }
+
+  const deleteProfile = async (profileId: string) => {
+    try {
+      const response = await axios.delete(`${apiBaseUrl}/llm/profiles/${profileId}`)
+      llmSettings.value = response.data
+      if (editingProfileId.value === profileId) {
+        editProfile(response.data.active_profile_id)
+      }
+    } catch (err) {
+      console.error('Failed to delete profile:', err)
+      if (axios.isAxiosError(err) && err.response) {
+        error.value = err.response.data?.detail || '删除配置失败'
+      } else {
+        error.value = '删除配置失败'
+      }
+      throw err
     }
   }
 
@@ -534,6 +705,72 @@ export function useTaskViewModel() {
     }
   }
 
+  const checkLocalPath = async (filePath: string): Promise<LocalPathCheckResult | null> => {
+    try {
+      const response = await axios.get(`${apiBaseUrl}/local-path/check`, {
+        params: { file_path: filePath }
+      })
+      return response.data as LocalPathCheckResult
+    } catch (err) {
+      console.error('Failed to check local path:', err)
+      return null
+    }
+  }
+
+  const scanLocalFolder = async (folderPath: string): Promise<LocalFolderScanResult | null> => {
+    try {
+      const response = await axios.get(`${apiBaseUrl}/local-folder/scan`, {
+        params: { folder_path: folderPath }
+      })
+      return response.data as LocalFolderScanResult
+    } catch (err) {
+      console.error('Failed to scan local folder:', err)
+      return null
+    }
+  }
+
+  const submitLocalPathTasks = async (
+    paths: string[],
+    mode: 'merge' | 'separate'
+  ): Promise<void> => {
+    const controller = new AbortController()
+    submitAbortController = controller
+    isSubmitting.value = true
+    error.value = null
+
+    try {
+      if (mode === 'merge') {
+        // 合并模式：暂时不支持，需要后端支持
+        error.value = '合并多个文件功能开发中，请选择"拆分为多个任务"'
+        throw new Error('Merge mode not supported yet')
+      } else {
+        // 分别模式：逐个提交
+        for (const path of paths) {
+          await axios.post(`${apiBaseUrl}/upload/local-path`, {
+            file_path: path,
+            summary_mode: summaryMode.value,
+          }, {
+            signal: controller.signal
+          })
+        }
+      }
+    } catch (err) {
+      if (isCanceledRequest(err)) {
+        return
+      }
+      console.error('Failed to submit local path tasks:', err)
+      if (!error.value) {
+        error.value = getAxiosErrorMessage(err, '提交任务失败')
+      }
+      throw err
+    } finally {
+      if (submitAbortController === controller) {
+        submitAbortController = null
+        isSubmitting.value = false
+      }
+    }
+  }
+
   const submitTaskWithParts = async (
     videoUrl: string,
     partsConfig: BilibiliPartsConfig,
@@ -577,6 +814,10 @@ export function useTaskViewModel() {
     fetchTranscriptionSettings()
     fetchSummarizationSettings()
     connectWebSocket()
+    // 通过 HTTP 获取预热状态作为兜底（WS 可能还没连上）
+    fetch(`${apiBaseUrl}/prewarm/status`).then(r => r.json()).then(d => {
+      isPrewarming.value = !d.ready
+    }).catch(() => {})
   })
 
   onUnmounted(() => {
@@ -602,11 +843,24 @@ export function useTaskViewModel() {
     llmProviders,
     llmSettings,
     isUpdatingLlmSettings,
+    activeProfileId,
+    editingProfileId,
+    profileFormState,
+    isSwitchingProfile,
     transcriptionSettings,
     isUpdatingTranscriptionSettings,
     summarizationSettings,
     isUpdatingSummarizationSettings,
     isReadingBilibiliCookieFromBrowser,
+    isMultiSelectMode,
+    selectedTaskIds,
+    streamingBuffer: streamingBlocks,
+    streamingTaskId,
+    isPrewarming,
+    resumeSnapshot,
+    takeResumeSnapshot,
+    clearResumeSnapshot,
+    resetStreamingState,
 
     // Actions
     submitTask,
@@ -617,7 +871,12 @@ export function useTaskViewModel() {
     fetchTasks,
     fetchLlmProviders,
     fetchLlmSettings,
-    updateLlmSettings,
+    updateProfile,
+    createProfile,
+    deleteProfile,
+    switchActiveProfile,
+    editProfile,
+    syncProfileFormState,
     fetchTranscriptionSettings,
     updateTranscriptionSettings,
     fetchSummarizationSettings,
@@ -626,6 +885,9 @@ export function useTaskViewModel() {
     readBilibiliCookieFromBrowser,
     checkBilibiliVideoInfo,
     submitTaskWithParts,
+    checkLocalPath,
+    scanLocalFolder,
+    submitLocalPathTasks,
     isBilibiliUrl,
     downloadContent,
     copyContent: async (type: 'summary' | 'transcript') => {
@@ -713,6 +975,117 @@ export function useTaskViewModel() {
         error.value = '更新主题失败'
         throw err
       }
-    }
+    },
+
+    // --- Multi-select & Batch Operations ---
+    toggleMultiSelectMode: () => {
+      isMultiSelectMode.value = !isMultiSelectMode.value
+      if (!isMultiSelectMode.value) {
+        selectedTaskIds.value.clear()
+      }
+    },
+    toggleTaskSelection: (taskId: string) => {
+      if (selectedTaskIds.value.has(taskId)) {
+        selectedTaskIds.value.delete(taskId)
+      } else {
+        selectedTaskIds.value.add(taskId)
+      }
+    },
+    toggleFolderSelection: (taskIds: string[], selected: boolean) => {
+      for (const id of taskIds) {
+        if (selected) {
+          selectedTaskIds.value.add(id)
+        } else {
+          selectedTaskIds.value.delete(id)
+        }
+      }
+    },
+    selectAllTasks: () => {
+      for (const t of tasks.value) {
+        selectedTaskIds.value.add(t.id)
+      }
+    },
+    clearSelection: () => {
+      selectedTaskIds.value.clear()
+      isMultiSelectMode.value = false
+    },
+    batchReSummarize: async (taskIds: string[]) => {
+      if (!confirm(`确定要对 ${taskIds.length} 个任务重新总结吗？`)) return
+      for (const id of taskIds) {
+        try {
+          await axios.post(`${apiBaseUrl}/tasks/${id}/re-summarize`, {
+            summary_mode: summaryMode.value
+          })
+        } catch (err) {
+          console.error(`Failed to re-summarize task ${id}:`, err)
+        }
+        await new Promise(r => setTimeout(r, 200))
+      }
+      selectedTaskIds.value.clear()
+      isMultiSelectMode.value = false
+    },
+    batchReTranscribe: async (taskIds: string[]) => {
+      if (!confirm(`确定要对 ${taskIds.length} 个任务重新转录吗？这将清除原有转录和总结。`)) return
+      for (const id of taskIds) {
+        try {
+          await axios.post(`${apiBaseUrl}/tasks/${id}/re-transcribe`, {
+            summary_mode: summaryMode.value
+          })
+        } catch (err) {
+          console.error(`Failed to re-transcribe task ${id}:`, err)
+        }
+        await new Promise(r => setTimeout(r, 200))
+      }
+      selectedTaskIds.value.clear()
+      isMultiSelectMode.value = false
+    },
+    batchDownloadMarkdown: (taskIds: string[]) => {
+      for (const id of taskIds) {
+        const task = tasks.value.find(t => t.id === id)
+        if (!task?.summary) continue
+        const topic = task.topic || task.title || id
+        const blob = new Blob([task.summary], { type: 'text/plain' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `AI总结-${topic}.md`
+        a.click()
+        URL.revokeObjectURL(url)
+      }
+      selectedTaskIds.value.clear()
+      isMultiSelectMode.value = false
+    },
+    batchDownloadTxt: (taskIds: string[]) => {
+      for (const id of taskIds) {
+        const task = tasks.value.find(t => t.id === id)
+        if (!task?.transcript) continue
+        const topic = task.topic || task.title || id
+        const blob = new Blob([task.transcript], { type: 'text/plain' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `视频转录-${topic}.txt`
+        a.click()
+        URL.revokeObjectURL(url)
+      }
+      selectedTaskIds.value.clear()
+      isMultiSelectMode.value = false
+    },
+    batchDelete: async (taskIds: string[]) => {
+      if (!confirm(`确定要删除 ${taskIds.length} 个任务吗？此操作不可恢复。`)) return
+      for (const id of taskIds) {
+        try {
+          await axios.delete(`${apiBaseUrl}/tasks/${id}`)
+          tasks.value = tasks.value.filter(t => t.id !== id)
+          if (selectedTask.value?.id === id) {
+            selectedTask.value = null
+          }
+        } catch (err) {
+          console.error(`Failed to delete task ${id}:`, err)
+        }
+      }
+      selectedTaskIds.value.clear()
+      isMultiSelectMode.value = false
+    },
   }
 }

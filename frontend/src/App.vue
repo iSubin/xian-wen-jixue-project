@@ -3,6 +3,7 @@ import { computed, watch, ref } from 'vue'
 import { PhMonitorPlay, PhList } from '@phosphor-icons/vue'
 import { marked } from 'marked'
 import { useTaskViewModel } from './composables/useTaskViewModel'
+import { useFolderViewModel } from './composables/useFolderViewModel'
 import { useMermaidViewer } from './composables/useMermaidViewer'
 import {
   useSummaryImageExporter,
@@ -17,7 +18,7 @@ import {
 import { useToast } from './composables/useToast'
 import { stripDoubleBracePlaceholders } from './utils/formatters'
 import { postProcessCompiledMarkdown } from './utils/markdownPostProcessor'
-import type { Task, MarkdownHeadingItem, BilibiliVideoInfo, BilibiliPartsConfig } from './types'
+import type { Task, MarkdownHeadingItem, BilibiliVideoInfo, BilibiliPartsConfig, LocalFolderScanResult } from './types'
 import Sidebar from './components/Sidebar.vue'
 import FloatingToolbar from './components/FloatingToolbar.vue'
 import TaskInfoModal from './components/TaskInfoModal.vue'
@@ -26,6 +27,7 @@ import MermaidViewerModal from './components/MermaidViewerModal.vue'
 import SummaryImageWorkbenchModal from './components/SummaryImageWorkbenchModal.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import BilibiliPartsSelector from './components/BilibiliPartsSelector.vue'
+import LocalFolderSelector from './components/LocalFolderSelector.vue'
 import ToastContainer from './components/ToastContainer.vue'
 
 const {
@@ -43,11 +45,24 @@ const {
   llmProviders,
   llmSettings,
   isUpdatingLlmSettings,
+  activeProfileId,
+  editingProfileId,
+  profileFormState,
+  isSwitchingProfile,
   transcriptionSettings,
   isUpdatingTranscriptionSettings,
   summarizationSettings,
   isUpdatingSummarizationSettings,
   isReadingBilibiliCookieFromBrowser,
+  isMultiSelectMode,
+  selectedTaskIds,
+  streamingBuffer,
+  streamingTaskId,
+  isPrewarming,
+  resumeSnapshot,
+  takeResumeSnapshot,
+  clearResumeSnapshot,
+  resetStreamingState,
   submitTask,
   cancelSubmitting,
   selectTask,
@@ -58,15 +73,41 @@ const {
   reSummarize,
   reTranscribe,
   updateTaskTopic,
-  updateLlmSettings,
+  updateProfile,
+  createProfile,
+  deleteProfile,
+  switchActiveProfile,
+  editProfile,
   updateTranscriptionSettings,
   updateSummarizationSettings,
   testLlm,
   readBilibiliCookieFromBrowser,
   checkBilibiliVideoInfo,
   submitTaskWithParts,
-  isBilibiliUrl
+  isBilibiliUrl,
+  checkLocalPath,
+  scanLocalFolder,
+  submitLocalPathTasks,
+  toggleMultiSelectMode,
+  toggleTaskSelection,
+  selectAllTasks,
+  clearSelection,
+  batchReSummarize,
+  batchReTranscribe,
+  batchDownloadMarkdown,
+  batchDelete,
+  toggleFolderSelection,
 } = useTaskViewModel()
+
+const {
+  folders,
+  folderTree,
+  createFolder,
+  renameFolder,
+  deleteFolder,
+  moveFolder,
+  assignTaskToFolder,
+} = useFolderViewModel()
 
 // 状态变量
 const showInfoModal = ref(false)
@@ -90,6 +131,11 @@ const isBilibiliPartsSelectorOpen = ref(false)
 const bilibiliVideoInfo = ref<BilibiliVideoInfo | null>(null)
 const isCheckingBilibiliVideoInfo = ref(false)
 const pendingBilibiliUrl = ref('')
+
+// 本地文件夹选择器状态
+const isLocalFolderSelectorOpen = ref(false)
+const localFolderInfo = ref<LocalFolderScanResult | null>(null)
+const isScanningLocalFolder = ref(false)
 
 // Mermaid 查看器
 const mermaidViewerModalRef = ref<{
@@ -384,37 +430,58 @@ const handleExportSummaryImage = async () => {
 }
 
 const handleUpdateLlmSettings = async (payload: {
-  provider: string
+  profile_id: string
+  name?: string
+  provider?: string
   base_url?: string
   api_key?: string
   model_id?: string
   temperature?: number
 }) => {
   try {
-    await updateLlmSettings(payload)
+    await updateProfile(payload)
     success('LLM 配置已更新')
-  } catch (_e) {
-    // 错误信息由 useTaskViewModel + Toast 统一处理
-  }
+  } catch (_e) {}
 }
 
 const handleUpdateLlmSettingsAndTest = async (payload: {
-  provider: string
+  profile_id: string
+  name?: string
+  provider?: string
   base_url?: string
   api_key?: string
   model_id?: string
   temperature?: number
 }) => {
   try {
-    // 先保存配置
-    await updateLlmSettings(payload)
+    await updateProfile(payload)
     success('LLM 配置已更新')
-
-    // 配置保存成功后立即测试
     await handleTestLlm()
-  } catch (_e) {
-    // 错误信息由 useTaskViewModel + Toast 统一处理
-  }
+  } catch (_e) {}
+}
+
+const handleCreateProfile = async (name: string, provider: string) => {
+  try {
+    await createProfile(name, provider)
+    success('配置已创建')
+  } catch (_e) {}
+}
+
+const handleDeleteProfile = async (profileId: string) => {
+  try {
+    await deleteProfile(profileId)
+    success('配置已删除')
+  } catch (_e) {}
+}
+
+const handleSwitchActiveProfile = async (profileId: string) => {
+  try {
+    await switchActiveProfile(profileId)
+  } catch (_e) {}
+}
+
+const handleEditProfile = (profileId: string) => {
+  editProfile(profileId)
 }
 
 const handleUpdateTranscriptionSettings = async (payload: {
@@ -451,6 +518,43 @@ const handleReadBilibiliCookieFromBrowser = async () => {
 const handleSubmit = async () => {
   // localhost 场景优先使用本地路径直读（避免文件上传复制）
   if (isLocalClient && localFilePath.value.trim()) {
+    // 先检查路径类型
+    const pathCheck = await checkLocalPath(localFilePath.value.trim())
+
+    // 处理检查失败的情况
+    if (!pathCheck) {
+      toastError('无法检查本地路径，请确认服务器是否正常运行')
+      return
+    }
+
+    if (pathCheck.type === 'not_found') {
+      toastError(`路径不存在: ${pathCheck.path}`)
+      return
+    }
+
+    if (pathCheck.type === 'folder') {
+      // 是文件夹，扫描并弹出选择器
+      isScanningLocalFolder.value = true
+      try {
+        const scanResult = await scanLocalFolder(localFilePath.value.trim())
+        if (scanResult && scanResult.files.length > 0) {
+          localFolderInfo.value = scanResult
+          isLocalFolderSelectorOpen.value = true
+        } else if (scanResult && scanResult.files.length === 0) {
+          toastError('文件夹中没有找到支持的视频/音频文件')
+        } else {
+          toastError('扫描文件夹失败，请重试')
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : '扫描文件夹失败'
+        toastError(errMsg)
+      } finally {
+        isScanningLocalFolder.value = false
+      }
+      return
+    }
+
+    // 是文件，直接提交
     await submitTask()
     return
   }
@@ -513,6 +617,26 @@ const handleBilibiliPartsClose = () => {
   pendingBilibiliUrl.value = ''
 }
 
+const handleLocalFolderConfirm = async (config: { mode: 'merge' | 'separate'; paths: string[] }) => {
+  isLocalFolderSelectorOpen.value = false
+  try {
+    await submitLocalPathTasks(config.paths, config.mode)
+    localFilePath.value = ''
+    if (config.paths.length > 1) {
+      success(`已提交 ${config.paths.length} 个任务`)
+    } else {
+      success('已提交任务')
+    }
+  } catch (_e) {
+    // 错误信息由 useTaskViewModel + Toast 统一处理
+  }
+}
+
+const handleLocalFolderClose = () => {
+  isLocalFolderSelectorOpen.value = false
+  localFolderInfo.value = null
+}
+
 const startEditingTopic = () => {
   editingTopicValue.value = topic.value || selectedTask.value?.title || ''
   isEditingTopic.value = true
@@ -533,12 +657,18 @@ const cancelEditingTopic = () => {
   isEditingTopic.value = false
 }
 
-const handleSelectTask = (task: Task) => {
+const handleSelectTask = async (task: Task) => {
   summaryHighlightRequest.value = null
   markdownHeadings.value = []
   activeHeadingId.value = ''
   headingJumpRequest.value = null
-  selectTask(task)
+  await selectTask(task)
+  // 如果选中了正在流式输出的任务，拍快照用于无缝显示已有内容
+  if (selectedTask.value?.status === 'SUMMARIZING' && selectedTask.value.summary) {
+    takeResumeSnapshot(selectedTask.value.summary)
+  } else {
+    clearResumeSnapshot()
+  }
 }
 
 const handleFocusSearchMatch = (payload: {
@@ -622,6 +752,40 @@ const compiledMarkdown = computed(() => {
   })
 })
 
+// 切回来时用的已有内容快照（编译为 HTML 后不再响应 task.summary 更新，避免闪烁）
+const compiledResumeSummary = computed(() => {
+  if (!resumeSnapshot.value) return ''
+  const cleaned = stripDoubleBracePlaceholders(resumeSnapshot.value)
+  const html = marked.parse(cleaned) as string
+  return postProcessCompiledMarkdown(html, {
+    videoUrl: selectedTask.value?.video_url || '',
+  })
+})
+
+const isStreamingSummary = computed(() =>
+  streamingTaskId.value === selectedTask.value?.id
+  && selectedTask.value?.status === 'SUMMARIZING'
+)
+
+// 预热完成时弹出提示
+watch(isPrewarming, (val) => {
+  if (!val) {
+    const { success } = useToast()
+    success('系统预热完成，已准备就绪')
+  }
+})
+
+const streamingBlocks = computed(() =>
+  isStreamingSummary.value ? streamingBuffer.value : []
+)
+
+watch(() => selectedTask.value?.status, (newStatus) => {
+  if (newStatus === 'COMPLETED' || newStatus === 'FAILED') {
+    resetStreamingState()
+    clearResumeSnapshot()
+  }
+})
+
 const topic = computed(() => {
   if (selectedTask.value?.topic) return selectedTask.value.topic
   if (!selectedTask.value?.summary) return ''
@@ -668,14 +832,22 @@ watch(
       :isOpen="isSettingsModalOpen"
       :llmProviders="llmProviders"
       :llmSettings="llmSettings"
+      :activeProfileId="activeProfileId"
+      :editingProfileId="editingProfileId"
+      :profileFormState="profileFormState"
       :isUpdatingLlmSettings="isUpdatingLlmSettings"
       :isTestingLlm="isTestingLlm"
+      :isSwitchingProfile="isSwitchingProfile"
       :transcriptionSettings="transcriptionSettings"
       :isUpdatingTranscriptionSettings="isUpdatingTranscriptionSettings"
       :summarizationSettings="summarizationSettings"
       :isUpdatingSummarizationSettings="isUpdatingSummarizationSettings"
       :isReadingBilibiliCookieFromBrowser="isReadingBilibiliCookieFromBrowser"
       @close="isSettingsModalOpen = false"
+      @switchActiveProfile="handleSwitchActiveProfile"
+      @editProfile="handleEditProfile"
+      @createProfile="handleCreateProfile"
+      @deleteProfile="handleDeleteProfile"
       @updateLlmSettings="handleUpdateLlmSettings"
       @updateLlmSettingsAndTest="handleUpdateLlmSettingsAndTest"
       @testLlm="handleTestLlm"
@@ -701,25 +873,52 @@ watch(
       :tasks="tasks"
       :selectedTask="selectedTask"
       :isSubmitting="isSubmitting"
+      :isPrewarming="isPrewarming"
       :llmProviders="llmProviders"
       :llmSettings="llmSettings"
+      :activeProfileId="activeProfileId"
+      :editingProfileId="editingProfileId"
+      :profileFormState="profileFormState"
       :isUpdatingLlmSettings="isUpdatingLlmSettings"
       :isTestingLlm="isTestingLlm"
+      :isSwitchingProfile="isSwitchingProfile"
       :transcriptionSettings="transcriptionSettings"
       :isUpdatingTranscriptionSettings="isUpdatingTranscriptionSettings"
       :summarizationSettings="summarizationSettings"
       :isUpdatingSummarizationSettings="isUpdatingSummarizationSettings"
+      :folders="folders"
+      :folderTree="folderTree"
+      :isMultiSelectMode="isMultiSelectMode"
+      :selectedTaskIds="selectedTaskIds"
       @submit="handleSubmit"
       @cancelSubmit="cancelSubmitting"
       @selectTask="handleSelectTask"
       @deleteTask="handleDeleteTask"
       @updateLlmSettings="handleUpdateLlmSettings"
+      @switchActiveProfile="handleSwitchActiveProfile"
+      @editProfile="handleEditProfile"
+      @createProfile="handleCreateProfile"
+      @deleteProfile="handleDeleteProfile"
       @updateTranscriptionSettings="handleUpdateTranscriptionSettings"
       @updateSummarizationSettings="handleUpdateSummarizationSettings"
       @startTestLlm="handleTestLlm"
       @focusSearchMatch="handleFocusSearchMatch"
       @showInfo="(task) => { handleSelectTask(task); showInfoModal = true; }"
       @openSettings="isSettingsModalOpen = true"
+      @createFolder="(name: string, parentId: string | null) => createFolder(name, parentId)"
+      @renameFolder="(folderId: string, newName: string) => renameFolder(folderId, newName)"
+      @deleteFolder="deleteFolder"
+      @assignTaskToFolder="(taskId: string, folderId: string | null) => assignTaskToFolder(taskId, folderId)"
+      @moveFolder="(folderId: string, newParentId: string | null) => moveFolder(folderId, newParentId)"
+      @toggleMultiSelectMode="toggleMultiSelectMode"
+      @toggleTaskSelection="toggleTaskSelection"
+      @selectAllTasks="selectAllTasks"
+      @clearSelection="clearSelection"
+      @batchReSummarize="batchReSummarize"
+      @batchReTranscribe="batchReTranscribe"
+      @batchDownloadMarkdown="batchDownloadMarkdown"
+      @batchDelete="batchDelete"
+      @toggleFolderSelection="toggleFolderSelection"
     />
 
     <!-- 右侧内容区 -->
@@ -754,6 +953,9 @@ watch(
           :topic="topic"
           :is-editing-topic="isEditingTopic"
           :editing-topic-value="editingTopicValue"
+          :is-streaming-summary="isStreamingSummary"
+          :streaming-blocks="streamingBlocks"
+          :compiled-resume-summary="compiledResumeSummary"
           @open-mermaid-viewer="openMermaidViewer"
           @start-edit-topic="startEditingTopic"
           @save-topic="saveTopic"
@@ -831,6 +1033,15 @@ watch(
       :isLoading="isCheckingBilibiliVideoInfo"
       @close="handleBilibiliPartsClose"
       @confirm="handleBilibiliPartsConfirm"
+    />
+
+    <!-- 本地文件夹选择器 -->
+    <LocalFolderSelector
+      :isOpen="isLocalFolderSelectorOpen"
+      :folderInfo="localFolderInfo"
+      :isLoading="isScanningLocalFolder"
+      @close="handleLocalFolderClose"
+      @confirm="handleLocalFolderConfirm"
     />
   </div>
 </template>

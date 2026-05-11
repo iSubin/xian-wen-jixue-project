@@ -205,7 +205,23 @@ async def lifespan(app: FastAPI):
         )
 
     logger.info("--- [Lifespan] 服务启动完成，前端已可访问 ---")
-    logger.info("--- [Lifespan] Workers 将在首次使用时自动初始化 ---")
+
+    # 后台预热 Workers（避免首次请求时卡住）
+    async def _prewarm_workers():
+        try:
+            logger.info("--- [Prewarm] 开始后台预热 Workers... ---")
+            # 预热 LLM 模块（测试模型按钮首次点击时会卡住）
+            from src.main.python.sheng_wen.llm.llm import get_llm
+            logger.info("--- [Prewarm] LLM 模块加载完成 ---")
+            # 预热 Worker 链（提交按钮首次点击时会卡住）
+            await api_module.get_transcriber_worker()
+            logger.info("--- [Prewarm] Workers 预热完成 ---")
+            api_module.set_prewarm_ready()
+        except Exception as e:
+            logger.warning(f"--- [Prewarm] 预热失败（首次请求时再试即可）: {e} ---")
+
+    asyncio.create_task(_prewarm_workers())
+
     log_access_tips(config.app.port)
 
     # 启动进度条测试（如果已启用）

@@ -10,6 +10,8 @@ from ..api import notify_task_update
 from ..config.settings import config
 from ..summarization.chunked_summarizer import ChunkedSummarizer
 from ..summarization.chunker import count_timestamp_lines, split_transcript_into_chunks
+from ..summarization.protocol import strip_state_instruction_blocks
+from ..summarization.assembler import remove_program_markers
 from ..utils.logger import logger
 from ..worker import TaskCancelledError, Worker
 from .llm import LLM, LLMError, LLMMessage
@@ -292,7 +294,11 @@ class LLMWorker(Worker):
                 return
 
             response_chunks.append(chunk)
-            # 每次收到新内容就尝试更新（防抖在flush内部处理）
+            # 高频 delta 广播（无防抖，逐 token）
+            if task_id and isinstance(chunk, str) and chunk:
+                from ..api import notify_summary_delta
+                self._submit_coro(notify_summary_delta(task_id, delta=chunk))
+            # 低频通道（防抖在 flush 内部处理）
             if task_id:
                 self._submit_coro(flush_partial_summary())
 
@@ -345,6 +351,18 @@ class LLMWorker(Worker):
         last_stream_update = 0.0
         last_stream_summary = ""
         update_in_progress = False
+        current_chunk_done = [0]
+        current_chunk_total = [0]
+
+        def delta_callback(delta: str):
+            if not task_id or not delta or self.is_task_cancelled(task_id):
+                return
+            from ..api import notify_summary_delta
+            self._submit_coro(notify_summary_delta(
+                task_id, delta=delta,
+                chunk_done=current_chunk_done[0],
+                chunk_total=current_chunk_total[0],
+            ))
 
         def update_chunk_progress(done: int, total: int, partial_summary: str):
             nonlocal last_stream_summary
@@ -354,6 +372,9 @@ class LLMWorker(Worker):
 
             if self.is_task_cancelled(task_id):
                 return
+
+            current_chunk_done[0] = done
+            current_chunk_total[0] = total
 
             current_task = db.get_task(task_id)
             if not current_task:
@@ -407,11 +428,13 @@ class LLMWorker(Worker):
                     return
 
                 progress = int((done / total) * 100) if total > 0 else 0
+                cleaned_summary = strip_state_instruction_blocks(streaming_summary)
+                cleaned_summary = remove_program_markers(cleaned_summary)
                 await update_and_notify(
                     task_id,
                     {
                         "status": TaskStatus.SUMMARIZING,
-                        "summary": streaming_summary,
+                        "summary": cleaned_summary,
                         "progress": progress,
                         "summary_mode": mode_value if mode_value in {"auto", "agent"} else "agent",
                         "summary_chunk_total": total,
@@ -450,6 +473,7 @@ class LLMWorker(Worker):
             transcript_text=transcript_text,
             on_chunk_progress=update_chunk_progress,
             on_chunk_stream=update_chunk_stream,
+            on_chunk_delta=delta_callback,
         )
         topic = _extract_topic(result.summary_text)
         summary_meta = {

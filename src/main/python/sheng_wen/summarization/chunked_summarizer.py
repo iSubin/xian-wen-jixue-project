@@ -10,7 +10,7 @@ from typing import Callable
 from ..llm.llm import LLM, LLMError, LLMMessage
 from ..utils.logger import logger
 from ..worker import TaskCancelledError
-from .assembler import assemble_chunk_summaries
+from .assembler import assemble_chunk_summaries, remove_program_markers
 from .chunker import TranscriptChunk, split_transcript_into_chunks, tail_timestamp_lines
 from .prompt_builder import build_chunk_user_prompt, generate_structure_overview
 from .protocol import parse_state_ops, strip_state_instruction_blocks
@@ -101,6 +101,7 @@ class ChunkedSummarizer:
         transcript_text: str,
         on_chunk_progress: Callable[[int, int, str], None] | None = None,
         on_chunk_stream: Callable[[int, int, str], None] | None = None,
+        on_chunk_delta: Callable[[str], None] | None = None,
     ) -> ChunkedSummaryResult:
         chunks = split_transcript_into_chunks(
             transcript_text=transcript_text,
@@ -134,14 +135,17 @@ class ChunkedSummarizer:
             def emit_chunk_stream(partial_chunk_output: str):
                 if not on_chunk_stream:
                     return
-                preview = partial_chunk_output
+                cleaned = strip_state_instruction_blocks(partial_chunk_output)
+                cleaned = remove_program_markers(cleaned)
+                preview = cleaned
                 if chunk_prefix.strip():
-                    preview = f"{chunk_prefix.rstrip()}\n\n{partial_chunk_output}"
+                    preview = f"{chunk_prefix.rstrip()}\n\n{cleaned}"
                 on_chunk_stream(idx, len(chunks), preview)
 
             output = await self._call_llm_with_retry(
                 user_prompt,
                 on_partial=emit_chunk_stream if on_chunk_stream else None,
+                on_chunk_delta=on_chunk_delta,
             )
             chunk_outputs.append(output)
 
@@ -216,13 +220,14 @@ class ChunkedSummarizer:
         self,
         user_prompt: str,
         on_partial: Callable[[str], None] | None = None,
+        on_chunk_delta: Callable[[str], None] | None = None,
     ) -> str:
         attempt = 0
         last_error: Exception | None = None
         while attempt < self._llm_call_retry_max:
             attempt += 1
             try:
-                return await self._call_llm_once(user_prompt, on_partial=on_partial)
+                return await self._call_llm_once(user_prompt, on_partial=on_partial, on_chunk_delta=on_chunk_delta)
             except asyncio.CancelledError:
                 raise
             except TaskCancelledError:
@@ -240,6 +245,7 @@ class ChunkedSummarizer:
         self,
         user_prompt: str,
         on_partial: Callable[[str], None] | None = None,
+        on_chunk_delta: Callable[[str], None] | None = None,
     ) -> str:
         self._ensure_not_cancelled()
         messages = [
@@ -259,6 +265,11 @@ class ChunkedSummarizer:
                 llm_error = chunk
                 return
             response_chunks.append(chunk)
+            if on_chunk_delta and isinstance(chunk, str) and chunk:
+                try:
+                    on_chunk_delta(chunk)
+                except Exception as e:
+                    logger.warning(f"[ChunkedSummarizer] delta回调失败: {e}")
             if on_partial:
                 now = asyncio.get_event_loop().time()
                 if now - last_emit_at >= 0.5:

@@ -42,7 +42,8 @@ class TaskModel(Base):
     summary_chunk_total = Column(Integer, nullable=True)
     summary_chunk_done = Column(Integer, nullable=True)
     summary_meta = Column(Text, nullable=True)
-    
+    folder_id = Column(String, nullable=True)
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "id": self.id,
@@ -64,6 +65,30 @@ class TaskModel(Base):
             "summary_chunk_total": self.summary_chunk_total,
             "summary_chunk_done": self.summary_chunk_done,
             "summary_meta": self.summary_meta,
+            "folder_id": self.folder_id,
+        }
+
+
+class FolderModel(Base):
+    __tablename__ = "folders"
+
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False)
+    parent_id = Column(String, nullable=True)
+    folder_type = Column(String, default="manual")
+    source_video_url = Column(String, nullable=True)
+    sort_order = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "parent_id": self.parent_id,
+            "folder_type": self.folder_type,
+            "source_video_url": self.source_video_url,
+            "sort_order": self.sort_order,
+            "created_at": self.created_at.isoformat() + 'Z' if self.created_at else None,
         }
 
 
@@ -93,6 +118,11 @@ class TaskDB:
         """Add backward-compatible columns for existing databases."""
         try:
             inspector = inspect(self.engine)
+            # Ensure folders table exists
+            if not inspector.has_table("folders"):
+                FolderModel.__table__.create(self.engine)
+                logger.info("Database schema updated: created folders table")
+
             columns = {col["name"] for col in inspector.get_columns("tasks")}
             has_latest_modified_at = "latest_modified_at" in columns
             has_author_name = "author_name" in columns
@@ -101,6 +131,7 @@ class TaskDB:
             has_summary_chunk_total = "summary_chunk_total" in columns
             has_summary_chunk_done = "summary_chunk_done" in columns
             has_summary_meta = "summary_meta" in columns
+            has_folder_id = "folder_id" in columns
             if (
                 has_latest_modified_at
                 and has_author_name
@@ -109,6 +140,7 @@ class TaskDB:
                 and has_summary_chunk_total
                 and has_summary_chunk_done
                 and has_summary_meta
+                and has_folder_id
             ):
                 return
 
@@ -135,6 +167,9 @@ class TaskDB:
                 if not has_summary_meta:
                     conn.execute(text("ALTER TABLE tasks ADD COLUMN summary_meta TEXT"))
                     logger.info("Database schema updated: added tasks.summary_meta")
+                if not has_folder_id:
+                    conn.execute(text("ALTER TABLE tasks ADD COLUMN folder_id VARCHAR"))
+                    logger.info("Database schema updated: added tasks.folder_id")
         except Exception as e:
             logger.error(f"Failed to ensure database schema: {e}")
 
@@ -342,6 +377,98 @@ class TaskDB:
                 updated += 1
 
         return updated
+
+    # ── Folder CRUD ──
+
+    def create_folder(self, folder_data: Dict[str, Any]) -> Dict[str, Any]:
+        session: Session = self.SessionLocal()
+        try:
+            folder = FolderModel(**folder_data)
+            session.add(folder)
+            session.commit()
+            session.refresh(folder)
+            return folder.to_dict()
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Failed to create folder: {e}")
+            raise
+        finally:
+            session.close()
+
+    def get_folder(self, folder_id: str) -> Optional[Dict[str, Any]]:
+        session: Session = self.SessionLocal()
+        try:
+            folder = session.query(FolderModel).filter(FolderModel.id == folder_id).first()
+            return folder.to_dict() if folder else None
+        finally:
+            session.close()
+
+    def list_folders(self) -> List[Dict[str, Any]]:
+        session: Session = self.SessionLocal()
+        try:
+            folders = session.query(FolderModel).order_by(FolderModel.sort_order, FolderModel.created_at).all()
+            return [f.to_dict() for f in folders]
+        finally:
+            session.close()
+
+    def update_folder(self, folder_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        session: Session = self.SessionLocal()
+        try:
+            folder = session.query(FolderModel).filter(FolderModel.id == folder_id).first()
+            if not folder:
+                return None
+            for key, value in updates.items():
+                setattr(folder, key, value)
+            session.commit()
+            session.refresh(folder)
+            return folder.to_dict()
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Failed to update folder: {e}")
+            raise
+        finally:
+            session.close()
+
+    def delete_folder(self, folder_id: str) -> None:
+        session: Session = self.SessionLocal()
+        try:
+            # Move sub-folders up to parent level
+            folder = session.query(FolderModel).filter(FolderModel.id == folder_id).first()
+            parent_id = folder.parent_id if folder else None
+            session.query(FolderModel).filter(FolderModel.parent_id == folder_id).update({"parent_id": parent_id})
+            # Unassign all tasks in this folder
+            session.query(TaskModel).filter(TaskModel.folder_id == folder_id).update({"folder_id": None})
+            # Delete the folder
+            session.delete(folder)
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Failed to delete folder: {e}")
+            raise
+        finally:
+            session.close()
+
+    def assign_task_to_folder(self, task_id: str, folder_id: Optional[str]) -> None:
+        session: Session = self.SessionLocal()
+        try:
+            task = session.query(TaskModel).filter(TaskModel.id == task_id).first()
+            if task:
+                task.folder_id = folder_id
+                session.commit()
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Failed to assign task to folder: {e}")
+            raise
+        finally:
+            session.close()
+
+    def list_tasks_in_folder(self, folder_id: str) -> List[Dict[str, Any]]:
+        session: Session = self.SessionLocal()
+        try:
+            tasks = session.query(TaskModel).filter(TaskModel.folder_id == folder_id).order_by(TaskModel.created_at.desc()).all()
+            return [t.to_dict() for t in tasks]
+        finally:
+            session.close()
 
 # Global instance
 db = TaskDB(

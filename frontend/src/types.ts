@@ -31,6 +31,7 @@ export interface Task {
   summary_chunk_total?: number;
   summary_chunk_done?: number;
   summary_meta?: string;
+  folder_id?: string | null;
 }
 
 export interface CreateTaskRequest {
@@ -53,7 +54,9 @@ export interface LLMProvider {
   description: string;
 }
 
-export interface LLMSettings {
+export interface LLMProfile {
+  id: string;
+  name: string;
   provider: string;
   base_url: string;
   model_id: string;
@@ -63,13 +66,33 @@ export interface LLMSettings {
   api_key_hint: string;
 }
 
-export interface UpdateLLMSettingsRequest {
+export interface LLMSettings {
+  active_profile_id: string;
+  profiles: LLMProfile[];
+}
+
+export interface CreateProfileRequest {
+  name: string;
   provider: string;
   base_url?: string;
   api_key?: string;
   model_id?: string;
   temperature?: number;
+}
+
+export interface UpdateProfileRequest {
+  profile_id: string;
+  name?: string;
+  provider?: string;
+  base_url?: string;
+  api_key?: string;
+  model_id?: string;
+  temperature?: number;
   context_window_size?: number;
+}
+
+export interface SwitchActiveProfileRequest {
+  profile_id: string;
 }
 
 export interface TranscriptionSettings {
@@ -163,3 +186,37 @@ export interface BilibiliPartsConfig {
   mode: 'merge' | 'separate';
   indices: number[];
 }
+
+export interface LocalFolderFile {
+  name: string;
+  path: string;
+  size: number;
+}
+
+export interface LocalFolderScanResult {
+  folder_path: string;
+  files: LocalFolderFile[];
+  total: number;
+}
+
+export interface LocalPathCheckResult {
+  type: 'file' | 'folder' | 'not_found';
+  path: string;
+}
+
+export interface Folder {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  folder_type: 'auto' | 'manual';
+  source_video_url: string | null;
+  sort_order: number;
+  created_at: string;
+  task_ids?: string[];
+}
+
+export interface FolderTreeNode extends Folder {
+  children: FolderTreeNode[];
+}
+
+export type FolderNode = FolderTreeNode
