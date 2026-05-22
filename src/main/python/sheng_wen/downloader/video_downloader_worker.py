@@ -384,6 +384,85 @@ class VideoDownloaderWorker(Worker):
     def _try_extract_bilibili_subtitle(self, video_url: str, sessdata: str) -> Dict[str, Any] | None:
         return asyncio.run(self._extract_bilibili_subtitle_via_api(video_url, sessdata, 0))
 
+    def _build_ydl_opts(
+        self,
+        quality: str,
+        progress_hook,
+        enable_frame_snapshots: bool = True,
+        bilibili_sessdata: str | None = None,
+        output_template: str | None = None,
+    ) -> Dict[str, Any]:
+        outtmpl = output_template or os.path.join(self.output_dir, '%(id)s.%(ext)s')
+        if enable_frame_snapshots:
+            ydl_opts = {
+                'outtmpl': outtmpl,
+                'format': 'bestvideo[height<=2160]+bestaudio/bestvideo[height<=2160]/bestvideo/best',
+                'merge_output_format': 'mp4',
+                'progress_hooks': [progress_hook],
+            }
+        elif quality == "audio_only":
+            ydl_opts = {
+                'outtmpl': outtmpl,
+                'format': 'worstvideo[vcodec^=avc]+bestaudio[acodec^=mp4a]/worst[ext=mp4]/best',
+                'progress_hooks': [progress_hook],
+                'writethumbnail': False,
+                'writesubtitles': False,
+            }
+        else:
+            ydl_opts = {
+                'outtmpl': outtmpl,
+                'format': 'worstvideo[vcodec^=avc]+bestaudio[acodec^=mp4a]/worst[ext=mp4]/best',
+                'merge_output_format': 'mp4',
+                'progress_hooks': [progress_hook],
+            }
+
+        ffmpeg_location = FFmpegHelper.get_yt_dlp_ffmpeg_location()
+        if ffmpeg_location:
+            ydl_opts['ffmpeg_location'] = ffmpeg_location
+        sessdata = self._sanitize_cookie_value(bilibili_sessdata)
+        if sessdata:
+            ydl_opts['http_headers'] = {
+                **ydl_opts.get('http_headers', {}),
+                'Cookie': f"SESSDATA={sessdata}",
+            }
+        return ydl_opts
+
+    def _build_frame_source_outtmpl(self, task_id: str) -> str:
+        safe_task_id = re.sub(r"[^0-9A-Za-z_.-]+", "_", str(task_id or "task")).strip("._-") or "task"
+        return os.path.join(self.output_dir, f"{safe_task_id}_source_%(id)s.%(ext)s")
+
+    def _download_source_video_for_frames(
+        self,
+        video_url: str,
+        task_id: str,
+        quality: str,
+        bilibili_sessdata: str | None = None,
+    ) -> str | None:
+        logger.info(f"[{self.name}] 为知识文档截图下载高清视频源: task_id={task_id}, url={video_url}")
+
+        def progress_hook(d):
+            if task_id and self.is_task_cancelled(task_id):
+                raise TaskCancelledError(f"任务已取消，停止截图源视频下载: {task_id}")
+
+        try:
+            ydl_opts = self._build_ydl_opts(
+                quality=quality,
+                progress_hook=progress_hook,
+                enable_frame_snapshots=True,
+                bilibili_sessdata=bilibili_sessdata,
+                output_template=self._build_frame_source_outtmpl(task_id),
+            )
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info_dict = ydl.extract_info(video_url, download=True)
+                video_path = ydl.prepare_filename(info_dict)
+            logger.info(f"[{self.name}] 截图源视频下载完成: {video_path}")
+            return video_path
+        except TaskCancelledError:
+            raise
+        except Exception as e:
+            logger.warning(f"[{self.name}] 截图源视频下载失败，将只生成纯文本总结: {e}")
+            return None
+
     def _try_process_with_bilibili_subtitle(self, payload: Dict[str, Any]) -> bool:
         video_url = str(payload.get("video_url") or "")
         task_id = payload.get("task_id")
@@ -437,6 +516,14 @@ class VideoDownloaderWorker(Worker):
             transcript = subtitle_result["transcript"]
             intermediate_file_path = os.path.join(self.output_dir, f"{task_id}_subtitle.txt")
             output_file = os.path.join(self.output_dir, f"{task_id}_summary.md")
+            source_video_file = None
+            if bool(payload.get("enable_frame_snapshots", True)):
+                source_video_file = self._download_source_video_for_frames(
+                    video_url=video_url,
+                    task_id=str(task_id),
+                    quality=str(payload.get("quality") or "best"),
+                    bilibili_sessdata=sessdata,
+                )
 
             with open(intermediate_file_path, "w", encoding="utf-8", errors="replace") as f:
                 f.write(transcript)
@@ -469,6 +556,8 @@ class VideoDownloaderWorker(Worker):
                 "intermediate_file_path": intermediate_file_path,
                 "output_file": output_file,
             })
+            if source_video_file:
+                next_payload["source_video_file"] = source_video_file
             if self.is_task_cancelled(task_id):
                 raise TaskCancelledError(f"任务已取消，停止派发总结: {task_id}")
             self._submit_coro(self.summary_worker.add_task(next_payload))
@@ -664,28 +753,21 @@ class VideoDownloaderWorker(Worker):
                     logger.warning(f"[{self.name}] 无法从 yt-dlp 解析进度: '{p}' (原始值: '{raw_p}')")
 
         try:
-            # 配置 ffmpeg 路径（使用 FFmpegHelper）
-            ffmpeg_location = FFmpegHelper.get_yt_dlp_ffmpeg_location()
-            
-            if quality == "audio_only":
-                ydl_opts = {
-                    'outtmpl': os.path.join(self.output_dir, '%(id)s.%(ext)s'),
-                    'format': 'worstvideo[vcodec^=avc]+bestaudio[acodec^=mp4a]/worst[ext=mp4]/best',
-                    'progress_hooks': [progress_hook],
-                    'writethumbnail': False,
-                    'writesubtitles': False,
-                }
-            else:
-                ydl_opts = {
-                    'outtmpl': os.path.join(self.output_dir, '%(id)s.%(ext)s'),
-                    'format': 'worstvideo[vcodec^=avc]+bestaudio[acodec^=mp4a]/worst[ext=mp4]/best',
-                    'merge_output_format': 'mp4',
-                    'progress_hooks': [progress_hook],
-                }
-            
-            # 如果有 ffmpeg 路径，添加到配置中
-            if ffmpeg_location:
-                ydl_opts['ffmpeg_location'] = ffmpeg_location
+            enable_frame_snapshots = bool(payload.get("enable_frame_snapshots", True))
+            ydl_sessdata = ""
+            if self._is_bilibili_url(str(video_url)):
+                ydl_sessdata, _ = self._resolve_bilibili_sessdata(payload)
+            ydl_opts = self._build_ydl_opts(
+                quality=quality,
+                progress_hook=progress_hook,
+                enable_frame_snapshots=enable_frame_snapshots,
+                bilibili_sessdata=ydl_sessdata,
+                output_template=(
+                    self._build_frame_source_outtmpl(str(task_id))
+                    if enable_frame_snapshots and task_id
+                    else None
+                ),
+            )
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info_dict = ydl.extract_info(video_url, download=True)

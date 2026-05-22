@@ -12,6 +12,8 @@ from ..summarization.chunked_summarizer import ChunkedSummarizer
 from ..summarization.chunker import count_timestamp_lines, split_transcript_into_chunks
 from ..summarization.protocol import strip_state_instruction_blocks
 from ..summarization.assembler import remove_program_markers
+from ..frame_enricher import FrameWriter, enrich_summary_with_video_frames, write_high_quality_frame
+from ..utils.project_root import get_project_root
 from ..utils.logger import logger
 from ..worker import TaskCancelledError, Worker
 from .llm import LLM, LLMError, LLMMessage
@@ -29,12 +31,20 @@ class LLMWorker(Worker):
     - auto: 自动判定（长文本走 agent）
     """
 
-    def __init__(self, name: str, llm_client: LLM):
+    def __init__(
+        self,
+        name: str,
+        llm_client: LLM,
+        frame_assets_root: str | None = None,
+        frame_writer: FrameWriter = write_high_quality_frame,
+    ):
         super().__init__(name)
         self._llm_client = llm_client
         self.system_prompt: str | None = None
         self._chunk_prompt_cache_path: str | None = None
         self._chunk_prompt_cache_text: str | None = None
+        self._frame_assets_root = frame_assets_root or str(get_project_root() / "temp" / "task-assets")
+        self._frame_writer = frame_writer
 
     def load_system_prompt(self, prompt_file: str):
         try:
@@ -148,6 +158,13 @@ class LLMWorker(Worker):
         if task_id and self.is_task_cancelled(task_id):
             raise TaskCancelledError(f"任务已取消，停止写入总结结果: {task_id}")
 
+        final_summary = self._enrich_summary_with_frames(
+            final_summary,
+            task_id=task_id,
+            payload=payload,
+            transcript_text=transcript_text,
+        )
+
         try:
             Path(output_file).parent.mkdir(parents=True, exist_ok=True)
             with open(output_file, "w", encoding="utf-8") as f:
@@ -184,6 +201,25 @@ class LLMWorker(Worker):
 
             from ..task_updater import update_and_notify
             await update_and_notify(task_id, update_data)
+
+    def _enrich_summary_with_frames(
+        self,
+        final_summary: str,
+        task_id: str | None,
+        payload: dict[str, Any],
+        transcript_text: str | None = None,
+    ) -> str:
+        if not task_id:
+            return final_summary
+        video_path = payload.get("video_file") or payload.get("source_video_file")
+        return enrich_summary_with_video_frames(
+            final_summary,
+            task_id=task_id,
+            video_path=str(video_path) if video_path else None,
+            transcript_text=transcript_text,
+            assets_root=self._frame_assets_root,
+            frame_writer=self._frame_writer,
+        )
 
     def _resolve_requested_mode(self, payload: dict[str, Any], task_data: dict[str, Any] | None) -> str:
         payload_mode = str(payload.get("summary_mode") or "").strip().lower()
@@ -238,8 +274,33 @@ class LLMWorker(Worker):
         if not self.system_prompt:
             raise RuntimeError("未加载系统提示词，无法执行标准总结。")
 
+        attempts = max(1, int(config.summarization.llm_call_retry_max))
+        last_error: Exception | None = None
+        for attempt in range(1, attempts + 1):
+            try:
+                final_summary = await self._call_standard_summary_once(transcript_text, task_id)
+                self._raise_if_summary_incomplete(final_summary, transcript_text)
+                topic = _extract_topic(final_summary)
+                return final_summary, topic
+            except asyncio.CancelledError:
+                raise
+            except TaskCancelledError:
+                raise
+            except Exception as e:
+                last_error = e
+                if attempt >= attempts:
+                    break
+                logger.warning(
+                    f"[{self.name}] 标准总结输出异常，准备重试 "
+                    f"({attempt}/{attempts}): {e}"
+                )
+                await asyncio.sleep(min(2.0, 0.3 * attempt))
+
+        raise RuntimeError(f"LLM 总结输出疑似截断: {last_error}")
+
+    async def _call_standard_summary_once(self, transcript_text: str, task_id: str | None) -> str:
         messages = [
-            LLMMessage(role="system", content=self.system_prompt),
+            LLMMessage(role="system", content=self.system_prompt or ""),
             LLMMessage(role="user", content=transcript_text),
         ]
         response_chunks: list[str] = []
@@ -302,13 +363,44 @@ class LLMWorker(Worker):
             if task_id:
                 self._submit_coro(flush_partial_summary())
 
-        await self._llm_client.response(messages=messages, resp_callback=callback)
+        timeout_sec = self._standard_summary_timeout_sec()
+        try:
+            await asyncio.wait_for(
+                self._llm_client.response(
+                    messages=messages,
+                    resp_callback=callback,
+                    timeout=timeout_sec,
+                ),
+                timeout=timeout_sec,
+            )
+        except asyncio.TimeoutError as exc:
+            raise RuntimeError(f"LLM 请求超时: {timeout_sec:g}s") from exc
         if llm_error:
             raise llm_error
 
-        final_summary = "".join(response_chunks)
-        topic = _extract_topic(final_summary)
-        return final_summary, topic
+        return "".join(response_chunks)
+
+    def _standard_summary_timeout_sec(self) -> float:
+        return float(config.summarization.llm_call_timeout_sec)
+
+    @staticmethod
+    def _raise_if_summary_incomplete(summary: str, transcript_text: str) -> None:
+        stripped = (summary or "").strip()
+        if not stripped:
+            raise RuntimeError("LLM 未返回总结内容")
+
+        transcript_len = len((transcript_text or "").strip())
+        min_summary_len = 120 if transcript_len >= 1000 else 60
+        if transcript_len >= 500 and len(stripped) < min_summary_len:
+            raise RuntimeError(
+                f"总结长度过短: summary_len={len(stripped)}, transcript_len={transcript_len}"
+            )
+
+        if stripped.count("{{") > stripped.count("}}"):
+            raise RuntimeError("主题标签未闭合")
+
+        if re.search(r"(?:^|\n)#{1,6}\s*$", stripped):
+            raise RuntimeError("Markdown 标题疑似截断")
 
     async def _run_chunked_summary(
         self,

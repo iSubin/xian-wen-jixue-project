@@ -260,6 +260,9 @@ app.include_router(api_module.app.router)
 # 重新挂载静态文件目录 (这部分不会被 include_router 包含)
 dist_dir = config.app.frontend_dist_dir
 assets_dir = os.path.join(dist_dir, "assets")
+task_assets_dir = os.path.join(path, "temp", "task-assets")
+os.makedirs(task_assets_dir, exist_ok=True)
+app.mount("/task-assets", StaticFiles(directory=task_assets_dir), name="task-assets")
 
 if os.path.exists(dist_dir):
     app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
@@ -287,5 +290,4 @@ if __name__ == "__main__":
 
     # 确保 uvicorn 运行的是我们新创建的 app 实例
     uvicorn.run(app, host=host, port=port)
-
 

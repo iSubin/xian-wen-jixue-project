@@ -85,6 +85,9 @@ app.add_middleware(
 # api.py 位于 src/main/python/sheng_wen/api.py，需要向上跳 5 级到达项目根目录
 base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 dist_dir = os.path.join(base_dir, "frontend", "dist")
+task_assets_dir = os.path.join(base_dir, "temp", "task-assets")
+os.makedirs(task_assets_dir, exist_ok=True)
+app.mount("/task-assets", StaticFiles(directory=task_assets_dir), name="task-assets")
 
 if os.path.exists(dist_dir):
     app.mount("/assets", StaticFiles(directory=os.path.join(dist_dir, "assets")), name="assets")
@@ -1921,4 +1924,3 @@ async def websocket_endpoint(websocket: WebSocket):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-

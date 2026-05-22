@@ -52,6 +52,7 @@
     "prev_tail_timestamp_lines_m": 10,
     "prev_summary_tail_chars_j": 500,
     "llm_call_retry_max": 3,
+    "llm_call_timeout_sec": 120,
     "fallback_to_standard_on_agent_error": true,
     "chunk_prompt_file": "src/main/python/sheng_wen/prompt_for_chunk.md",
     "max_agent_value_chars": 500,

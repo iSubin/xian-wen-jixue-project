@@ -190,6 +190,7 @@ class SummarizationConfig:
     prev_tail_timestamp_lines_m: int = 10
     prev_summary_tail_chars_j: int = 500
     llm_call_retry_max: int = 3
+    llm_call_timeout_sec: int = 120
     fallback_to_standard_on_agent_error: bool = True
     chunk_prompt_file: str = "src/main/python/sheng_wen/prompt_for_chunk.md"
     max_agent_value_chars: int = 500
@@ -213,6 +214,7 @@ class SummarizationConfig:
         self.prev_tail_timestamp_lines_m = max(0, int(self.prev_tail_timestamp_lines_m))
         self.prev_summary_tail_chars_j = max(0, int(self.prev_summary_tail_chars_j))
         self.llm_call_retry_max = max(1, int(self.llm_call_retry_max))
+        self.llm_call_timeout_sec = max(10, int(self.llm_call_timeout_sec))
         self.max_agent_value_chars = max(100, int(self.max_agent_value_chars))
         self.transcript_chunk_emit_duration_sec = max(30, int(self.transcript_chunk_emit_duration_sec))
         self.chunk_prompt_file = _resolve_project_path(self.chunk_prompt_file)
@@ -526,6 +528,7 @@ class JSONConfigManager:
             "prev_tail_timestamp_lines_m",
             "prev_summary_tail_chars_j",
             "llm_call_retry_max",
+            "llm_call_timeout_sec",
             "max_agent_value_chars",
             "transcript_chunk_emit_duration_sec",
         ]
@@ -674,6 +677,7 @@ class JSONConfigManager:
             ),
             prev_summary_tail_chars_j=int(raw.get("prev_summary_tail_chars_j", defaults["prev_summary_tail_chars_j"])),
             llm_call_retry_max=int(raw.get("llm_call_retry_max", defaults["llm_call_retry_max"])),
+            llm_call_timeout_sec=int(raw.get("llm_call_timeout_sec", defaults["llm_call_timeout_sec"])),
             fallback_to_standard_on_agent_error=bool(
                 raw.get("fallback_to_standard_on_agent_error", defaults["fallback_to_standard_on_agent_error"])
             ),
