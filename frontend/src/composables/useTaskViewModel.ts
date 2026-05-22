@@ -1,6 +1,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useIncremark } from '@incremark/vue'
 import axios from 'axios'
+import { formatTranscriptAsText } from '../utils/transcriptFormatter'
 import type {
   Task,
   CreateTaskRequest,
@@ -381,7 +382,7 @@ export function useTaskViewModel() {
       content = selectedTask.value.summary || ''
       filename = `AI总结-${topic}.md`
     } else {
-      content = selectedTask.value.transcript || ''
+      content = formatTranscriptAsText(selectedTask.value.transcript || '')
       filename = `视频转录-${topic}.txt`
     }
     
@@ -898,7 +899,7 @@ export function useTaskViewModel() {
       if (type === 'summary') {
         text = selectedTask.value.summary || ''
       } else {
-        text = selectedTask.value.transcript || ''
+        text = formatTranscriptAsText(selectedTask.value.transcript || '')
       }
 
       if (!text) return false
@@ -1060,7 +1061,7 @@ export function useTaskViewModel() {
         const task = tasks.value.find(t => t.id === id)
         if (!task?.transcript) continue
         const topic = task.topic || task.title || id
-        const blob = new Blob([task.transcript], { type: 'text/plain' })
+        const blob = new Blob([formatTranscriptAsText(task.transcript)], { type: 'text/plain' })
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url

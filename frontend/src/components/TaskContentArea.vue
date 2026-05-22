@@ -8,6 +8,7 @@ import TaskMetaCard from './TaskMetaCard.vue'
 import { countWords } from '../utils/formatters'
 import { normalizeAccidentalInlineCodeBlocks } from '../utils/markdownNormalizer'
 import { normalizeMermaidSvgLayout } from '../utils/mermaidLayout'
+import { formatTranscriptForDisplay } from '../utils/transcriptFormatter'
 import { useMarkdownTheme } from '../composables/useMarkdownTheme'
 import { getMermaid } from '../utils/mermaidLoader'
 
@@ -62,6 +63,10 @@ const { currentThemeId } = useMarkdownTheme()
 const summaryWordCount = computed(() => {
   if (!props.task.summary) return 0
   return countWords(props.task.summary)
+})
+
+const formattedTranscript = computed(() => {
+  return formatTranscriptForDisplay(props.task.transcript || '', { videoUrl: props.task.video_url })
 })
 
 const showContent = computed(() => {
@@ -581,11 +586,55 @@ watch(() => props.streamingBlocks, () => {
 
         <!-- 转录文本 Tab -->
         <div v-show="activeTab === 'transcript'" class="px-8 py-8">
-          <div class="flex justify-between items-center mb-6">
+          <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
             <h3 class="text-lg font-bold text-slate-800">全文转录</h3>
+            <div
+              v-if="task.transcript && formattedTranscript.segments.length"
+              class="text-xs font-medium text-slate-500 bg-slate-100 border border-slate-200 rounded-full px-3 py-1"
+            >
+              共 {{ formattedTranscript.segments.length }} 段
+            </div>
           </div>
-          <div class="space-y-4 text-slate-600 leading-relaxed font-normal">
-            <p v-if="task.transcript" class="whitespace-pre-wrap text-sm leading-relaxed">{{ task.transcript }}</p>
+          <div class="text-slate-700 leading-relaxed font-normal">
+            <div
+              v-if="task.transcript && formattedTranscript.hasTimestampedSegments"
+              class="relative space-y-1 before:absolute before:left-[3.75rem] before:top-2 before:bottom-2 before:w-px before:bg-slate-200"
+            >
+              <div
+                v-for="segment in formattedTranscript.segments"
+                :key="segment.id"
+                class="relative grid grid-cols-[7.5rem_minmax(0,1fr)] gap-4 py-2"
+              >
+                <div class="relative z-10 flex justify-center">
+                  <a
+                    v-if="segment.timeLabel && segment.jumpUrl"
+                    :href="segment.jumpUrl"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="h-7 rounded-md border border-blue-200 bg-blue-50 px-2 text-[11px] font-semibold leading-7 text-blue-700 tabular-nums shadow-sm transition hover:border-blue-300 hover:bg-blue-100"
+                    :title="`跳转到原视频 ${segment.timeLabel}`"
+                  >
+                    {{ segment.timeLabel }}
+                  </a>
+                  <span
+                    v-else-if="segment.timeLabel"
+                    class="h-7 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold leading-7 text-slate-500 tabular-nums shadow-sm"
+                  >
+                    {{ segment.timeLabel }}
+                  </span>
+                </div>
+                <p class="min-w-0 text-sm leading-7 text-slate-700">{{ segment.text }}</p>
+              </div>
+            </div>
+            <div v-else-if="task.transcript" class="space-y-3">
+              <p
+                v-for="segment in formattedTranscript.segments"
+                :key="segment.id"
+                class="text-sm leading-7 text-slate-700"
+              >
+                {{ segment.text }}
+              </p>
+            </div>
             <p v-else class="text-gray-400 italic">暂无转录内容</p>
           </div>
         </div>
