@@ -83,6 +83,13 @@ class LLMProviderManager:
                 description="OpenAI 官方 API",
             ),
             LLMProvider(
+                id="anthropic",
+                label="Anthropic",
+                default_base_url="https://api.anthropic.com",
+                default_model_id="claude-3-5-sonnet-latest",
+                description="Anthropic 官方或兼容接口",
+            ),
+            LLMProvider(
                 id="openrouter",
                 label="OpenRouter",
                 default_base_url="https://openrouter.ai/api/v1",
@@ -119,6 +126,8 @@ class LLMProviderManager:
             return "deepseek"
         if "api.openai.com" in normalized:
             return "openai"
+        if "api.anthropic.com" in normalized:
+            return "anthropic"
         return "openai_compatible"
 
     def bind_llm_worker(self, llm_worker: Any) -> None:

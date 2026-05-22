@@ -838,6 +838,7 @@ watch(
       :isUpdatingLlmSettings="isUpdatingLlmSettings"
       :isTestingLlm="isTestingLlm"
       :isSwitchingProfile="isSwitchingProfile"
+      :isPrewarming="isPrewarming"
       :transcriptionSettings="transcriptionSettings"
       :isUpdatingTranscriptionSettings="isUpdatingTranscriptionSettings"
       :summarizationSettings="summarizationSettings"

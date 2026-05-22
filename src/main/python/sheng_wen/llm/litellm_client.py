@@ -36,6 +36,7 @@ class LiteLLMClient(LLM):
         route_map = {
             "openai_compatible": "openai",
             "openai": "openai",
+            "anthropic": "anthropic",
             "deepseek": "openai",
             "ollama": "openai",
             "openrouter": "openrouter",

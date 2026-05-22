@@ -7,10 +7,14 @@ import unittest
 path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 sys.path.insert(0, path)
 
-from src.main.python.sheng_wen.config.settings import JSONConfigManager
+from src.main.python.sheng_wen.config.settings import DEFAULT_SETTINGS, JSONConfigManager
 
 
 class TestJSONConfigManager(unittest.TestCase):
+    def test_default_profile_id_is_stable_for_example_file(self):
+        self.assertEqual(DEFAULT_SETTINGS["llm"]["active_profile_id"], "default")
+        self.assertEqual(DEFAULT_SETTINGS["llm"]["profiles"][0]["id"], "default")
+
     def test_switch_to_auto_download_clears_manual_model_paths(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             config_path = os.path.join(temp_dir, "settings.json")

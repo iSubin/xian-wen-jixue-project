@@ -119,6 +119,12 @@ _BUILTIN_PROVIDER_DEFAULTS: dict[str, dict[str, Any]] = {
         "api_key": "",
         "model_id": "gpt-4.1-mini",
     },
+    "anthropic": {
+        "label": "Anthropic",
+        "base_url": "https://api.anthropic.com",
+        "api_key": "",
+        "model_id": "claude-3-5-sonnet-latest",
+    },
     "openrouter": {
         "label": "OpenRouter",
         "base_url": "https://openrouter.ai/api/v1",
@@ -227,7 +233,7 @@ def _dataclass_defaults(cls: type[Any]) -> dict[str, Any]:
 
 
 def _build_default_settings() -> dict[str, Any]:
-    default_profile_id = uuid.uuid4().hex[:8]
+    default_profile_id = "default"
     default_provider = _BUILTIN_PROVIDER_DEFAULTS["openai_compatible"]
     llm_defaults = {
         "active_profile_id": default_profile_id,
@@ -746,5 +752,3 @@ def to_llm_config(settings: Settings) -> "LLMConfigDataclass":
         context_window_size=llm_cfg.context_window_size,
         provider=llm_cfg.provider,
     )
-
-
