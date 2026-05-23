@@ -2,6 +2,8 @@ import os
 import sys
 import unittest
 import asyncio
+import tempfile
+from unittest.mock import patch
 
 
 path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
@@ -24,17 +26,37 @@ class TestVideoDownloaderFrameQuality(unittest.TestCase):
         self.assertNotIn("worstvideo", opts["format"])
         self.assertEqual(opts["merge_output_format"], "mp4")
 
-    def test_ydl_opts_include_bilibili_sessdata_cookie_when_available(self):
+    def test_ydl_opts_include_bilibili_cookiefile_when_available(self):
         worker = VideoDownloaderWorker(name="test-downloader")
 
-        opts = worker._build_ydl_opts(
-            quality="audio_only",
-            progress_hook=lambda _: None,
-            enable_frame_snapshots=True,
-            bilibili_sessdata="sess-value",
-        )
+        fd, cookie_path = tempfile.mkstemp(prefix="shengwen-test-", suffix=".cookies.txt")
+        os.close(fd)
+        try:
+            opts = worker._build_ydl_opts(
+                quality="audio_only",
+                progress_hook=lambda _: None,
+                enable_frame_snapshots=True,
+                bilibili_sessdata="sess-value",
+                bilibili_cookiefile=cookie_path,
+            )
 
-        self.assertEqual(opts["http_headers"]["Cookie"], "SESSDATA=sess-value")
+            self.assertEqual(opts["cookiefile"], cookie_path)
+            self.assertNotIn("Cookie", opts.get("http_headers", {}))
+        finally:
+            os.remove(cookie_path)
+
+    def test_writes_bilibili_sessdata_as_netscape_cookie_file(self):
+        worker = VideoDownloaderWorker(name="test-downloader")
+
+        cookie_path = worker._write_bilibili_sessdata_cookie_file("sess-value")
+
+        try:
+            with open(cookie_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            self.assertIn(".bilibili.com\tTRUE\t/\tFALSE\t", content)
+            self.assertIn("\tSESSDATA\tsess-value\n", content)
+        finally:
+            os.remove(cookie_path)
 
     def test_frame_source_download_uses_task_scoped_output_template(self):
         worker = VideoDownloaderWorker(name="test-downloader")
@@ -55,6 +77,79 @@ class TestVideoDownloaderFrameQuality(unittest.TestCase):
         )
 
         self.assertEqual(opts["outtmpl"], "temp/task-123_source_%(id)s.%(ext)s")
+
+    def test_normalizes_bilibili_bare_domain_to_www(self):
+        worker = VideoDownloaderWorker(name="test-downloader")
+
+        normalized = worker._normalize_bilibili_url_for_download(
+            "https://bilibili.com/video/BV1YZGB6cEBN/?spm_id_from=333.40164.0.0"
+        )
+
+        self.assertEqual(
+            normalized,
+            "https://www.bilibili.com/video/BV1YZGB6cEBN/?spm_id_from=333.40164.0.0",
+        )
+
+    def test_download_path_uses_normalized_bilibili_url_for_ytdlp(self):
+        worker = VideoDownloaderWorker(name="test-downloader")
+        worker._try_process_with_bilibili_subtitle = lambda payload: False
+        worker._validate_downloaded_media_duration = lambda **kwargs: None
+        captured_urls = []
+
+        class FakeYDL:
+            def __init__(self, opts):
+                self.opts = opts
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def extract_info(self, video_url, download=True):
+                captured_urls.append(video_url)
+                return {"id": "BV1YZGB6cEBN", "duration": 120, "title": "title"}
+
+            def prepare_filename(self, info_dict):
+                return "/tmp/video.mp4"
+
+        with patch(
+            "src.main.python.sheng_wen.downloader.video_downloader_worker.yt_dlp.YoutubeDL",
+            FakeYDL,
+        ):
+            worker.process_task(
+                {
+                    "video_url": "https://bilibili.com/video/BV1YZGB6cEBN/?spm_id_from=333.40164.0.0",
+                    "quality": "best",
+                    "enable_frame_snapshots": False,
+                }
+            )
+
+        self.assertEqual(
+            captured_urls,
+            ["https://www.bilibili.com/video/BV1YZGB6cEBN/?spm_id_from=333.40164.0.0"],
+        )
+
+    def test_rejects_downloaded_media_when_duration_is_much_shorter_than_metadata(self):
+        worker = VideoDownloaderWorker(name="test-downloader")
+        worker._probe_downloaded_media_duration = lambda _: 960.0
+
+        with self.assertRaisesRegex(RuntimeError, "下载不完整"):
+            worker._validate_downloaded_media_duration(
+                video_path="/tmp/partial.mp4",
+                expected_duration=2156.831,
+                video_url="https://www.bilibili.com/video/BV1YZGB6cEBN/",
+            )
+
+    def test_accepts_downloaded_media_when_duration_matches_metadata(self):
+        worker = VideoDownloaderWorker(name="test-downloader")
+        worker._probe_downloaded_media_duration = lambda _: 2154.0
+
+        worker._validate_downloaded_media_duration(
+            video_path="/tmp/full.mp4",
+            expected_duration=2156.831,
+            video_url="https://www.bilibili.com/video/BV1YZGB6cEBN/",
+        )
 
     def test_bilibili_subtitle_path_passes_high_quality_source_video_for_frames(self):
         captured_payloads = []

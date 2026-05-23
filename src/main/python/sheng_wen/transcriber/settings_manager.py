@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import glob
+import hashlib
 import os
 import re
+import sqlite3
 import shutil
 import subprocess
+import sys
+import tempfile
 from threading import Lock
 from typing import Any, Literal
 
@@ -53,6 +58,118 @@ def _read_bilibili_cookie_from_browser() -> tuple[str, str]:
         except Exception as e:
             logger.debug(f"[TranscriptionSettingsManager] 从 {browser_name} 读取失败: {e}")
             continue
+
+    sessdata, browser_name = _read_bilibili_cookie_from_macos_chrome()
+    if sessdata:
+        return sessdata, browser_name
+
+    return "", ""
+
+
+def _get_macos_chrome_safe_storage_password() -> str:
+    result = subprocess.run(
+        ["security", "find-generic-password", "-w", "-s", "Chrome Safe Storage"],
+        capture_output=True,
+        text=True,
+        timeout=5,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError((result.stderr or result.stdout or "无法读取 Chrome Safe Storage").strip())
+    return (result.stdout or "").strip()
+
+
+def _decrypt_macos_chrome_v10_cookie(
+    host_key: str,
+    value: str | bytes | None,
+    encrypted_value: bytes,
+    password: str,
+) -> str:
+    if value:
+        return value.decode("utf-8", errors="replace") if isinstance(value, bytes) else str(value)
+    if not encrypted_value or not encrypted_value.startswith(b"v10"):
+        return ""
+
+    try:
+        from Cryptodome.Cipher import AES
+        from Cryptodome.Protocol.KDF import PBKDF2
+        from Cryptodome.Util.Padding import unpad
+    except Exception as exc:
+        raise RuntimeError("缺少 Cryptodome，无法解密 Chrome Cookie") from exc
+
+    key = PBKDF2(password, b"saltysalt", 16, 1003)
+    cipher = AES.new(key, AES.MODE_CBC, b" " * 16)
+    plaintext = unpad(cipher.decrypt(encrypted_value[3:]), AES.block_size)
+
+    # Chrome newer cookie schema prepends SHA256(host_key) before the real value.
+    host_digest = hashlib.sha256(str(host_key or "").encode("utf-8")).digest()
+    if plaintext.startswith(host_digest):
+        plaintext = plaintext[len(host_digest):]
+    return plaintext.decode("utf-8")
+
+
+def _iter_macos_chrome_cookie_files() -> list[str]:
+    chrome_root = os.path.expanduser("~/Library/Application Support/Google/Chrome")
+    patterns = [
+        os.path.join(chrome_root, "Default", "Cookies"),
+        os.path.join(chrome_root, "Default", "Network", "Cookies"),
+        os.path.join(chrome_root, "Profile *", "Cookies"),
+        os.path.join(chrome_root, "Profile *", "Network", "Cookies"),
+    ]
+    cookie_files: list[str] = []
+    for pattern in patterns:
+        for cookie_file in glob.glob(pattern):
+            if os.path.isfile(cookie_file) and cookie_file not in cookie_files:
+                cookie_files.append(cookie_file)
+    return cookie_files
+
+
+def _read_bilibili_cookie_from_macos_chrome() -> tuple[str, str]:
+    if sys.platform != "darwin":
+        return "", ""
+
+    cookie_files = _iter_macos_chrome_cookie_files()
+    if not cookie_files:
+        return "", ""
+
+    try:
+        password = _get_macos_chrome_safe_storage_password()
+    except Exception as e:
+        logger.debug(f"[TranscriptionSettingsManager] 读取 Chrome Safe Storage 失败: {e}")
+        return "", ""
+
+    for cookie_file in cookie_files:
+        temp_path = ""
+        try:
+            fd, temp_path = tempfile.mkstemp(prefix="shengwen-chrome-cookies-", suffix=".sqlite")
+            os.close(fd)
+            shutil.copy2(cookie_file, temp_path)
+            with sqlite3.connect(temp_path) as con:
+                rows = con.execute(
+                    """
+                    SELECT host_key, name, value, encrypted_value
+                    FROM cookies
+                    WHERE host_key LIKE ? AND name = ?
+                    ORDER BY expires_utc DESC
+                    """,
+                    ("%bilibili.com%", "SESSDATA"),
+                ).fetchall()
+
+            for host_key, name, value, encrypted_value in rows:
+                sessdata = _sanitize_cookie_value(
+                    _decrypt_macos_chrome_v10_cookie(host_key, value, encrypted_value, password)
+                )
+                if sessdata:
+                    logger.info("[TranscriptionSettingsManager] 已通过 macOS Chrome 兜底读取 B 站 Cookie")
+                    return sessdata, "Google Chrome"
+        except Exception as e:
+            logger.debug(f"[TranscriptionSettingsManager] Chrome Cookie 兜底读取失败: {e}")
+        finally:
+            if temp_path:
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
 
     return "", ""
 
@@ -540,4 +657,3 @@ class TranscriptionSettingsManager:
                 "enable_bilibili_subtitle_fetch": self._enable_bilibili_subtitle_fetch,
                 "bilibili_sessdata": self._bilibili_sessdata,
             }
-

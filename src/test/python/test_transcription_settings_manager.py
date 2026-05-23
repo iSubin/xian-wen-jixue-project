@@ -2,13 +2,21 @@ import os
 import sys
 import tempfile
 import unittest
+import hashlib
 from unittest.mock import patch
+
+from Cryptodome.Cipher import AES
+from Cryptodome.Protocol.KDF import PBKDF2
+from Cryptodome.Util.Padding import pad
 
 
 path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 sys.path.insert(0, path)
 
-from src.main.python.sheng_wen.transcriber.settings_manager import TranscriptionSettingsManager
+from src.main.python.sheng_wen.transcriber.settings_manager import (
+    TranscriptionSettingsManager,
+    _decrypt_macos_chrome_v10_cookie,
+)
 
 
 class _DummyTranscriberWorker:
@@ -53,6 +61,20 @@ class TestTranscriptionSettingsManager(unittest.TestCase):
             value, source = manager.resolve_bilibili_sessdata("task_cookie_xyz")
             self.assertEqual(source, "task")
             self.assertEqual(value, "task_cookie_xyz")
+
+    def test_decrypt_macos_chrome_v10_cookie_strips_host_digest_prefix(self):
+        host_key = ".bilibili.com"
+        expected_value = "sessdata-value"
+        password = "test-safe-storage"
+        key = PBKDF2(password, b"saltysalt", 16, 1003)
+        plaintext = hashlib.sha256(host_key.encode("utf-8")).digest() + expected_value.encode("utf-8")
+        encrypted_value = b"v10" + AES.new(key, AES.MODE_CBC, b" " * 16).encrypt(
+            pad(plaintext, AES.block_size)
+        )
+
+        value = _decrypt_macos_chrome_v10_cookie(host_key, "", encrypted_value, password)
+
+        self.assertEqual(value, expected_value)
 
     def test_update_device_without_worker_should_not_rebuild_transcriber(self):
         manager = TranscriptionSettingsManager(initial_device="cuda", model_size="tiny")
@@ -129,4 +151,3 @@ class TestTranscriptionSettingsManager(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

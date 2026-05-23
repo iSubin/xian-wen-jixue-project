@@ -2,8 +2,9 @@ import asyncio
 import json
 import os
 import re
+import tempfile
 import uuid
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
 from typing import Any, Dict, List, Tuple, Optional
 import yt_dlp
@@ -40,6 +41,20 @@ class VideoDownloaderWorker(Worker):
         return "bilibili.com" in netloc or "b23.tv" in netloc
 
     @staticmethod
+    def _normalize_bilibili_url_for_download(video_url: str) -> str:
+        try:
+            parsed = urlparse(video_url)
+        except Exception:
+            return video_url
+        if (parsed.hostname or "").lower() != "bilibili.com":
+            return video_url
+
+        netloc = "www.bilibili.com"
+        if parsed.port:
+            netloc = f"{netloc}:{parsed.port}"
+        return urlunparse(parsed._replace(netloc=netloc))
+
+    @staticmethod
     def _format_duration(seconds: float) -> str:
         """将秒数格式化为 HHMMSS 字符串。"""
         hours = int(seconds // 3600)
@@ -48,8 +63,101 @@ class VideoDownloaderWorker(Worker):
         return f"{hours:02d}{minutes:02d}{sec:02d}"
 
     @staticmethod
+    def _format_duration_label(seconds: float) -> str:
+        """将秒数格式化为 HH:MM:SS 字符串，用于用户可读错误信息。"""
+        try:
+            value = max(0, int(float(seconds)))
+        except (TypeError, ValueError):
+            value = 0
+        hours = value // 3600
+        minutes = (value % 3600) // 60
+        sec = value % 60
+        return f"{hours:02d}:{minutes:02d}:{sec:02d}"
+
+    def _probe_downloaded_media_duration(self, media_path: str) -> float:
+        if not media_path or not os.path.exists(media_path):
+            return 0.0
+        if not FFmpegHelper.configure_ffmpeg_python():
+            return 0.0
+
+        try:
+            import ffmpeg
+
+            probe = ffmpeg.probe(media_path)
+            fmt = probe.get("format") or {}
+            raw_duration = fmt.get("duration")
+            if raw_duration is None:
+                return 0.0
+            duration = float(raw_duration)
+            return duration if duration > 0 else 0.0
+        except Exception as e:
+            logger.warning(f"[{self.name}] 无法探测下载媒体时长，跳过完整性校验: {e}")
+            return 0.0
+
+    def _validate_downloaded_media_duration(
+        self,
+        video_path: str,
+        expected_duration: Any,
+        video_url: str,
+    ) -> None:
+        try:
+            expected = float(expected_duration or 0)
+        except (TypeError, ValueError):
+            expected = 0.0
+        if expected <= 0:
+            return
+
+        actual = self._probe_downloaded_media_duration(video_path)
+        if actual <= 0:
+            return
+
+        missing_duration = expected - actual
+        allowed_gap = max(60.0, expected * 0.1)
+        if missing_duration <= allowed_gap:
+            return
+
+        expected_label = self._format_duration_label(expected)
+        actual_label = self._format_duration_label(actual)
+        hint = ""
+        if self._is_bilibili_url(video_url):
+            hint = (
+                "这通常是 B 站匿名下载只返回了截断媒体导致的。"
+                "请在转录设置中配置 B 站 SESSDATA，或使用“从浏览器读取 Cookie”后重试。"
+            )
+        raise RuntimeError(
+            f"视频下载不完整：页面标称时长 {expected_label}，"
+            f"但本地媒体只有 {actual_label}。{hint}"
+        )
+
+    @staticmethod
     def _sanitize_cookie_value(value: str | None) -> str:
         return (value or "").strip().replace("\r", "").replace("\n", "")
+
+    def _write_bilibili_sessdata_cookie_file(self, sessdata: str | None) -> str:
+        sessdata = self._sanitize_cookie_value(sessdata)
+        if not sessdata:
+            return ""
+
+        fd, cookie_path = tempfile.mkstemp(
+            prefix="shengwen-bilibili-",
+            suffix=".cookies.txt",
+            dir=self.output_dir,
+        )
+        os.close(fd)
+        os.chmod(cookie_path, 0o600)
+        with open(cookie_path, "w", encoding="utf-8") as f:
+            f.write("# Netscape HTTP Cookie File\n")
+            f.write(f".bilibili.com\tTRUE\t/\tFALSE\t2147483647\tSESSDATA\t{sessdata}\n")
+        return cookie_path
+
+    @staticmethod
+    def _remove_temp_cookie_file(cookie_path: str | None) -> None:
+        if not cookie_path:
+            return
+        try:
+            os.remove(cookie_path)
+        except OSError:
+            pass
 
     @staticmethod
     def _resolve_final_url(video_url: str) -> str:
@@ -390,6 +498,7 @@ class VideoDownloaderWorker(Worker):
         progress_hook,
         enable_frame_snapshots: bool = True,
         bilibili_sessdata: str | None = None,
+        bilibili_cookiefile: str | None = None,
         output_template: str | None = None,
     ) -> Dict[str, Any]:
         outtmpl = output_template or os.path.join(self.output_dir, '%(id)s.%(ext)s')
@@ -420,10 +529,17 @@ class VideoDownloaderWorker(Worker):
         if ffmpeg_location:
             ydl_opts['ffmpeg_location'] = ffmpeg_location
         sessdata = self._sanitize_cookie_value(bilibili_sessdata)
-        if sessdata:
+        if sessdata and bilibili_cookiefile:
+            ydl_opts['cookiefile'] = bilibili_cookiefile
+            ydl_opts['http_headers'] = {
+                **ydl_opts.get('http_headers', {}),
+                'Referer': 'https://www.bilibili.com/',
+            }
+        elif sessdata:
             ydl_opts['http_headers'] = {
                 **ydl_opts.get('http_headers', {}),
                 'Cookie': f"SESSDATA={sessdata}",
+                'Referer': 'https://www.bilibili.com/',
             }
         return ydl_opts
 
@@ -438,6 +554,7 @@ class VideoDownloaderWorker(Worker):
         quality: str,
         bilibili_sessdata: str | None = None,
     ) -> str | None:
+        video_url = self._normalize_bilibili_url_for_download(str(video_url))
         logger.info(f"[{self.name}] 为知识文档截图下载高清视频源: task_id={task_id}, url={video_url}")
 
         def progress_hook(d):
@@ -445,16 +562,21 @@ class VideoDownloaderWorker(Worker):
                 raise TaskCancelledError(f"任务已取消，停止截图源视频下载: {task_id}")
 
         try:
+            cookiefile = self._write_bilibili_sessdata_cookie_file(bilibili_sessdata)
             ydl_opts = self._build_ydl_opts(
                 quality=quality,
                 progress_hook=progress_hook,
                 enable_frame_snapshots=True,
                 bilibili_sessdata=bilibili_sessdata,
+                bilibili_cookiefile=cookiefile,
                 output_template=self._build_frame_source_outtmpl(task_id),
             )
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info_dict = ydl.extract_info(video_url, download=True)
-                video_path = ydl.prepare_filename(info_dict)
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info_dict = ydl.extract_info(video_url, download=True)
+                    video_path = ydl.prepare_filename(info_dict)
+            finally:
+                self._remove_temp_cookie_file(cookiefile)
             logger.info(f"[{self.name}] 截图源视频下载完成: {video_path}")
             return video_path
         except TaskCancelledError:
@@ -464,7 +586,7 @@ class VideoDownloaderWorker(Worker):
             return None
 
     def _try_process_with_bilibili_subtitle(self, payload: Dict[str, Any]) -> bool:
-        video_url = str(payload.get("video_url") or "")
+        video_url = self._normalize_bilibili_url_for_download(str(payload.get("video_url") or ""))
         task_id = payload.get("task_id")
 
         if not video_url or not task_id:
@@ -670,6 +792,7 @@ class VideoDownloaderWorker(Worker):
             return False
 
     async def _resolve_and_save_bilibili_author(self, task_id: str, video_url: str):
+        video_url = self._normalize_bilibili_url_for_download(str(video_url))
         if not task_id or not self._is_bilibili_url(video_url):
             return
 
@@ -699,7 +822,7 @@ class VideoDownloaderWorker(Worker):
         
         :param payload: 包含 'video_url' 的字典。
         """
-        video_url = payload.get("video_url")
+        video_url = self._normalize_bilibili_url_for_download(str(payload.get("video_url") or ""))
         quality = payload.get("quality", "best")
         task_id = payload.get("task_id") # 用于更新进度
 
@@ -715,6 +838,10 @@ class VideoDownloaderWorker(Worker):
         try:
             if task_id and self.is_task_cancelled(task_id):
                 raise TaskCancelledError(f"任务已取消，跳过下载: {task_id}")
+
+            if video_url != payload.get("video_url"):
+                payload = payload.copy()
+                payload["video_url"] = video_url
 
             if self._try_process_with_bilibili_subtitle(payload):
                 return
@@ -757,11 +884,13 @@ class VideoDownloaderWorker(Worker):
             ydl_sessdata = ""
             if self._is_bilibili_url(str(video_url)):
                 ydl_sessdata, _ = self._resolve_bilibili_sessdata(payload)
+            cookiefile = self._write_bilibili_sessdata_cookie_file(ydl_sessdata)
             ydl_opts = self._build_ydl_opts(
                 quality=quality,
                 progress_hook=progress_hook,
                 enable_frame_snapshots=enable_frame_snapshots,
                 bilibili_sessdata=ydl_sessdata,
+                bilibili_cookiefile=cookiefile,
                 output_template=(
                     self._build_frame_source_outtmpl(str(task_id))
                     if enable_frame_snapshots and task_id
@@ -769,9 +898,18 @@ class VideoDownloaderWorker(Worker):
                 ),
             )
 
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info_dict = ydl.extract_info(video_url, download=True)
-                video_path = ydl.prepare_filename(info_dict)
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info_dict = ydl.extract_info(video_url, download=True)
+                    video_path = ydl.prepare_filename(info_dict)
+            finally:
+                self._remove_temp_cookie_file(cookiefile)
+
+            self._validate_downloaded_media_duration(
+                video_path=video_path,
+                expected_duration=info_dict.get("duration"),
+                video_url=str(video_url),
+            )
 
             logger.info(f"[{self.name}] 视频下载成功: {video_path}")
 
