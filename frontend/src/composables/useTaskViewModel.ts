@@ -1,7 +1,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useIncremark } from '@incremark/vue'
 import axios from 'axios'
-import { formatTranscriptAsText } from '../utils/transcriptFormatter'
+import { formatTranscriptAsPlainText, formatTranscriptAsText } from '../utils/transcriptFormatter'
 import type {
   Task,
   CreateTaskRequest,
@@ -371,7 +371,7 @@ export function useTaskViewModel() {
     }
   }
 
-  const downloadContent = (type: 'summary' | 'transcript') => {
+  const downloadContent = (type: 'summary' | 'transcript' | 'plainTranscript') => {
     if (!selectedTask.value) return
     
     const topic = selectedTask.value.topic || selectedTask.value.title || new Date().toLocaleString('zh-CN').replace(/[/:]/g, '-')
@@ -381,9 +381,12 @@ export function useTaskViewModel() {
     if (type === 'summary') {
       content = selectedTask.value.summary || ''
       filename = `AI总结-${topic}.md`
-    } else {
+    } else if (type === 'transcript') {
       content = formatTranscriptAsText(selectedTask.value.transcript || '')
       filename = `视频转录-${topic}.txt`
+    } else {
+      content = formatTranscriptAsPlainText(selectedTask.value.transcript || '')
+      filename = `逐字稿-${topic}.txt`
     }
     
     const blob = new Blob([content], { type: 'text/plain' })

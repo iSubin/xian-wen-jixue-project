@@ -20,6 +20,7 @@ const emit = defineEmits<{
   copyTranscript: []
   downloadMarkdown: []
   downloadTxt: []
+  downloadPlainTranscript: []
   exportSummaryImage: []
   openSummaryImageSettings: []
   toggleSidebar: []
@@ -146,6 +147,13 @@ const emit = defineEmits<{
                 >
                   <PhDownloadSimple :size="14" />
                   下载 TXT
+                </button>
+                <button
+                  @click="emit('downloadPlainTranscript')"
+                  class="w-full text-left flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors"
+                >
+                  <PhDownloadSimple :size="14" />
+                  下载逐字稿
                 </button>
               </div>
             </div>

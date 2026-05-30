@@ -17,6 +17,7 @@ await build({
 const {
   formatTranscriptForDisplay,
   formatTranscriptAsText,
+  formatTranscriptAsPlainText,
 } = await import(`${pathToFileURL(outfile.pathname).href}?t=${Date.now()}`)
 
 const transcript = [
@@ -49,6 +50,13 @@ assert.equal(linked.segments[1].jumpUrl.includes('BV1C7Gt6mEAw'), true)
 const exported = formatTranscriptAsText(transcript)
 assert.equal(exported.split('\n')[0], '[00:00:00] 经过昨天市场大幅度下跌以后')
 assert.equal(exported.split('\n')[1], '[00:00:10] 创业板今天还是比较强 这一行是上一句的补充')
+
+const plainExported = formatTranscriptAsPlainText(transcript)
+assert.equal(plainExported.split('\n')[0], '经过昨天市场大幅度下跌以后')
+assert.equal(plainExported.split('\n')[1], '创业板今天还是比较强 这一行是上一句的补充')
+assert.equal(plainExported.includes('[00:00:00]'), false)
+assert.equal(plainExported.includes('000010'), false)
+assert.equal(plainExported.includes('經過'), false)
 
 const plain = formatTranscriptForDisplay('沒有時間戳的原文\n第二段')
 assert.equal(plain.hasTimestampedSegments, false)

@@ -132,3 +132,10 @@ export const formatTranscriptForDisplay = (
 export const formatTranscriptAsText = (transcript: string) => {
   return formatTranscriptForDisplay(transcript).plainText
 }
+
+export const formatTranscriptAsPlainText = (transcript: string) => {
+  return formatTranscriptForDisplay(transcript).segments
+    .map((segment) => segment.text)
+    .filter(Boolean)
+    .join('\n')
+}

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PhXCircle } from '@phosphor-icons/vue'
+import { PhDownloadSimple, PhXCircle } from '@phosphor-icons/vue'
 import { computed, watch, nextTick, ref, onBeforeUnmount } from 'vue'
 import type { Task, MarkdownHeadingItem } from '../types'
 import { TaskStatus } from '../types'
@@ -40,6 +40,7 @@ const emit = defineEmits<{
   'start-edit-topic': []
   'save-topic': []
   'cancel-edit-topic': []
+  'download-plain-transcript': []
   'update:editing-topic-value': [value: string]
   'update-markdown-headings': [headings: MarkdownHeadingItem[]]
   'update-active-heading-id': [headingId: string]
@@ -588,11 +589,22 @@ watch(() => props.streamingBlocks, () => {
         <div v-show="activeTab === 'transcript'" class="px-8 py-8">
           <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
             <h3 class="text-lg font-bold text-slate-800">全文转录</h3>
-            <div
-              v-if="task.transcript && formattedTranscript.segments.length"
-              class="text-xs font-medium text-slate-500 bg-slate-100 border border-slate-200 rounded-full px-3 py-1"
-            >
-              共 {{ formattedTranscript.segments.length }} 段
+            <div class="flex flex-wrap items-center justify-end gap-2">
+              <button
+                v-if="task.transcript && formattedTranscript.segments.length"
+                type="button"
+                @click="emit('download-plain-transcript')"
+                class="inline-flex h-8 items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 text-xs font-semibold text-blue-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-100"
+              >
+                <PhDownloadSimple :size="14" />
+                下载逐字稿
+              </button>
+              <div
+                v-if="task.transcript && formattedTranscript.segments.length"
+                class="text-xs font-medium text-slate-500 bg-slate-100 border border-slate-200 rounded-full px-3 py-1"
+              >
+                共 {{ formattedTranscript.segments.length }} 段
+              </div>
             </div>
           </div>
           <div class="text-slate-700 leading-relaxed font-normal">

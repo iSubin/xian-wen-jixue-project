@@ -79,6 +79,10 @@ class FFmpegHelper:
             logger.warning(f"[FFmpegHelper] 无法创建标准名称的 ffmpeg.exe: {e}")
             logger.warning(f"[FFmpegHelper] 将直接使用原始路径: {original_path}")
             return original_path
+
+    @staticmethod
+    def _is_executable_file(path: str | None) -> bool:
+        return bool(path and os.path.isfile(path) and os.access(path, os.X_OK))
     
     @classmethod
     def get_ffmpeg_path(cls) -> Optional[str]:
@@ -98,12 +102,27 @@ class FFmpegHelper:
         try:
             from imageio_ffmpeg import get_ffmpeg_exe
             original_ffmpeg_path = get_ffmpeg_exe()
-            # 确保文件名为标准名称
-            cls._ffmpeg_path = cls._ensure_ffmpeg_exe_name(original_ffmpeg_path)
-            cls._ffmpeg_dir = os.path.dirname(cls._ffmpeg_path)
-            logger.info(f"[FFmpegHelper] 使用 imageio-ffmpeg 提供的 ffmpeg: {cls._ffmpeg_path}")
-            os.environ['FFMPEG_PATH'] = cls._ffmpeg_path
-            return cls._ffmpeg_path
+
+            if cls._is_executable_file(original_ffmpeg_path):
+                # 确保文件名为标准名称
+                cls._ffmpeg_path = cls._ensure_ffmpeg_exe_name(original_ffmpeg_path)
+                cls._ffmpeg_dir = os.path.dirname(cls._ffmpeg_path)
+                logger.info(f"[FFmpegHelper] 使用 imageio-ffmpeg 提供的 ffmpeg: {cls._ffmpeg_path}")
+                os.environ['FFMPEG_PATH'] = cls._ffmpeg_path
+                return cls._ffmpeg_path
+
+            resolved_path = shutil.which(original_ffmpeg_path or "ffmpeg")
+            if cls._is_executable_file(resolved_path):
+                cls._ffmpeg_path = resolved_path
+                cls._ffmpeg_dir = os.path.dirname(resolved_path)
+                logger.info(f"[FFmpegHelper] 使用系统 PATH 中的 ffmpeg: {cls._ffmpeg_path}")
+                os.environ['FFMPEG_PATH'] = cls._ffmpeg_path
+                return cls._ffmpeg_path
+
+            logger.warning(
+                "[FFmpegHelper] imageio-ffmpeg 返回的 ffmpeg 不可执行，尝试使用系统 ffmpeg: "
+                f"{original_ffmpeg_path}"
+            )
         except ImportError:
             logger.warning("[FFmpegHelper] imageio-ffmpeg 未安装，尝试使用系统 ffmpeg")
         

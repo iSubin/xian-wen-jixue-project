@@ -380,6 +380,11 @@ const handleDownloadTxt = () => {
   downloadContent('transcript')
 }
 
+const handleDownloadPlainTranscript = () => {
+  success('开始下载逐字稿...')
+  downloadContent('plainTranscript')
+}
+
 const handleTestLlm = async () => {
   isTestingLlm.value = true
   const { info, success, error, warning } = useToast()
@@ -938,6 +943,7 @@ watch(
           @copyTranscript="handleCopyTranscript"
           @downloadMarkdown="handleDownloadMarkdown"
           @downloadTxt="handleDownloadTxt"
+          @downloadPlainTranscript="handleDownloadPlainTranscript"
           @exportSummaryImage="handleExportSummaryImage"
           @openSummaryImageSettings="handleOpenSummaryImageSettings"
           @toggleSidebar="isSidebarOpen = true"
@@ -961,6 +967,7 @@ watch(
           @start-edit-topic="startEditingTopic"
           @save-topic="saveTopic"
           @cancel-edit-topic="cancelEditingTopic"
+          @download-plain-transcript="handleDownloadPlainTranscript"
           @update:editing-topic-value="(val) => editingTopicValue = val"
           @update-markdown-headings="handleMarkdownHeadingsUpdate"
           @update-active-heading-id="handleActiveHeadingIdUpdate"
@@ -1055,4 +1062,3 @@ watch(
 /* 移动端点击高亮优化 */
 html, body { -webkit-tap-highlight-color: transparent; }
 </style>
-
