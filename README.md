@@ -423,6 +423,45 @@ ShengWen 当前版本以 **前端设置面板** 作为主要配置入口，同�
   2. 环境变量（`BILIBILI_SESSDATA` / `SESSDATA`）
 - 前端仅显示掩码值与来源，不显示明文。
 
+### 采集账号与多站点登录态
+
+转录设置中已经新增「采集账号」模块，用于维护当前用户在不同内容站点的登录态。
+
+当前支持：
+
+- 哔哩哔哩：读取 `SESSDATA`
+- 小鹅通：按视频链接或店铺域名读取 Cookie Header
+- 投研大师 / Homeway：读取 `web_qtstr`
+
+推荐流程：
+
+1. 先在本机浏览器登录目标站点。
+2. 打开 ShengWen 的「转录设置」-「采集账号」。
+3. 对应站点点击「从浏览器获取」。
+4. 小鹅通需要先粘贴视频链接或店铺域名，用来定位具体店铺 Cookie。
+
+手动粘贴 Cookie 只作为高级兜底入口，默认收在「高级：手动填写」中。
+
+凭据不会通过 API 回显明文；服务端只返回脱敏摘要。当前本地单用户模式使用 `local-user`，后续接入用户体系后会按真实用户隔离凭据。
+
+详细设计、接口、数据表、安全边界和后续阶段见：[用户级采集账号设计](prj-docs/用户级采集账号设计.md)。
+
+### PostgreSQL 开发实例
+
+默认仍可使用 SQLite。本地验证用户级采集账号持久化时，可以启动 PostgreSQL：
+
+```bash
+docker compose -f docker-compose.postgres.yml up -d postgres
+```
+
+并通过环境变量指定数据库：
+
+```bash
+export SHENGWEN_DATABASE_URL='postgresql+psycopg://shengwen:shengwen_dev_password@127.0.0.1:54329/shengwen'
+```
+
+也可以写入 `config/settings.json` 的 `database.url`。
+
 
 ---
 ## 🤔 常见 Q&A
@@ -567,4 +606,3 @@ Made ❤️ by **[smileFAace](https://linux.do/u/smileface/summary)**
 联系我: [smileFAace@outlook.com](mailto:smileFAace@outlook.com)
 
 </div>
-
