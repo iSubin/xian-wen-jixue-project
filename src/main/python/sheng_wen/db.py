@@ -1,11 +1,15 @@
 import json
 import os
+import base64
+import hashlib
+import uuid
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
 from sqlalchemy import create_engine, Column, String, Float, Integer, Text, DateTime, Enum as SQLEnum, inspect, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
+from Cryptodome.Cipher import AES
 from .config.settings import config
 from .utils.logger import logger
 
@@ -92,25 +96,122 @@ class FolderModel(Base):
         }
 
 
+class CredentialSecretModel(Base):
+    __tablename__ = "credential_secrets"
+
+    id = Column(String, primary_key=True)
+    encrypted_payload = Column(Text, nullable=False)
+    key_version = Column(String, default="dev-v1")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ConnectedAccountModel(Base):
+    __tablename__ = "connected_accounts"
+
+    id = Column(String, primary_key=True)
+    user_id = Column(String, nullable=False, index=True)
+    provider = Column(String, nullable=False, index=True)
+    display_name = Column(String, nullable=True)
+    credential_type = Column(String, nullable=False)
+    secret_id = Column(String, nullable=False)
+    secret_masked = Column(String, nullable=True)
+    domain_scope = Column(String, nullable=True)
+    status = Column(String, default="connected", index=True)
+    last_verified_at = Column(DateTime, nullable=True)
+    last_used_at = Column(DateTime, nullable=True)
+    last_error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "provider": self.provider,
+            "display_name": self.display_name,
+            "credential_type": self.credential_type,
+            "secret_masked": self.secret_masked,
+            "domain_scope": self.domain_scope,
+            "status": self.status,
+            "last_verified_at": self.last_verified_at.isoformat() + "Z" if self.last_verified_at else None,
+            "last_used_at": self.last_used_at.isoformat() + "Z" if self.last_used_at else None,
+            "last_error": self.last_error,
+            "created_at": self.created_at.isoformat() + "Z" if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() + "Z" if self.updated_at else None,
+        }
+
+
+def _credential_key() -> bytes:
+    raw = os.getenv("SHENGWEN_CREDENTIAL_SECRET") or "shengwen-dev-credential-secret"
+    return hashlib.sha256(raw.encode("utf-8")).digest()
+
+
+def _encrypt_secret_payload(payload: Dict[str, Any]) -> str:
+    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    cipher = AES.new(_credential_key(), AES.MODE_GCM)
+    ciphertext, tag = cipher.encrypt_and_digest(raw)
+    packed = cipher.nonce + tag + ciphertext
+    return "v1:" + base64.b64encode(packed).decode("ascii")
+
+
+def _decrypt_secret_payload(encrypted_payload: str) -> Dict[str, Any]:
+    if not encrypted_payload.startswith("v1:"):
+        raise ValueError("Unsupported credential secret format")
+    packed = base64.b64decode(encrypted_payload[3:].encode("ascii"))
+    nonce, tag, ciphertext = packed[:16], packed[16:32], packed[32:]
+    cipher = AES.new(_credential_key(), AES.MODE_GCM, nonce=nonce)
+    raw = cipher.decrypt_and_verify(ciphertext, tag)
+    payload = json.loads(raw.decode("utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("Credential payload must be a JSON object")
+    return payload
+
+
+def _mask_secret_value(value: Any) -> str:
+    text_value = str(value or "")
+    if len(text_value) <= 8:
+        return "****" if text_value else ""
+    return f"{text_value[:4]}****{text_value[-4:]}"
+
+
+def _mask_secret_payload(payload: Dict[str, Any]) -> str:
+    for key in ("SESSDATA", "cookie_header", "web_qtstr", "access_token", "token"):
+        if payload.get(key):
+            label = "Cookie" if key == "cookie_header" else key
+            return f"{label}={_mask_secret_value(payload[key])}"
+    for key, value in payload.items():
+        if value:
+            return f"{key}={_mask_secret_value(value)}"
+    return ""
+
+
 class TaskDB:
     def __init__(
         self,
         file_path: str = "tasks.json",
         sqlite_path: str = "ShengWen.db",
+        database_url: str | None = None,
     ):
         self.file_path = file_path
         self.use_db = False
 
         try:
-            self.engine = create_engine(f"sqlite:///{sqlite_path}", echo=False)
+            configured_database_url = (
+                database_url
+                or os.getenv("SHENGWEN_DATABASE_URL")
+                or getattr(config.database, "url", "")
+            )
+            self.database_url = configured_database_url or f"sqlite:///{sqlite_path}"
+            self.engine = create_engine(self.database_url, echo=False)
             Base.metadata.create_all(self.engine)
             self._ensure_schema()
             self.SessionLocal = sessionmaker(bind=self.engine)
             self.use_db = True
-            logger.info(f"Using SQLite database: {sqlite_path}")
+            logger.info(f"Using database: {self.database_url}")
             self._migrate_from_file_if_needed()
         except Exception as e:
-            logger.error(f"Failed to initialize SQLite: {e}. Falling back to JSON file storage.")
+            logger.error(f"Failed to initialize database: {e}. Falling back to JSON file storage.")
             self.use_db = False
             self._load_from_file()
 
@@ -470,9 +571,168 @@ class TaskDB:
         finally:
             session.close()
 
+    # ── Connected account credential CRUD ──
+
+    def upsert_connected_account(
+        self,
+        *,
+        user_id: str,
+        account_id: str | None = None,
+        provider: str,
+        credential_type: str,
+        secret_payload: Dict[str, Any],
+        display_name: str | None = None,
+        domain_scope: str | None = None,
+    ) -> Dict[str, Any]:
+        if not self.use_db:
+            raise RuntimeError("Connected accounts require database storage")
+
+        now = datetime.utcnow()
+        session: Session = self.SessionLocal()
+        try:
+            if account_id:
+                account = (
+                    session.query(ConnectedAccountModel)
+                    .filter(
+                        ConnectedAccountModel.id == account_id,
+                        ConnectedAccountModel.user_id == user_id,
+                        ConnectedAccountModel.provider == provider,
+                        ConnectedAccountModel.status != "revoked",
+                    )
+                    .first()
+                )
+            else:
+                account = (
+                    session.query(ConnectedAccountModel)
+                    .filter(
+                        ConnectedAccountModel.user_id == user_id,
+                        ConnectedAccountModel.provider == provider,
+                        ConnectedAccountModel.credential_type == credential_type,
+                        ConnectedAccountModel.domain_scope == domain_scope,
+                        ConnectedAccountModel.status != "revoked",
+                    )
+                    .first()
+                )
+            encrypted_payload = _encrypt_secret_payload(secret_payload)
+            secret_masked = _mask_secret_payload(secret_payload)
+
+            if account:
+                secret = session.query(CredentialSecretModel).filter(CredentialSecretModel.id == account.secret_id).first()
+                if not secret:
+                    secret = CredentialSecretModel(id=uuid.uuid4().hex, encrypted_payload=encrypted_payload)
+                    session.add(secret)
+                    account.secret_id = secret.id
+                else:
+                    secret.encrypted_payload = encrypted_payload
+                    secret.updated_at = now
+                account.display_name = display_name or account.display_name
+                account.credential_type = credential_type
+                account.domain_scope = domain_scope
+                account.secret_masked = secret_masked
+                account.status = "connected"
+                account.last_error = None
+                account.updated_at = now
+            else:
+                secret = CredentialSecretModel(id=uuid.uuid4().hex, encrypted_payload=encrypted_payload)
+                account = ConnectedAccountModel(
+                    id=uuid.uuid4().hex,
+                    user_id=user_id,
+                    provider=provider,
+                    display_name=display_name,
+                    credential_type=credential_type,
+                    secret_id=secret.id,
+                    secret_masked=secret_masked,
+                    domain_scope=domain_scope,
+                    status="connected",
+                    created_at=now,
+                    updated_at=now,
+                )
+                session.add(secret)
+                session.add(account)
+
+            session.commit()
+            session.refresh(account)
+            return account.to_dict()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def list_connected_accounts(self, user_id: str) -> List[Dict[str, Any]]:
+        if not self.use_db:
+            return []
+
+        session: Session = self.SessionLocal()
+        try:
+            accounts = (
+                session.query(ConnectedAccountModel)
+                .filter(
+                    ConnectedAccountModel.user_id == user_id,
+                    ConnectedAccountModel.status != "revoked",
+                )
+                .order_by(ConnectedAccountModel.created_at.asc())
+                .all()
+            )
+            return [account.to_dict() for account in accounts]
+        finally:
+            session.close()
+
+    def get_connected_account_secret(self, user_id: str, account_id: str) -> Optional[Dict[str, Any]]:
+        if not self.use_db:
+            return None
+
+        session: Session = self.SessionLocal()
+        try:
+            account = (
+                session.query(ConnectedAccountModel)
+                .filter(
+                    ConnectedAccountModel.id == account_id,
+                    ConnectedAccountModel.user_id == user_id,
+                    ConnectedAccountModel.status != "revoked",
+                )
+                .first()
+            )
+            if not account:
+                return None
+            secret = session.query(CredentialSecretModel).filter(CredentialSecretModel.id == account.secret_id).first()
+            if not secret:
+                return None
+            return _decrypt_secret_payload(secret.encrypted_payload)
+        finally:
+            session.close()
+
+    def delete_connected_account(self, user_id: str, account_id: str) -> bool:
+        if not self.use_db:
+            return False
+
+        session: Session = self.SessionLocal()
+        try:
+            account = (
+                session.query(ConnectedAccountModel)
+                .filter(
+                    ConnectedAccountModel.id == account_id,
+                    ConnectedAccountModel.user_id == user_id,
+                )
+                .first()
+            )
+            if not account:
+                return False
+            secret = session.query(CredentialSecretModel).filter(CredentialSecretModel.id == account.secret_id).first()
+            if secret:
+                session.delete(secret)
+            session.delete(account)
+            session.commit()
+            return True
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
 # Global instance
 db = TaskDB(
     file_path=config.database.json_file_path,
     sqlite_path=config.database.sqlite_path,
+    database_url=config.database.url,
 )
-

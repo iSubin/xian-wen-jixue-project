@@ -150,6 +150,7 @@ _BUILTIN_PROVIDER_DEFAULTS: dict[str, dict[str, Any]] = {
 class DatabaseConfig:
     sqlite_path: str = "ShengWen.db"
     json_file_path: str = "tasks.json"
+    url: str = ""
 
 
 @dataclass

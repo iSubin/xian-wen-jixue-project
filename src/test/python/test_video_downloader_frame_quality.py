@@ -180,6 +180,55 @@ class TestVideoDownloaderFrameQuality(unittest.TestCase):
             ["https://cdn.example.com/video.m3u8?token=media-token"],
         )
 
+    def test_homeway_resolver_receives_task_level_web_qtstr(self):
+        worker = VideoDownloaderWorker(name="test-downloader")
+        worker._try_process_with_bilibili_subtitle = lambda payload: False
+        worker._validate_downloaded_media_duration = lambda **kwargs: None
+        captured_tokens = []
+
+        class FakeYDL:
+            def __init__(self, opts):
+                self.opts = opts
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def extract_info(self, video_url, download=True):
+                return {"id": "homeway-hls", "duration": 465, "title": "投研大师视频"}
+
+            def prepare_filename(self, info_dict):
+                return "/tmp/homeway.mp4"
+
+        def fake_resolve(video_url, web_qtstr=None):
+            captured_tokens.append(web_qtstr)
+            return HomewayResolvedVideo(
+                media_url="https://cdn.example.com/video.m3u8?token=media-token",
+                title="投研大师视频",
+                source_url=video_url,
+                vhall_id="260368304",
+            )
+
+        with patch(
+            "src.main.python.sheng_wen.downloader.video_downloader_worker.resolve_homeway_graphic_video",
+            fake_resolve,
+        ), patch(
+            "src.main.python.sheng_wen.downloader.video_downloader_worker.yt_dlp.YoutubeDL",
+            FakeYDL,
+        ):
+            worker.process_task(
+                {
+                    "video_url": "https://tyds.homeway.com.cn/#/GraphicVideo?key=5269",
+                    "quality": "best",
+                    "homeway_web_qtstr": "homeway-user-token",
+                    "enable_frame_snapshots": False,
+                }
+            )
+
+        self.assertEqual(captured_tokens, ["homeway-user-token"])
+
     def test_download_path_resolves_xiaoet_video_url_for_ytdlp(self):
         worker = VideoDownloaderWorker(name="test-downloader")
         worker._try_process_with_bilibili_subtitle = lambda payload: False
@@ -229,6 +278,57 @@ class TestVideoDownloaderFrameQuality(unittest.TestCase):
             captured_urls,
             ["https://vod.example.com/video.m3u8?sign=s&t=t&us=u"],
         )
+
+    def test_xiaoet_resolver_receives_task_level_cookie_header(self):
+        worker = VideoDownloaderWorker(name="test-downloader")
+        worker._try_process_with_bilibili_subtitle = lambda payload: False
+        worker._validate_downloaded_media_duration = lambda **kwargs: None
+        captured_cookies = []
+
+        class FakeYDL:
+            def __init__(self, opts):
+                self.opts = opts
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def extract_info(self, video_url, download=True):
+                return {"id": "xiaoet-hls", "duration": 1939, "title": "小鹅通视频"}
+
+            def prepare_filename(self, info_dict):
+                return "/tmp/xiaoet.mp4"
+
+        def fake_resolve(video_url, cookie_header=None):
+            captured_cookies.append(cookie_header)
+            return XiaoetResolvedVideo(
+                media_url="https://vod.example.com/video.m3u8?sign=s&t=t&us=u",
+                title="小鹅通视频",
+                source_url=video_url,
+                resource_id="v_abc",
+                product_id="course_1",
+                quality="1080p_hls",
+            )
+
+        with patch(
+            "src.main.python.sheng_wen.downloader.video_downloader_worker.resolve_xiaoet_video",
+            fake_resolve,
+        ), patch(
+            "src.main.python.sheng_wen.downloader.video_downloader_worker.yt_dlp.YoutubeDL",
+            FakeYDL,
+        ):
+            worker.process_task(
+                {
+                    "video_url": "https://appexpqpqic7617.h5.xiaoeknow.com/p/course/video/v_abc?product_id=course_1",
+                    "quality": "best",
+                    "xiaoet_cookie_header": "xiaoet_session=user-cookie",
+                    "enable_frame_snapshots": False,
+                }
+            )
+
+        self.assertEqual(captured_cookies, ["xiaoet_session=user-cookie"])
 
     def test_xiaoet_resolved_title_is_not_overwritten_by_hls_filename(self):
         captured_updates = []

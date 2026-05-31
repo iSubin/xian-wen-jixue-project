@@ -61,7 +61,10 @@ def is_homeway_graphic_video_url(video_url: str) -> bool:
     return bool(fragment_params.get("key"))
 
 
-def resolve_homeway_graphic_video(video_url: str) -> HomewayResolvedVideo:
+def resolve_homeway_graphic_video(video_url: str, web_qtstr: str | None = None) -> HomewayResolvedVideo:
+    token = _sanitize_cookie_value(web_qtstr)
+    if token:
+        return HomewayVideoResolver(token_provider=lambda: token).resolve(video_url)
     return HomewayVideoResolver().resolve(video_url)
 
 

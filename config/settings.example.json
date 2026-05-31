@@ -33,7 +33,8 @@
   },
   "database": {
     "sqlite_path": "ShengWen.db",
-    "json_file_path": "tasks.json"
+    "json_file_path": "tasks.json",
+    "url": ""
   },
   "cors": {
     "allow_origins": "*",

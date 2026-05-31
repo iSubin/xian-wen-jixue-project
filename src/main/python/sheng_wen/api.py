@@ -4,13 +4,13 @@ import json
 import glob
 import ipaddress
 import yt_dlp
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Request
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Request, Response
 from fastapi import Form
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, HttpUrl
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 import uuid
 from datetime import datetime
 from urllib.parse import unquote, urlparse
@@ -30,10 +30,107 @@ from .downloader.bilibili_author_resolver import (
     resolve_bilibili_author,
     BilibiliAuthorResolveError,
 )
+from .downloader.homeway_resolver import is_homeway_graphic_video_url
+from .downloader.xiaoet_resolver import is_xiaoet_video_url
 
 app = FastAPI(title="ShengWen API", description="视频转录与 AI 总结服务", version=APP_VERSION)
 
 VALID_SUMMARY_MODES = {"auto", "standard", "agent"}
+DEFAULT_LOCAL_USER_ID = "local-user"
+
+CAPTURE_PROVIDERS = [
+    {
+        "id": "bilibili",
+        "name": "哔哩哔哩",
+        "credential_types": ["sessdata_bundle"],
+        "supports_validate": False,
+    },
+    {
+        "id": "xiaoetong",
+        "name": "小鹅通",
+        "credential_types": ["cookie_header"],
+        "supports_validate": False,
+    },
+    {
+        "id": "homeway",
+        "name": "投研大师",
+        "credential_types": ["web_qtstr"],
+        "supports_validate": False,
+    },
+]
+CAPTURE_PROVIDER_BY_ID = {provider["id"]: provider for provider in CAPTURE_PROVIDERS}
+
+
+def _current_user_id(request: Request) -> str:
+    user_id = str(request.headers.get("X-ShengWen-User-Id") or DEFAULT_LOCAL_USER_ID).strip()
+    return user_id or DEFAULT_LOCAL_USER_ID
+
+
+def _credential_domain_matches(domain_scope: str | None, video_url: str) -> bool:
+    scope = str(domain_scope or "").strip().lower()
+    if not scope:
+        return True
+    host = (urlparse(video_url).hostname or "").lower()
+    if not host:
+        return False
+    normalized = scope[2:] if scope.startswith("*.") else scope
+    normalized = normalized[1:] if normalized.startswith(".") else normalized
+    return host == normalized or host.endswith(f".{normalized}")
+
+
+def _find_connected_account_secret(
+    user_id: str,
+    provider: str,
+    credential_type: str,
+    video_url: str | None = None,
+) -> Dict[str, Any] | None:
+    for account in db.list_connected_accounts(user_id):
+        if account.get("provider") != provider:
+            continue
+        if account.get("credential_type") != credential_type:
+            continue
+        if video_url and not _credential_domain_matches(account.get("domain_scope"), video_url):
+            continue
+        secret = db.get_connected_account_secret(user_id, str(account.get("id") or ""))
+        if secret:
+            return secret
+    return None
+
+
+def _resolve_bilibili_sessdata_for_task(request: Request, task_sessdata: str | None, video_url: str) -> str:
+    explicit = _sanitize_cookie_value(task_sessdata)
+    if explicit:
+        return explicit
+
+    user_id = _current_user_id(request)
+    secret = _find_connected_account_secret(user_id, "bilibili", "sessdata_bundle", video_url)
+    if secret:
+        sessdata = _sanitize_cookie_value(secret.get("SESSDATA"))
+        if sessdata:
+            return sessdata
+    return ""
+
+
+def _attach_connected_account_credentials(request: Request, video_url: str, task_payload: Dict[str, Any], task_in: "TaskCreate"):
+    user_id = _current_user_id(request)
+    if _is_bilibili_video_url(video_url):
+        task_cookie = _resolve_bilibili_sessdata_for_task(request, task_in.bilibili_sessdata, video_url)
+        if task_cookie:
+            task_payload["bilibili_sessdata"] = task_cookie
+        return
+
+    if is_xiaoet_video_url(video_url):
+        secret = _find_connected_account_secret(user_id, "xiaoetong", "cookie_header", video_url)
+        cookie_header = _sanitize_cookie_value((secret or {}).get("cookie_header"))
+        if cookie_header:
+            task_payload["xiaoet_cookie_header"] = cookie_header
+        return
+
+    if is_homeway_graphic_video_url(video_url):
+        secret = _find_connected_account_secret(user_id, "homeway", "web_qtstr", video_url)
+        web_qtstr = _sanitize_cookie_value((secret or {}).get("web_qtstr"))
+        if web_qtstr:
+            task_payload["homeway_web_qtstr"] = web_qtstr
 
 
 def _build_model_load_error_detail(error: ModelLoadError) -> str:
@@ -270,6 +367,37 @@ class TranscriptionSettingsUpdate(BaseModel):
         default=None,
         description="是否清空当前保存的全局 B 站 SESSDATA",
     )
+
+
+class CaptureProviderInfo(BaseModel):
+    id: str
+    name: str
+    credential_types: List[str]
+    supports_validate: bool
+
+
+class ConnectedAccountUpsert(BaseModel):
+    account_id: Optional[str] = None
+    credential_type: str
+    payload: Dict[str, Any]
+    display_name: Optional[str] = None
+    domain_scope: Optional[str] = None
+
+
+class ConnectedAccountView(BaseModel):
+    id: str
+    user_id: str
+    provider: str
+    display_name: Optional[str] = None
+    credential_type: str
+    secret_masked: Optional[str] = None
+    domain_scope: Optional[str] = None
+    status: str
+    last_verified_at: Optional[str] = None
+    last_used_at: Optional[str] = None
+    last_error: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
 
 class BilibiliCookieFromBrowserResult(BaseModel):
@@ -1030,7 +1158,7 @@ async def _get_bilibili_video_title_and_parts(video_url: str) -> tuple[str, list
 
 
 @app.post("/tasks/", response_model=Task, status_code=201)
-async def create_task(task_in: TaskCreate):
+async def create_task(task_in: TaskCreate, request: Request):
     """
     提交一个新的视频处理任务
     """
@@ -1106,9 +1234,7 @@ async def create_task(task_in: TaskCreate):
                     "indices": [part_index],
                 },
             }
-            task_cookie = _sanitize_cookie_value(task_in.bilibili_sessdata)
-            if task_cookie:
-                task_payload["bilibili_sessdata"] = task_cookie
+            _attach_connected_account_credentials(request, str(task_in.video_url), task_payload, task_in)
 
             await worker.add_task(task_payload)
             await notify_task_update(task_id)
@@ -1145,9 +1271,7 @@ async def create_task(task_in: TaskCreate):
         "quality": task_in.quality,
         "summary_mode": resolved_summary_mode,
     }
-    task_cookie = _sanitize_cookie_value(task_in.bilibili_sessdata)
-    if task_cookie:
-        task_payload["bilibili_sessdata"] = task_cookie
+    _attach_connected_account_credentials(request, str(task_in.video_url), task_payload, task_in)
 
     # 添加 B 站分P处理配置（merge 模式或单P视频）
     if task_in.bilibili_parts:
@@ -1775,6 +1899,49 @@ async def update_transcription_settings(payload: TranscriptionSettingsUpdate):
         return settings
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/providers", response_model=List[CaptureProviderInfo])
+async def list_capture_providers():
+    """列出已支持采集账号配置的站点。"""
+    return CAPTURE_PROVIDERS
+
+
+@app.get("/connected-accounts", response_model=List[ConnectedAccountView])
+async def list_connected_accounts(request: Request):
+    """列出当前用户的站点采集账号，响应中不包含明文凭据。"""
+    return db.list_connected_accounts(_current_user_id(request))
+
+
+@app.put("/connected-accounts/{provider}", response_model=ConnectedAccountView)
+async def upsert_connected_account(provider: str, payload: ConnectedAccountUpsert, request: Request):
+    """新增或更新当前用户某个站点的采集账号。"""
+    provider_info = CAPTURE_PROVIDER_BY_ID.get(provider)
+    if not provider_info:
+        raise HTTPException(status_code=404, detail="不支持的采集站点")
+    if payload.credential_type not in provider_info["credential_types"]:
+        raise HTTPException(status_code=400, detail="不支持的凭据类型")
+    if not payload.payload:
+        raise HTTPException(status_code=400, detail="凭据内容不能为空")
+
+    return db.upsert_connected_account(
+        user_id=_current_user_id(request),
+        account_id=payload.account_id,
+        provider=provider,
+        credential_type=payload.credential_type,
+        secret_payload=payload.payload,
+        display_name=payload.display_name,
+        domain_scope=payload.domain_scope,
+    )
+
+
+@app.delete("/connected-accounts/{account_id}", status_code=204)
+async def delete_connected_account(account_id: str, request: Request):
+    """删除当前用户的站点采集账号。"""
+    deleted = db.delete_connected_account(_current_user_id(request), account_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="采集账号不存在")
+    return Response(status_code=204)
 
 
 @app.post("/bilibili/video-info", response_model=BilibiliVideoInfo)

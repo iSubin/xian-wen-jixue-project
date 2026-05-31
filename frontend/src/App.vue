@@ -18,7 +18,14 @@ import {
 import { useToast } from './composables/useToast'
 import { stripDoubleBracePlaceholders } from './utils/formatters'
 import { postProcessCompiledMarkdown } from './utils/markdownPostProcessor'
-import type { Task, MarkdownHeadingItem, BilibiliVideoInfo, BilibiliPartsConfig, LocalFolderScanResult } from './types'
+import type {
+  BilibiliPartsConfig,
+  BilibiliVideoInfo,
+  ConnectedAccountUpsertRequest,
+  LocalFolderScanResult,
+  MarkdownHeadingItem,
+  Task,
+} from './types'
 import Sidebar from './components/Sidebar.vue'
 import FloatingToolbar from './components/FloatingToolbar.vue'
 import TaskInfoModal from './components/TaskInfoModal.vue'
@@ -54,6 +61,9 @@ const {
   summarizationSettings,
   isUpdatingSummarizationSettings,
   isReadingBilibiliCookieFromBrowser,
+  captureProviders,
+  connectedAccounts,
+  isUpdatingConnectedAccount,
   isMultiSelectMode,
   selectedTaskIds,
   streamingBuffer,
@@ -80,6 +90,8 @@ const {
   editProfile,
   updateTranscriptionSettings,
   updateSummarizationSettings,
+  upsertConnectedAccount,
+  deleteConnectedAccount,
   testLlm,
   readBilibiliCookieFromBrowser,
   checkBilibiliVideoInfo,
@@ -519,6 +531,24 @@ const handleReadBilibiliCookieFromBrowser = async () => {
   }
 }
 
+const handleUpsertConnectedAccount = async (provider: string, payload: ConnectedAccountUpsertRequest) => {
+  try {
+    await upsertConnectedAccount(provider, payload)
+    success('采集账号已保存')
+  } catch (_e) {
+    toastError('采集账号保存失败')
+  }
+}
+
+const handleDeleteConnectedAccount = async (accountId: string) => {
+  try {
+    await deleteConnectedAccount(accountId)
+    success('采集账号已删除')
+  } catch (_e) {
+    toastError('采集账号删除失败')
+  }
+}
+
 // B站分P处理
 const handleSubmit = async () => {
   // localhost 场景优先使用本地路径直读（避免文件上传复制）
@@ -846,6 +876,9 @@ watch(
       :isPrewarming="isPrewarming"
       :transcriptionSettings="transcriptionSettings"
       :isUpdatingTranscriptionSettings="isUpdatingTranscriptionSettings"
+      :captureProviders="captureProviders"
+      :connectedAccounts="connectedAccounts"
+      :isUpdatingConnectedAccount="isUpdatingConnectedAccount"
       :summarizationSettings="summarizationSettings"
       :isUpdatingSummarizationSettings="isUpdatingSummarizationSettings"
       :isReadingBilibiliCookieFromBrowser="isReadingBilibiliCookieFromBrowser"
@@ -859,6 +892,8 @@ watch(
       @testLlm="handleTestLlm"
       @updateTranscriptionSettings="handleUpdateTranscriptionSettings"
       @readBilibiliCookieFromBrowser="handleReadBilibiliCookieFromBrowser"
+      @upsertConnectedAccount="handleUpsertConnectedAccount"
+      @deleteConnectedAccount="handleDeleteConnectedAccount"
       @updateSummarizationSettings="handleUpdateSummarizationSettings"
     />
 
@@ -890,6 +925,9 @@ watch(
       :isSwitchingProfile="isSwitchingProfile"
       :transcriptionSettings="transcriptionSettings"
       :isUpdatingTranscriptionSettings="isUpdatingTranscriptionSettings"
+      :captureProviders="captureProviders"
+      :connectedAccounts="connectedAccounts"
+      :isUpdatingConnectedAccount="isUpdatingConnectedAccount"
       :summarizationSettings="summarizationSettings"
       :isUpdatingSummarizationSettings="isUpdatingSummarizationSettings"
       :folders="folders"
@@ -906,6 +944,8 @@ watch(
       @createProfile="handleCreateProfile"
       @deleteProfile="handleDeleteProfile"
       @updateTranscriptionSettings="handleUpdateTranscriptionSettings"
+      @upsertConnectedAccount="handleUpsertConnectedAccount"
+      @deleteConnectedAccount="handleDeleteConnectedAccount"
       @updateSummarizationSettings="handleUpdateSummarizationSettings"
       @startTestLlm="handleTestLlm"
       @focusSearchMatch="handleFocusSearchMatch"

@@ -25,6 +25,9 @@ import {
 } from '@phosphor-icons/vue'
 import {
   TaskStatus,
+  type CaptureProviderInfo,
+  type ConnectedAccount,
+  type ConnectedAccountUpsertRequest,
   type Task,
   type SummaryMode,
   type LLMProvider,
@@ -36,6 +39,7 @@ import {
 } from '../types'
 import ThemeSelector from './ThemeSelector.vue'
 import FolderBrowser from './FolderBrowser/FolderBrowser.vue'
+import ConnectedAccountsSettings from './ConnectedAccountsSettings.vue'
 
 const videoUrl = defineModel<string>('videoUrl', { required: true })
 const selectedFile = defineModel<File | null>('selectedFile', { default: null })
@@ -60,6 +64,9 @@ const props = defineProps<{
   isSwitchingProfile: boolean
   transcriptionSettings: TranscriptionSettings | null
   isUpdatingTranscriptionSettings: boolean
+  captureProviders: CaptureProviderInfo[]
+  connectedAccounts: ConnectedAccount[]
+  isUpdatingConnectedAccount: boolean
   summarizationSettings: SummarizationSettings | null
   isUpdatingSummarizationSettings: boolean
   folders: Folder[]
@@ -117,6 +124,8 @@ const emit = defineEmits<{
     bilibili_sessdata?: string
     clear_bilibili_sessdata?: boolean
   }]
+  upsertConnectedAccount: [provider: string, payload: ConnectedAccountUpsertRequest]
+  deleteConnectedAccount: [accountId: string]
   updateSummarizationSettings: [payload: {
     chunk_target_duration_sec?: number
     chunk_min_duration_sec?: number
@@ -970,7 +979,7 @@ watch(() => props.summarizationSettings, (settings) => {
 
                 <div class="rounded-xl border border-gray-200 bg-gray-50/60 px-3 py-3 space-y-2">
                   <div class="flex items-center justify-between gap-2">
-                    <p class="text-sm font-medium text-slate-700">全局 B 站 SESSDATA</p>
+                    <p class="text-sm font-medium text-slate-700">系统兜底 B 站 SESSDATA</p>
                     <span class="text-[10px] px-2 py-0.5 rounded-full border border-slate-200 bg-white text-slate-500">
                       来源: {{ bilibiliCookieSourceLabel }}
                     </span>
@@ -995,6 +1004,15 @@ watch(() => props.summarizationSettings, (settings) => {
                     清空已保存 Cookie
                   </button>
                 </div>
+
+                <ConnectedAccountsSettings
+                  compact
+                  :captureProviders="props.captureProviders"
+                  :connectedAccounts="props.connectedAccounts"
+                  :isUpdatingConnectedAccount="props.isUpdatingConnectedAccount"
+                  @upsertConnectedAccount="(provider, payload) => emit('upsertConnectedAccount', provider, payload)"
+                  @deleteConnectedAccount="(accountId) => emit('deleteConnectedAccount', accountId)"
+                />
 
                 <button
                   @click="submitTranscriptionSettings"
@@ -1497,4 +1515,3 @@ watch(() => props.summarizationSettings, (settings) => {
   animation: aurora-flow 12s ease-in-out infinite;
 }
 </style>
-

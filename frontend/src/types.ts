@@ -167,6 +167,37 @@ export interface BilibiliCookieFromBrowserResult {
   error?: string;
 }
 
+export interface CaptureProviderInfo {
+  id: string;
+  name: string;
+  credential_types: string[];
+  supports_validate: boolean;
+}
+
+export interface ConnectedAccount {
+  id: string;
+  user_id: string;
+  provider: string;
+  display_name?: string | null;
+  credential_type: string;
+  secret_masked?: string | null;
+  domain_scope?: string | null;
+  status: string;
+  last_verified_at?: string | null;
+  last_used_at?: string | null;
+  last_error?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface ConnectedAccountUpsertRequest {
+  account_id?: string;
+  credential_type: string;
+  payload: Record<string, string>;
+  display_name?: string;
+  domain_scope?: string;
+}
+
 export interface BilibiliVideoPartInfo {
   index: number;
   cid: number;

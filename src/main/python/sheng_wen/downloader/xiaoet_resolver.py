@@ -62,7 +62,10 @@ def is_xiaoet_video_url(video_url: str) -> bool:
     return bool(_extract_resource_id(parsed.path) and _extract_product_id(parsed.query))
 
 
-def resolve_xiaoet_video(video_url: str) -> XiaoetResolvedVideo:
+def resolve_xiaoet_video(video_url: str, cookie_header: str | None = None) -> XiaoetResolvedVideo:
+    sanitized_cookie = _sanitize_cookie_header(cookie_header)
+    if sanitized_cookie:
+        return XiaoetVideoResolver(cookie_provider=lambda host: sanitized_cookie).resolve(video_url)
     return XiaoetVideoResolver().resolve(video_url)
 
 

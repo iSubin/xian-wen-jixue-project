@@ -16,6 +16,9 @@ import type {
   SummarizationSettings,
   UpdateSummarizationSettingsRequest,
   BilibiliCookieFromBrowserResult,
+  CaptureProviderInfo,
+  ConnectedAccount,
+  ConnectedAccountUpsertRequest,
   BilibiliVideoInfo,
   BilibiliPartsConfig,
   LocalPathCheckResult,
@@ -160,6 +163,9 @@ export function useTaskViewModel() {
   const summarizationSettings = ref<SummarizationSettings | null>(null)
   const isUpdatingSummarizationSettings = ref(false)
   const isReadingBilibiliCookieFromBrowser = ref(false)
+  const captureProviders = ref<CaptureProviderInfo[]>([])
+  const connectedAccounts = ref<ConnectedAccount[]>([])
+  const isUpdatingConnectedAccount = ref(false)
 
   // --- Multi-select State ---
   const isMultiSelectMode = ref(false)
@@ -699,6 +705,66 @@ export function useTaskViewModel() {
     }
   }
 
+  const fetchCaptureProviders = async () => {
+    try {
+      const response = await axios.get(`${apiBaseUrl}/providers`)
+      captureProviders.value = response.data
+    } catch (err) {
+      console.error('Failed to fetch capture providers:', err)
+      error.value = '获取采集站点列表失败'
+    }
+  }
+
+  const fetchConnectedAccounts = async () => {
+    try {
+      const response = await axios.get(`${apiBaseUrl}/connected-accounts`)
+      connectedAccounts.value = response.data
+    } catch (err) {
+      console.error('Failed to fetch connected accounts:', err)
+      error.value = '获取采集账号失败'
+    }
+  }
+
+  const upsertConnectedAccount = async (
+    provider: string,
+    payload: ConnectedAccountUpsertRequest
+  ): Promise<ConnectedAccount> => {
+    isUpdatingConnectedAccount.value = true
+    try {
+      const response = await axios.put(`${apiBaseUrl}/connected-accounts/${provider}`, payload)
+      await fetchConnectedAccounts()
+      return response.data as ConnectedAccount
+    } catch (err) {
+      console.error('Failed to save connected account:', err)
+      if (axios.isAxiosError(err) && err.response) {
+        error.value = err.response.data?.detail || '保存采集账号失败'
+      } else {
+        error.value = '保存采集账号失败'
+      }
+      throw err
+    } finally {
+      isUpdatingConnectedAccount.value = false
+    }
+  }
+
+  const deleteConnectedAccount = async (accountId: string) => {
+    isUpdatingConnectedAccount.value = true
+    try {
+      await axios.delete(`${apiBaseUrl}/connected-accounts/${accountId}`)
+      connectedAccounts.value = connectedAccounts.value.filter(account => account.id !== accountId)
+    } catch (err) {
+      console.error('Failed to delete connected account:', err)
+      if (axios.isAxiosError(err) && err.response) {
+        error.value = err.response.data?.detail || '删除采集账号失败'
+      } else {
+        error.value = '删除采集账号失败'
+      }
+      throw err
+    } finally {
+      isUpdatingConnectedAccount.value = false
+    }
+  }
+
   const checkBilibiliVideoInfo = async (url: string): Promise<BilibiliVideoInfo | null> => {
     try {
       const response = await axios.post(`${apiBaseUrl}/bilibili/video-info`, { url })
@@ -817,6 +883,8 @@ export function useTaskViewModel() {
     fetchLlmSettings()
     fetchTranscriptionSettings()
     fetchSummarizationSettings()
+    fetchCaptureProviders()
+    fetchConnectedAccounts()
     connectWebSocket()
     // 通过 HTTP 获取预热状态作为兜底（WS 可能还没连上）
     fetch(`${apiBaseUrl}/prewarm/status`).then(r => r.json()).then(d => {
@@ -856,6 +924,9 @@ export function useTaskViewModel() {
     summarizationSettings,
     isUpdatingSummarizationSettings,
     isReadingBilibiliCookieFromBrowser,
+    captureProviders,
+    connectedAccounts,
+    isUpdatingConnectedAccount,
     isMultiSelectMode,
     selectedTaskIds,
     streamingBuffer: streamingBlocks,
@@ -887,6 +958,10 @@ export function useTaskViewModel() {
     updateSummarizationSettings,
     testLlm,
     readBilibiliCookieFromBrowser,
+    fetchCaptureProviders,
+    fetchConnectedAccounts,
+    upsertConnectedAccount,
+    deleteConnectedAccount,
     checkBilibiliVideoInfo,
     submitTaskWithParts,
     checkLocalPath,

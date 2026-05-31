@@ -16,7 +16,16 @@ import {
   PhPlus,
   PhTrash,
 } from '@phosphor-icons/vue'
-import type { LLMProvider, LLMSettings, TranscriptionSettings, SummarizationSettings } from '../types'
+import type {
+  CaptureProviderInfo,
+  ConnectedAccount,
+  ConnectedAccountUpsertRequest,
+  LLMProvider,
+  LLMSettings,
+  SummarizationSettings,
+  TranscriptionSettings,
+} from '../types'
+import ConnectedAccountsSettings from './ConnectedAccountsSettings.vue'
 
 const props = defineProps<{
   isOpen: boolean
@@ -31,6 +40,9 @@ const props = defineProps<{
   isPrewarming: boolean
   transcriptionSettings: TranscriptionSettings | null
   isUpdatingTranscriptionSettings: boolean
+  captureProviders: CaptureProviderInfo[]
+  connectedAccounts: ConnectedAccount[]
+  isUpdatingConnectedAccount: boolean
   summarizationSettings: SummarizationSettings | null
   isUpdatingSummarizationSettings: boolean
   isReadingBilibiliCookieFromBrowser: boolean
@@ -70,6 +82,8 @@ const emit = defineEmits<{
     clear_bilibili_sessdata?: boolean
   }]
   readBilibiliCookieFromBrowser: []
+  upsertConnectedAccount: [provider: string, payload: ConnectedAccountUpsertRequest]
+  deleteConnectedAccount: [accountId: string]
   updateSummarizationSettings: [payload: {
     chunk_target_duration_sec?: number
     chunk_min_duration_sec?: number
@@ -753,7 +767,7 @@ const handleSaveSummarizationSettings = () => {
             <!-- B站 SESSDATA -->
             <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 space-y-3">
               <div class="flex items-center justify-between gap-2">
-                <p class="text-sm font-medium text-slate-700">全局 B 站 SESSDATA</p>
+                <p class="text-sm font-medium text-slate-700">系统兜底 B 站 SESSDATA</p>
                 <span class="text-xs px-2 py-0.5 rounded-full border border-slate-300 bg-white text-slate-600">
                   来源: {{ bilibiliCookieSourceLabel }}
                 </span>
@@ -792,6 +806,14 @@ const handleSaveSummarizationSettings = () => {
               </div>
             </div>
             </div>
+
+            <ConnectedAccountsSettings
+              :captureProviders="captureProviders"
+              :connectedAccounts="connectedAccounts"
+              :isUpdatingConnectedAccount="isUpdatingConnectedAccount"
+              @upsertConnectedAccount="(provider, payload) => emit('upsertConnectedAccount', provider, payload)"
+              @deleteConnectedAccount="(accountId) => emit('deleteConnectedAccount', accountId)"
+            />
 
             <button
               @click="handleSaveTranscriptionSettings"

@@ -859,7 +859,10 @@ class VideoDownloaderWorker(Worker):
 
             if is_homeway_graphic_video_url(video_url):
                 source_url = video_url
-                resolved_homeway = resolve_homeway_graphic_video(video_url)
+                resolved_homeway = resolve_homeway_graphic_video(
+                    video_url,
+                    payload.get("homeway_web_qtstr"),
+                )
                 video_url = resolved_homeway.media_url
                 payload = payload.copy()
                 payload["video_url"] = video_url
@@ -879,7 +882,10 @@ class VideoDownloaderWorker(Worker):
 
             if is_xiaoet_video_url(video_url):
                 source_url = video_url
-                resolved_xiaoet = resolve_xiaoet_video(video_url)
+                resolved_xiaoet = resolve_xiaoet_video(
+                    video_url,
+                    payload.get("xiaoet_cookie_header"),
+                )
                 video_url = resolved_xiaoet.media_url
                 payload = payload.copy()
                 payload["video_url"] = video_url
