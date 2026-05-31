@@ -21,6 +21,7 @@ import { postProcessCompiledMarkdown } from './utils/markdownPostProcessor'
 import type {
   BilibiliPartsConfig,
   BilibiliVideoInfo,
+  ConnectedAccountBrowserImportRequest,
   ConnectedAccountUpsertRequest,
   LocalFolderScanResult,
   MarkdownHeadingItem,
@@ -64,6 +65,7 @@ const {
   captureProviders,
   connectedAccounts,
   isUpdatingConnectedAccount,
+  isImportingConnectedAccount,
   isMultiSelectMode,
   selectedTaskIds,
   streamingBuffer,
@@ -92,6 +94,7 @@ const {
   updateSummarizationSettings,
   upsertConnectedAccount,
   deleteConnectedAccount,
+  importConnectedAccountFromBrowser,
   testLlm,
   readBilibiliCookieFromBrowser,
   checkBilibiliVideoInfo,
@@ -549,6 +552,19 @@ const handleDeleteConnectedAccount = async (accountId: string) => {
   }
 }
 
+const handleImportConnectedAccountFromBrowser = async (
+  provider: string,
+  payload: ConnectedAccountBrowserImportRequest
+) => {
+  try {
+    const result = await importConnectedAccountFromBrowser(provider, payload)
+    const source = result.source_browser ? `（${result.source_browser}）` : ''
+    success(`已从浏览器获取登录态${source}`)
+  } catch (_e) {
+    toastError('从浏览器获取登录态失败')
+  }
+}
+
 // B站分P处理
 const handleSubmit = async () => {
   // localhost 场景优先使用本地路径直读（避免文件上传复制）
@@ -879,6 +895,7 @@ watch(
       :captureProviders="captureProviders"
       :connectedAccounts="connectedAccounts"
       :isUpdatingConnectedAccount="isUpdatingConnectedAccount"
+      :isImportingConnectedAccount="isImportingConnectedAccount"
       :summarizationSettings="summarizationSettings"
       :isUpdatingSummarizationSettings="isUpdatingSummarizationSettings"
       :isReadingBilibiliCookieFromBrowser="isReadingBilibiliCookieFromBrowser"
@@ -893,6 +910,7 @@ watch(
       @updateTranscriptionSettings="handleUpdateTranscriptionSettings"
       @readBilibiliCookieFromBrowser="handleReadBilibiliCookieFromBrowser"
       @upsertConnectedAccount="handleUpsertConnectedAccount"
+      @importConnectedAccountFromBrowser="handleImportConnectedAccountFromBrowser"
       @deleteConnectedAccount="handleDeleteConnectedAccount"
       @updateSummarizationSettings="handleUpdateSummarizationSettings"
     />
@@ -928,6 +946,7 @@ watch(
       :captureProviders="captureProviders"
       :connectedAccounts="connectedAccounts"
       :isUpdatingConnectedAccount="isUpdatingConnectedAccount"
+      :isImportingConnectedAccount="isImportingConnectedAccount"
       :summarizationSettings="summarizationSettings"
       :isUpdatingSummarizationSettings="isUpdatingSummarizationSettings"
       :folders="folders"
@@ -945,6 +964,7 @@ watch(
       @deleteProfile="handleDeleteProfile"
       @updateTranscriptionSettings="handleUpdateTranscriptionSettings"
       @upsertConnectedAccount="handleUpsertConnectedAccount"
+      @importConnectedAccountFromBrowser="handleImportConnectedAccountFromBrowser"
       @deleteConnectedAccount="handleDeleteConnectedAccount"
       @updateSummarizationSettings="handleUpdateSummarizationSettings"
       @startTestLlm="handleTestLlm"

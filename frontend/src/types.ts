@@ -198,6 +198,18 @@ export interface ConnectedAccountUpsertRequest {
   domain_scope?: string;
 }
 
+export interface ConnectedAccountBrowserImportRequest {
+  source_url?: string;
+  domain_scope?: string;
+  display_name?: string;
+}
+
+export interface ConnectedAccountBrowserImportResult {
+  success: boolean;
+  source_browser?: string | null;
+  account: ConnectedAccount;
+}
+
 export interface BilibiliVideoPartInfo {
   index: number;
   cid: number;

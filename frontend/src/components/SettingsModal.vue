@@ -19,6 +19,7 @@ import {
 import type {
   CaptureProviderInfo,
   ConnectedAccount,
+  ConnectedAccountBrowserImportRequest,
   ConnectedAccountUpsertRequest,
   LLMProvider,
   LLMSettings,
@@ -43,6 +44,7 @@ const props = defineProps<{
   captureProviders: CaptureProviderInfo[]
   connectedAccounts: ConnectedAccount[]
   isUpdatingConnectedAccount: boolean
+  isImportingConnectedAccount: boolean
   summarizationSettings: SummarizationSettings | null
   isUpdatingSummarizationSettings: boolean
   isReadingBilibiliCookieFromBrowser: boolean
@@ -83,6 +85,7 @@ const emit = defineEmits<{
   }]
   readBilibiliCookieFromBrowser: []
   upsertConnectedAccount: [provider: string, payload: ConnectedAccountUpsertRequest]
+  importConnectedAccountFromBrowser: [provider: string, payload: ConnectedAccountBrowserImportRequest]
   deleteConnectedAccount: [accountId: string]
   updateSummarizationSettings: [payload: {
     chunk_target_duration_sec?: number
@@ -811,7 +814,9 @@ const handleSaveSummarizationSettings = () => {
               :captureProviders="captureProviders"
               :connectedAccounts="connectedAccounts"
               :isUpdatingConnectedAccount="isUpdatingConnectedAccount"
+              :isImportingConnectedAccount="isImportingConnectedAccount"
               @upsertConnectedAccount="(provider, payload) => emit('upsertConnectedAccount', provider, payload)"
+              @importConnectedAccountFromBrowser="(provider, payload) => emit('importConnectedAccountFromBrowser', provider, payload)"
               @deleteConnectedAccount="(accountId) => emit('deleteConnectedAccount', accountId)"
             />
 

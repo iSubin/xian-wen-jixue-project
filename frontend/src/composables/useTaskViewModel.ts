@@ -18,6 +18,8 @@ import type {
   BilibiliCookieFromBrowserResult,
   CaptureProviderInfo,
   ConnectedAccount,
+  ConnectedAccountBrowserImportRequest,
+  ConnectedAccountBrowserImportResult,
   ConnectedAccountUpsertRequest,
   BilibiliVideoInfo,
   BilibiliPartsConfig,
@@ -166,6 +168,7 @@ export function useTaskViewModel() {
   const captureProviders = ref<CaptureProviderInfo[]>([])
   const connectedAccounts = ref<ConnectedAccount[]>([])
   const isUpdatingConnectedAccount = ref(false)
+  const isImportingConnectedAccount = ref(false)
 
   // --- Multi-select State ---
   const isMultiSelectMode = ref(false)
@@ -765,6 +768,28 @@ export function useTaskViewModel() {
     }
   }
 
+  const importConnectedAccountFromBrowser = async (
+    provider: string,
+    payload: ConnectedAccountBrowserImportRequest = {}
+  ): Promise<ConnectedAccountBrowserImportResult> => {
+    isImportingConnectedAccount.value = true
+    try {
+      const response = await axios.post(`${apiBaseUrl}/connected-accounts/${provider}/from-browser`, payload)
+      await fetchConnectedAccounts()
+      return response.data as ConnectedAccountBrowserImportResult
+    } catch (err) {
+      console.error('Failed to import connected account from browser:', err)
+      if (axios.isAxiosError(err) && err.response) {
+        error.value = err.response.data?.detail || '从浏览器获取登录态失败'
+      } else {
+        error.value = '从浏览器获取登录态失败'
+      }
+      throw err
+    } finally {
+      isImportingConnectedAccount.value = false
+    }
+  }
+
   const checkBilibiliVideoInfo = async (url: string): Promise<BilibiliVideoInfo | null> => {
     try {
       const response = await axios.post(`${apiBaseUrl}/bilibili/video-info`, { url })
@@ -927,6 +952,7 @@ export function useTaskViewModel() {
     captureProviders,
     connectedAccounts,
     isUpdatingConnectedAccount,
+    isImportingConnectedAccount,
     isMultiSelectMode,
     selectedTaskIds,
     streamingBuffer: streamingBlocks,
@@ -962,6 +988,7 @@ export function useTaskViewModel() {
     fetchConnectedAccounts,
     upsertConnectedAccount,
     deleteConnectedAccount,
+    importConnectedAccountFromBrowser,
     checkBilibiliVideoInfo,
     submitTaskWithParts,
     checkLocalPath,

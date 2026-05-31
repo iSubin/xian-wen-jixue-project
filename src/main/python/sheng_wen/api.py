@@ -20,7 +20,7 @@ from .config.settings import config, get_config_manager
 from .version import APP_VERSION
 from .llm.llm import LLMConfig
 from .llm.provider_manager import LLMProviderManager
-from .transcriber.settings_manager import TranscriptionSettingsManager
+from .transcriber.settings_manager import TranscriptionSettingsManager, _read_bilibili_cookie_from_browser
 from .transcriber.transcriber import ModelLoadError
 from .utils.media import (
     SUPPORTED_MEDIA_EXTENSIONS,
@@ -30,8 +30,16 @@ from .downloader.bilibili_author_resolver import (
     resolve_bilibili_author,
     BilibiliAuthorResolveError,
 )
-from .downloader.homeway_resolver import is_homeway_graphic_video_url
-from .downloader.xiaoet_resolver import is_xiaoet_video_url
+from .downloader.homeway_resolver import (
+    _read_homeway_token_from_browser_cookie3,
+    _read_homeway_token_from_macos_chrome,
+    is_homeway_graphic_video_url,
+)
+from .downloader.xiaoet_resolver import (
+    _read_xiaoet_cookie_from_browser_cookie3,
+    _read_xiaoet_cookie_from_macos_chrome,
+    is_xiaoet_video_url,
+)
 
 app = FastAPI(title="ShengWen API", description="视频转录与 AI 总结服务", version=APP_VERSION)
 
@@ -76,6 +84,18 @@ def _credential_domain_matches(domain_scope: str | None, video_url: str) -> bool
     normalized = scope[2:] if scope.startswith("*.") else scope
     normalized = normalized[1:] if normalized.startswith(".") else normalized
     return host == normalized or host.endswith(f".{normalized}")
+
+
+def _normalize_import_host(source: str | None) -> str:
+    raw = str(source or "").strip()
+    if not raw:
+        return ""
+    parsed = urlparse(raw if "://" in raw else f"https://{raw}")
+    return (parsed.hostname or "").strip().lower().strip(".")
+
+
+def _is_supported_xiaoet_host(host: str) -> bool:
+    return host.endswith(".h5.xiaoeknow.com") or host.endswith(".xet.citv.cn")
 
 
 def _find_connected_account_secret(
@@ -384,6 +404,12 @@ class ConnectedAccountUpsert(BaseModel):
     domain_scope: Optional[str] = None
 
 
+class ConnectedAccountBrowserImport(BaseModel):
+    source_url: Optional[str] = None
+    domain_scope: Optional[str] = None
+    display_name: Optional[str] = None
+
+
 class ConnectedAccountView(BaseModel):
     id: str
     user_id: str
@@ -398,6 +424,12 @@ class ConnectedAccountView(BaseModel):
     last_error: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+
+
+class ConnectedAccountBrowserImportResult(BaseModel):
+    success: bool
+    source_browser: Optional[str] = None
+    account: ConnectedAccountView
 
 
 class BilibiliCookieFromBrowserResult(BaseModel):
@@ -1933,6 +1965,86 @@ async def upsert_connected_account(provider: str, payload: ConnectedAccountUpser
         display_name=payload.display_name,
         domain_scope=payload.domain_scope,
     )
+
+
+@app.post("/connected-accounts/{provider}/from-browser", response_model=ConnectedAccountBrowserImportResult)
+async def import_connected_account_from_browser(
+    provider: str,
+    payload: ConnectedAccountBrowserImport,
+    request: Request,
+):
+    """从本机浏览器读取登录态，并保存为当前用户的站点采集账号。"""
+    provider_info = CAPTURE_PROVIDER_BY_ID.get(provider)
+    if not provider_info:
+        raise HTTPException(status_code=404, detail="不支持的采集站点")
+
+    source_browser = ""
+    user_id = _current_user_id(request)
+
+    if provider == "bilibili":
+        sessdata, source_browser = _read_bilibili_cookie_from_browser()
+        if not sessdata:
+            raise HTTPException(
+                status_code=404,
+                detail="未在浏览器中找到 B 站登录态。请确认已在浏览器登录 bilibili.com，或关闭浏览器后重试。",
+            )
+        account = db.upsert_connected_account(
+            user_id=user_id,
+            provider=provider,
+            credential_type="sessdata_bundle",
+            secret_payload={"SESSDATA": sessdata},
+            display_name=payload.display_name or "哔哩哔哩",
+            domain_scope=".bilibili.com",
+        )
+        return {"success": True, "source_browser": source_browser, "account": account}
+
+    if provider == "xiaoetong":
+        host = _normalize_import_host(payload.source_url or payload.domain_scope)
+        if not host or not _is_supported_xiaoet_host(host):
+            raise HTTPException(
+                status_code=400,
+                detail="请先填写小鹅通视频链接或店铺域名，例如 appexpqpqic7617.h5.xiaoeknow.com。",
+            )
+
+        cookie_header, source_browser = _read_xiaoet_cookie_from_browser_cookie3(host)
+        if not cookie_header:
+            cookie_header, source_browser = _read_xiaoet_cookie_from_macos_chrome(host)
+        if not cookie_header:
+            raise HTTPException(
+                status_code=404,
+                detail="未在浏览器中找到小鹅通登录态。请确认已在 Chrome 登录并打开过对应店铺的视频页。",
+            )
+
+        account = db.upsert_connected_account(
+            user_id=user_id,
+            provider=provider,
+            credential_type="cookie_header",
+            secret_payload={"cookie_header": cookie_header, "host_scope": host},
+            display_name=payload.display_name or f"小鹅通 {host}",
+            domain_scope=host,
+        )
+        return {"success": True, "source_browser": source_browser, "account": account}
+
+    if provider == "homeway":
+        token, source_browser = _read_homeway_token_from_browser_cookie3()
+        if not token:
+            token, source_browser = _read_homeway_token_from_macos_chrome()
+        if not token:
+            raise HTTPException(
+                status_code=404,
+                detail="未在浏览器中找到投研大师登录态 web_qtstr。请确认已在 Chrome 登录并打开过投研大师页面。",
+            )
+        account = db.upsert_connected_account(
+            user_id=user_id,
+            provider=provider,
+            credential_type="web_qtstr",
+            secret_payload={"web_qtstr": token},
+            display_name=payload.display_name or "投研大师",
+            domain_scope="homeway.com.cn",
+        )
+        return {"success": True, "source_browser": source_browser, "account": account}
+
+    raise HTTPException(status_code=404, detail="不支持从浏览器导入该站点")
 
 
 @app.delete("/connected-accounts/{account_id}", status_code=204)

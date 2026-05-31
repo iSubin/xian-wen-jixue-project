@@ -27,6 +27,7 @@ import {
   TaskStatus,
   type CaptureProviderInfo,
   type ConnectedAccount,
+  type ConnectedAccountBrowserImportRequest,
   type ConnectedAccountUpsertRequest,
   type Task,
   type SummaryMode,
@@ -67,6 +68,7 @@ const props = defineProps<{
   captureProviders: CaptureProviderInfo[]
   connectedAccounts: ConnectedAccount[]
   isUpdatingConnectedAccount: boolean
+  isImportingConnectedAccount: boolean
   summarizationSettings: SummarizationSettings | null
   isUpdatingSummarizationSettings: boolean
   folders: Folder[]
@@ -125,6 +127,7 @@ const emit = defineEmits<{
     clear_bilibili_sessdata?: boolean
   }]
   upsertConnectedAccount: [provider: string, payload: ConnectedAccountUpsertRequest]
+  importConnectedAccountFromBrowser: [provider: string, payload: ConnectedAccountBrowserImportRequest]
   deleteConnectedAccount: [accountId: string]
   updateSummarizationSettings: [payload: {
     chunk_target_duration_sec?: number
@@ -1010,7 +1013,9 @@ watch(() => props.summarizationSettings, (settings) => {
                   :captureProviders="props.captureProviders"
                   :connectedAccounts="props.connectedAccounts"
                   :isUpdatingConnectedAccount="props.isUpdatingConnectedAccount"
+                  :isImportingConnectedAccount="props.isImportingConnectedAccount"
                   @upsertConnectedAccount="(provider, payload) => emit('upsertConnectedAccount', provider, payload)"
+                  @importConnectedAccountFromBrowser="(provider, payload) => emit('importConnectedAccountFromBrowser', provider, payload)"
                   @deleteConnectedAccount="(accountId) => emit('deleteConnectedAccount', accountId)"
                 />
 

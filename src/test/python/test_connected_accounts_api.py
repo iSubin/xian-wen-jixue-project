@@ -125,6 +125,102 @@ class TestConnectedAccountsApi(unittest.TestCase):
         self.assertEqual(len(account_list), 1)
         self.assertEqual(account_list[0]["domain_scope"], "second.h5.xiaoeknow.com")
 
+    def test_imports_bilibili_connected_account_from_browser(self):
+        with patch.object(
+            api_module,
+            "_read_bilibili_cookie_from_browser",
+            return_value=("browser-bili-secret", "Google Chrome"),
+        ):
+            response = self.client.post(
+                "/connected-accounts/bilibili/from-browser",
+                headers={"X-ShengWen-User-Id": "user-a"},
+                json={},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertTrue(result["success"])
+        self.assertEqual(result["source_browser"], "Google Chrome")
+        account = result["account"]
+        self.assertEqual(account["provider"], "bilibili")
+        self.assertEqual(account["domain_scope"], ".bilibili.com")
+        self.assertIn("****", account["secret_masked"])
+        self.assertNotIn("browser-bili-secret", response.text)
+        self.assertEqual(
+            api_module.db.get_connected_account_secret("user-a", account["id"]),
+            {"SESSDATA": "browser-bili-secret"},
+        )
+
+    def test_imports_xiaoetong_connected_account_from_browser_source_url(self):
+        with patch.object(
+            api_module,
+            "_read_xiaoet_cookie_from_browser_cookie3",
+            return_value=("xiaoet_session=browser-cookie", "Google Chrome"),
+        ), patch.object(
+            api_module,
+            "_read_xiaoet_cookie_from_macos_chrome",
+            return_value=("", ""),
+        ):
+            response = self.client.post(
+                "/connected-accounts/xiaoetong/from-browser",
+                headers={"X-ShengWen-User-Id": "user-a"},
+                json={
+                    "source_url": (
+                        "https://appexpqpqic7617.h5.xiaoeknow.com/p/course/video/v_abc"
+                        "?product_id=course_1"
+                    ),
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        account = result["account"]
+        self.assertEqual(account["provider"], "xiaoetong")
+        self.assertEqual(account["domain_scope"], "appexpqpqic7617.h5.xiaoeknow.com")
+        self.assertEqual(
+            api_module.db.get_connected_account_secret("user-a", account["id"]),
+            {
+                "cookie_header": "xiaoet_session=browser-cookie",
+                "host_scope": "appexpqpqic7617.h5.xiaoeknow.com",
+            },
+        )
+
+    def test_xiaoetong_browser_import_requires_supported_host(self):
+        response = self.client.post(
+            "/connected-accounts/xiaoetong/from-browser",
+            headers={"X-ShengWen-User-Id": "user-a"},
+            json={"source_url": "https://example.com/video"},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("小鹅通", response.text)
+
+    def test_imports_homeway_connected_account_from_browser(self):
+        with patch.object(
+            api_module,
+            "_read_homeway_token_from_browser_cookie3",
+            return_value=("homeway-browser-token", "Google Chrome"),
+        ), patch.object(
+            api_module,
+            "_read_homeway_token_from_macos_chrome",
+            return_value=("", ""),
+        ):
+            response = self.client.post(
+                "/connected-accounts/homeway/from-browser",
+                headers={"X-ShengWen-User-Id": "user-a"},
+                json={},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        account = result["account"]
+        self.assertEqual(account["provider"], "homeway")
+        self.assertEqual(account["domain_scope"], "homeway.com.cn")
+        self.assertEqual(
+            api_module.db.get_connected_account_secret("user-a", account["id"]),
+            {"web_qtstr": "homeway-browser-token"},
+        )
+
     def test_bilibili_task_uses_current_users_connected_account_secret(self):
         captured_payloads = []
 

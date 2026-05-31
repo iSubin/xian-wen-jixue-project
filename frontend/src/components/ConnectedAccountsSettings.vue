@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { PhCheckCircle, PhFloppyDisk, PhKey, PhTrash } from '@phosphor-icons/vue'
+import { PhCheckCircle, PhDownloadSimple, PhFloppyDisk, PhKey, PhTrash } from '@phosphor-icons/vue'
 import type {
   CaptureProviderInfo,
   ConnectedAccount,
+  ConnectedAccountBrowserImportRequest,
   ConnectedAccountUpsertRequest,
 } from '../types'
 
@@ -11,11 +12,13 @@ const props = defineProps<{
   captureProviders: CaptureProviderInfo[]
   connectedAccounts: ConnectedAccount[]
   isUpdatingConnectedAccount: boolean
+  isImportingConnectedAccount: boolean
   compact?: boolean
 }>()
 
 const emit = defineEmits<{
   upsertConnectedAccount: [provider: string, payload: ConnectedAccountUpsertRequest]
+  importConnectedAccountFromBrowser: [provider: string, payload: ConnectedAccountBrowserImportRequest]
   deleteConnectedAccount: [accountId: string]
 }>()
 
@@ -35,6 +38,7 @@ const providerMeta: Record<string, {
   credentialLabel: string
   secretKey: string
   placeholder: string
+  browserHint: string
   domainLabel?: string
   domainPlaceholder?: string
 }> = {
@@ -42,18 +46,21 @@ const providerMeta: Record<string, {
     credentialLabel: 'SESSDATA',
     secretKey: 'SESSDATA',
     placeholder: '粘贴 B 站 SESSDATA',
+    browserHint: '确认已在浏览器登录 bilibili.com 后点击获取。',
   },
   xiaoetong: {
     credentialLabel: 'Cookie Header',
     secretKey: 'cookie_header',
     placeholder: '粘贴小鹅通 Cookie Header',
-    domainLabel: '适用域名',
-    domainPlaceholder: '例如 appexpqpqic7617.h5.xiaoeknow.com',
+    domainLabel: '视频链接或店铺域名',
+    domainPlaceholder: '粘贴小鹅通视频链接或 appexpqpqic7617.h5.xiaoeknow.com',
+    browserHint: '先粘贴小鹅通视频链接或店铺域名，再读取浏览器登录态。',
   },
   homeway: {
     credentialLabel: 'web_qtstr',
     secretKey: 'web_qtstr',
     placeholder: '粘贴投研大师 web_qtstr',
+    browserHint: '确认已在浏览器登录投研大师后点击获取。',
   },
 }
 
@@ -78,6 +85,7 @@ const getMeta = (providerId: string) => {
     credentialLabel: '凭据',
     secretKey: 'credential',
     placeholder: '粘贴站点凭据',
+    browserHint: '确认已在浏览器登录目标站点后点击获取。',
   }
 }
 
@@ -167,6 +175,21 @@ const handleDelete = (account?: ConnectedAccount) => {
   if (!account) return
   emit('deleteConnectedAccount', account.id)
 }
+
+const canImportFromBrowser = (provider: CaptureProviderInfo) => {
+  if (provider.id !== 'xiaoetong') return true
+  return Boolean(forms.value[provider.id]?.domainScope?.trim())
+}
+
+const handleImportFromBrowser = (provider: CaptureProviderInfo) => {
+  const form = forms.value[provider.id]
+  const source = form?.domainScope?.trim() || ''
+  emit('importConnectedAccountFromBrowser', provider.id, {
+    source_url: source || undefined,
+    domain_scope: source || undefined,
+    display_name: form?.displayName?.trim() || provider.name,
+  })
+}
 </script>
 
 <template>
@@ -206,6 +229,9 @@ const handleDelete = (account?: ConnectedAccount) => {
         <p class="min-h-[18px] text-xs text-slate-500 truncate">
           当前：{{ row.account?.secret_masked || '未保存' }}
         </p>
+        <p class="text-xs leading-relaxed text-slate-500">
+          {{ row.meta.browserHint }}
+        </p>
 
         <div class="space-y-2">
           <input
@@ -237,10 +263,19 @@ const handleDelete = (account?: ConnectedAccount) => {
           </div>
         </div>
 
+        <button
+          @click="handleImportFromBrowser(row.provider)"
+          :disabled="isImportingConnectedAccount || !canImportFromBrowser(row.provider)"
+          class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-500 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <PhDownloadSimple :size="14" />
+          <span>{{ isImportingConnectedAccount ? '读取中' : '从浏览器获取' }}</span>
+        </button>
+
         <div class="grid grid-cols-2 gap-2">
           <button
             @click="handleSave(row.provider)"
-            :disabled="isUpdatingConnectedAccount || !row.form.secret.trim()"
+            :disabled="isUpdatingConnectedAccount || isImportingConnectedAccount || !row.form.secret.trim()"
             class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-800 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <PhFloppyDisk :size="14" />
@@ -248,7 +283,7 @@ const handleDelete = (account?: ConnectedAccount) => {
           </button>
           <button
             @click="handleDelete(row.account)"
-            :disabled="isUpdatingConnectedAccount || !row.account"
+            :disabled="isUpdatingConnectedAccount || isImportingConnectedAccount || !row.account"
             class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <PhTrash :size="14" />
