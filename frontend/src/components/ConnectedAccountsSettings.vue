@@ -233,63 +233,72 @@ const handleImportFromBrowser = (provider: CaptureProviderInfo) => {
           {{ row.meta.browserHint }}
         </p>
 
-        <div class="space-y-2">
+        <div v-if="row.meta.domainLabel" class="space-y-2">
           <input
-            v-model="row.form.displayName"
-            type="text"
-            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            placeholder="显示名称"
-            autocomplete="off"
-          >
-
-          <input
-            v-if="row.meta.domainLabel"
             v-model="row.form.domainScope"
             type="text"
             class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             :placeholder="row.meta.domainPlaceholder"
             autocomplete="off"
           >
-
-          <div class="relative">
-            <PhKey :size="15" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              v-model="row.form.secret"
-              type="password"
-              class="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              :placeholder="row.meta.placeholder"
-              autocomplete="off"
-            >
-          </div>
         </div>
 
-        <button
-          @click="handleImportFromBrowser(row.provider)"
-          :disabled="isImportingConnectedAccount || !canImportFromBrowser(row.provider)"
-          class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-500 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <PhDownloadSimple :size="14" />
-          <span>{{ isImportingConnectedAccount ? '读取中' : '从浏览器获取' }}</span>
-        </button>
-
-        <div class="grid grid-cols-2 gap-2">
+        <div class="flex items-center gap-2">
           <button
-            @click="handleSave(row.provider)"
-            :disabled="isUpdatingConnectedAccount || isImportingConnectedAccount || !row.form.secret.trim()"
-            class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-800 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+            @click="handleImportFromBrowser(row.provider)"
+            :disabled="isImportingConnectedAccount || !canImportFromBrowser(row.provider)"
+            class="inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-500 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <PhFloppyDisk :size="14" />
-            <span>{{ isUpdatingConnectedAccount ? '保存中' : '保存' }}</span>
+            <PhDownloadSimple :size="14" />
+            <span>{{ isImportingConnectedAccount ? '读取中' : '从浏览器获取' }}</span>
           </button>
           <button
+            v-if="row.account"
             @click="handleDelete(row.account)"
-            :disabled="isUpdatingConnectedAccount || isImportingConnectedAccount || !row.account"
-            class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="isUpdatingConnectedAccount || isImportingConnectedAccount"
+            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+            title="删除已保存账号"
           >
             <PhTrash :size="14" />
-            <span>删除</span>
+            <span class="sr-only">删除已保存账号</span>
           </button>
         </div>
+
+        <details class="rounded-lg border border-slate-200 bg-white/70 px-3 py-2">
+          <summary class="cursor-pointer select-none text-xs font-medium text-slate-500 transition-colors hover:text-slate-700">
+            高级：手动填写
+          </summary>
+
+          <div class="mt-3 space-y-2">
+            <input
+              v-model="row.form.displayName"
+              type="text"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              placeholder="显示名称"
+              autocomplete="off"
+            >
+
+            <div class="relative">
+              <PhKey :size="15" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                v-model="row.form.secret"
+                type="password"
+                class="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                :placeholder="row.meta.placeholder"
+                autocomplete="off"
+              >
+            </div>
+
+            <button
+              @click="handleSave(row.provider)"
+              :disabled="isUpdatingConnectedAccount || isImportingConnectedAccount || !row.form.secret.trim()"
+              class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-slate-800 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <PhFloppyDisk :size="14" />
+              <span>{{ isUpdatingConnectedAccount ? '保存中' : '保存手动凭据' }}</span>
+            </button>
+          </div>
+        </details>
       </div>
     </div>
   </div>
