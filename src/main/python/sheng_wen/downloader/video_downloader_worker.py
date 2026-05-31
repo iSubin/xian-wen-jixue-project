@@ -13,6 +13,17 @@ from ..worker import Worker, TaskCancelledError
 from ..utils.logger import logger
 from ..utils.ffmpeg_helper import FFmpegHelper
 from .bilibili_author_resolver import resolve_bilibili_author, BilibiliAuthorResolveError
+from .homeway_resolver import (
+    HomewayResolveError,
+    is_homeway_graphic_video_url,
+    redact_sensitive_url,
+    resolve_homeway_graphic_video,
+)
+from .xiaoet_resolver import (
+    XiaoetResolveError,
+    is_xiaoet_video_url,
+    resolve_xiaoet_video,
+)
 
 class VideoDownloaderWorker(Worker):
     """
@@ -845,11 +856,66 @@ class VideoDownloaderWorker(Worker):
 
             if self._try_process_with_bilibili_subtitle(payload):
                 return
+
+            if is_homeway_graphic_video_url(video_url):
+                source_url = video_url
+                resolved_homeway = resolve_homeway_graphic_video(video_url)
+                video_url = resolved_homeway.media_url
+                payload = payload.copy()
+                payload["video_url"] = video_url
+                payload["source_video_url"] = source_url
+                payload["resolved_title"] = resolved_homeway.title
+                logger.info(
+                    f"[{self.name}] 已解析投研大师视频: "
+                    f"vhall_id={resolved_homeway.vhall_id}, media={redact_sensitive_url(video_url)}"
+                )
+                if task_id and resolved_homeway.title:
+                    from ..db import TaskStatus
+                    from ..task_updater import update_and_notify
+                    self._submit_coro(update_and_notify(
+                        task_id,
+                        {"title": resolved_homeway.title, "status": TaskStatus.DOWNLOADING},
+                    ))
+
+            if is_xiaoet_video_url(video_url):
+                source_url = video_url
+                resolved_xiaoet = resolve_xiaoet_video(video_url)
+                video_url = resolved_xiaoet.media_url
+                payload = payload.copy()
+                payload["video_url"] = video_url
+                payload["source_video_url"] = source_url
+                payload["resolved_title"] = resolved_xiaoet.title
+                logger.info(
+                    f"[{self.name}] 已解析小鹅通视频: "
+                    f"resource_id={resolved_xiaoet.resource_id}, "
+                    f"quality={resolved_xiaoet.quality}, media={redact_sensitive_url(video_url)}"
+                )
+                if task_id and resolved_xiaoet.title:
+                    from ..db import TaskStatus
+                    from ..task_updater import update_and_notify
+                    self._submit_coro(update_and_notify(
+                        task_id,
+                        {"title": resolved_xiaoet.title, "status": TaskStatus.DOWNLOADING},
+                    ))
         except TaskCancelledError as e:
             logger.info(f"[{self.name}] {e}")
             return
+        except HomewayResolveError as e:
+            logger.error(f"[{self.name}] 投研大师视频解析失败: {e}")
+            if task_id:
+                from ..db import TaskStatus
+                from ..task_updater import update_and_notify
+                self._submit_coro(update_and_notify(task_id, {"status": TaskStatus.FAILED, "error_message": str(e)}))
+            return
+        except XiaoetResolveError as e:
+            logger.error(f"[{self.name}] 小鹅通视频解析失败: {e}")
+            if task_id:
+                from ..db import TaskStatus
+                from ..task_updater import update_and_notify
+                self._submit_coro(update_and_notify(task_id, {"status": TaskStatus.FAILED, "error_message": str(e)}))
+            return
 
-        logger.info(f"[{self.name}] 开始下载视频: {video_url} (质量: {quality})")
+        logger.info(f"[{self.name}] 开始下载视频: {redact_sensitive_url(video_url)} (质量: {quality})")
 
         if task_id:
             from ..db import TaskStatus
@@ -928,7 +994,7 @@ class VideoDownloaderWorker(Worker):
                 from ..db import TaskStatus
                 from ..task_updater import update_and_notify
                 updates = {"status": TaskStatus.TRANSCRIBING}
-                video_title = info_dict.get("title")
+                video_title = payload.get("resolved_title") or info_dict.get("title")
                 if video_title:
                     updates["title"] = str(video_title)
                 self._submit_coro(update_and_notify(task_id, updates))
@@ -945,10 +1011,11 @@ class VideoDownloaderWorker(Worker):
         except TaskCancelledError as e:
             logger.info(f"[{self.name}] {e}")
         except Exception as e:
-            logger.error(f"[{self.name}] 下载视频时出错: {e}", exc_info=True)
+            logger.error(f"[{self.name}] 下载视频时出错: {redact_sensitive_url(str(e))}", exc_info=True)
             if task_id:
                 from ..db import TaskStatus
                 from ..task_updater import update_and_notify
                 # 清理错误信息中的 ANSI 转义序列
                 clean_error = re.sub(r'\x1B(?:[@-Z\-_]|\[[0-?]*[ -/]*[@-~])', '', str(e))
+                clean_error = redact_sensitive_url(clean_error)
                 self._submit_coro(update_and_notify(task_id, {"status": TaskStatus.FAILED, "error_message": clean_error}))

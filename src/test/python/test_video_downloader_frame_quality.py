@@ -9,6 +9,8 @@ from unittest.mock import patch
 path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 sys.path.insert(0, path)
 
+from src.main.python.sheng_wen.downloader.homeway_resolver import HomewayResolvedVideo
+from src.main.python.sheng_wen.downloader.xiaoet_resolver import XiaoetResolvedVideo
 from src.main.python.sheng_wen.downloader.video_downloader_worker import VideoDownloaderWorker
 
 
@@ -129,6 +131,165 @@ class TestVideoDownloaderFrameQuality(unittest.TestCase):
             captured_urls,
             ["https://www.bilibili.com/video/BV1YZGB6cEBN/?spm_id_from=333.40164.0.0"],
         )
+
+    def test_download_path_resolves_homeway_graphic_video_url_for_ytdlp(self):
+        worker = VideoDownloaderWorker(name="test-downloader")
+        worker._try_process_with_bilibili_subtitle = lambda payload: False
+        worker._validate_downloaded_media_duration = lambda **kwargs: None
+        captured_urls = []
+
+        class FakeYDL:
+            def __init__(self, opts):
+                self.opts = opts
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def extract_info(self, video_url, download=True):
+                captured_urls.append(video_url)
+                return {"id": "homeway-hls", "duration": 465, "title": "投研大师视频"}
+
+            def prepare_filename(self, info_dict):
+                return "/tmp/homeway.mp4"
+
+        with patch(
+            "src.main.python.sheng_wen.downloader.video_downloader_worker.resolve_homeway_graphic_video",
+            return_value=HomewayResolvedVideo(
+                media_url="https://cdn.example.com/video.m3u8?token=media-token",
+                title="投研大师视频",
+                source_url="https://tyds.homeway.com.cn/#/GraphicVideo?key=5269",
+                vhall_id="260368304",
+            ),
+        ), patch(
+            "src.main.python.sheng_wen.downloader.video_downloader_worker.yt_dlp.YoutubeDL",
+            FakeYDL,
+        ):
+            worker.process_task(
+                {
+                    "video_url": "https://tyds.homeway.com.cn/#/GraphicVideo?key=5269",
+                    "quality": "best",
+                    "enable_frame_snapshots": False,
+                }
+            )
+
+        self.assertEqual(
+            captured_urls,
+            ["https://cdn.example.com/video.m3u8?token=media-token"],
+        )
+
+    def test_download_path_resolves_xiaoet_video_url_for_ytdlp(self):
+        worker = VideoDownloaderWorker(name="test-downloader")
+        worker._try_process_with_bilibili_subtitle = lambda payload: False
+        worker._validate_downloaded_media_duration = lambda **kwargs: None
+        captured_urls = []
+
+        class FakeYDL:
+            def __init__(self, opts):
+                self.opts = opts
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def extract_info(self, video_url, download=True):
+                captured_urls.append(video_url)
+                return {"id": "xiaoet-hls", "duration": 1939, "title": "小鹅通视频"}
+
+            def prepare_filename(self, info_dict):
+                return "/tmp/xiaoet.mp4"
+
+        with patch(
+            "src.main.python.sheng_wen.downloader.video_downloader_worker.resolve_xiaoet_video",
+            return_value=XiaoetResolvedVideo(
+                media_url="https://vod.example.com/video.m3u8?sign=s&t=t&us=u",
+                title="小鹅通视频",
+                source_url="https://appexpqpqic7617.h5.xiaoeknow.com/p/course/video/v_abc?product_id=course_1",
+                resource_id="v_abc",
+                product_id="course_1",
+                quality="1080p_hls",
+            ),
+        ), patch(
+            "src.main.python.sheng_wen.downloader.video_downloader_worker.yt_dlp.YoutubeDL",
+            FakeYDL,
+        ):
+            worker.process_task(
+                {
+                    "video_url": "https://appexpqpqic7617.h5.xiaoeknow.com/p/course/video/v_abc?product_id=course_1",
+                    "quality": "best",
+                    "enable_frame_snapshots": False,
+                }
+            )
+
+        self.assertEqual(
+            captured_urls,
+            ["https://vod.example.com/video.m3u8?sign=s&t=t&us=u"],
+        )
+
+    def test_xiaoet_resolved_title_is_not_overwritten_by_hls_filename(self):
+        captured_updates = []
+
+        async def fake_update_and_notify(task_id, updates):
+            captured_updates.append((task_id, updates))
+            return None
+
+        def submit_coro(coro):
+            asyncio.run(coro)
+
+        worker = VideoDownloaderWorker(name="test-downloader")
+        worker._submit_coro = submit_coro
+        worker._try_process_with_bilibili_subtitle = lambda payload: False
+        worker._validate_downloaded_media_duration = lambda **kwargs: None
+        worker.is_task_cancelled = lambda task_id: False
+
+        class FakeYDL:
+            def __init__(self, opts):
+                self.opts = opts
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def extract_info(self, video_url, download=True):
+                return {"id": "v.f421220", "duration": 1939, "title": "v.f421220"}
+
+            def prepare_filename(self, info_dict):
+                return "/tmp/xiaoet.mp4"
+
+        with patch(
+            "src.main.python.sheng_wen.downloader.video_downloader_worker.resolve_xiaoet_video",
+            return_value=XiaoetResolvedVideo(
+                media_url="https://vod.example.com/video.m3u8?sign=s&t=t&us=u",
+                title="第15课.mp4",
+                source_url="https://appexpqpqic7617.h5.xiaoeknow.com/p/course/video/v_abc?product_id=course_1",
+                resource_id="v_abc",
+                product_id="course_1",
+                quality="720p_hls",
+            ),
+        ), patch(
+            "src.main.python.sheng_wen.downloader.video_downloader_worker.yt_dlp.YoutubeDL",
+            FakeYDL,
+        ), patch(
+            "src.main.python.sheng_wen.task_updater.update_and_notify",
+            fake_update_and_notify,
+        ):
+            worker.process_task(
+                {
+                    "task_id": "task-xiaoet",
+                    "video_url": "https://appexpqpqic7617.h5.xiaoeknow.com/p/course/video/v_abc?product_id=course_1",
+                    "quality": "best",
+                    "enable_frame_snapshots": False,
+                }
+            )
+
+        title_updates = [updates for _task_id, updates in captured_updates if "title" in updates]
+        self.assertEqual(title_updates[-1]["title"], "第15课.mp4")
 
     def test_rejects_downloaded_media_when_duration_is_much_shorter_than_metadata(self):
         worker = VideoDownloaderWorker(name="test-downloader")
