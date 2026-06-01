@@ -142,6 +142,74 @@ class ConnectedAccountModel(Base):
         }
 
 
+class CollectionJobModel(Base):
+    __tablename__ = "collection_jobs"
+
+    id = Column(String, primary_key=True)
+    provider = Column(String, nullable=False, index=True)
+    source_type = Column(String, nullable=False)
+    source_url = Column(Text, nullable=True)
+    title = Column(String, nullable=False)
+    folder_id = Column(String, nullable=True)
+    status = Column(String, default="PENDING", index=True)
+    total_items = Column(Integer, default=0)
+    completed_items = Column(Integer, default=0)
+    failed_items = Column(Integer, default=0)
+    aggregate_markdown = Column(Text, nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "provider": self.provider,
+            "source_type": self.source_type,
+            "source_url": self.source_url,
+            "title": self.title,
+            "folder_id": self.folder_id,
+            "status": self.status,
+            "total_items": self.total_items,
+            "completed_items": self.completed_items,
+            "failed_items": self.failed_items,
+            "aggregate_markdown": self.aggregate_markdown,
+            "error_message": self.error_message,
+            "created_at": self.created_at.isoformat() + "Z" if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() + "Z" if self.updated_at else None,
+        }
+
+
+class CollectionItemModel(Base):
+    __tablename__ = "collection_items"
+
+    id = Column(String, primary_key=True)
+    job_id = Column(String, nullable=False, index=True)
+    sort_order = Column(Integer, default=0)
+    provider = Column(String, nullable=False, index=True)
+    source_url = Column(Text, nullable=False)
+    title = Column(String, nullable=False)
+    part_index = Column(Integer, nullable=True)
+    duration = Column(Integer, nullable=True)
+    task_id = Column(String, nullable=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "job_id": self.job_id,
+            "sort_order": self.sort_order,
+            "provider": self.provider,
+            "source_url": self.source_url,
+            "title": self.title,
+            "part_index": self.part_index,
+            "duration": self.duration,
+            "task_id": self.task_id,
+            "created_at": self.created_at.isoformat() + "Z" if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() + "Z" if self.updated_at else None,
+        }
+
+
 def _credential_key() -> bytes:
     raw = os.getenv("SHENGWEN_CREDENTIAL_SECRET") or "shengwen-dev-credential-secret"
     return hashlib.sha256(raw.encode("utf-8")).digest()
@@ -568,6 +636,177 @@ class TaskDB:
         try:
             tasks = session.query(TaskModel).filter(TaskModel.folder_id == folder_id).order_by(TaskModel.created_at.desc()).all()
             return [t.to_dict() for t in tasks]
+        finally:
+            session.close()
+
+    # ── Collection jobs ──
+
+    def _collection_counts_from_items(self, items: List[Dict[str, Any]]) -> Dict[str, Any]:
+        total = len(items)
+        completed = 0
+        failed = 0
+        running = 0
+        linked = 0
+        running_statuses = {
+            TaskStatus.DOWNLOADING.value,
+            TaskStatus.UPLOADING.value,
+            TaskStatus.TRANSCRIBING.value,
+            TaskStatus.SUMMARIZING.value,
+        }
+
+        for item in items:
+            task = item.get("task") or {}
+            status = str(task.get("status") or "PENDING")
+            if item.get("task_id") or task:
+                linked += 1
+            if status == TaskStatus.COMPLETED.value:
+                completed += 1
+            elif status == TaskStatus.FAILED.value:
+                failed += 1
+            elif status in running_statuses:
+                running += 1
+
+        if total > 0 and completed == total:
+            status = "COMPLETED"
+        elif total > 0 and failed > 0 and completed + failed == total:
+            status = "FAILED"
+        elif running > 0 or linked > 0:
+            status = "RUNNING"
+        else:
+            status = "PENDING"
+
+        return {
+            "status": status,
+            "total_items": total,
+            "completed_items": completed,
+            "failed_items": failed,
+            "running_items": running,
+        }
+
+    def _collection_item_to_dict(self, session: Session, item: CollectionItemModel) -> Dict[str, Any]:
+        data = item.to_dict()
+        task = None
+        if item.task_id:
+            task_model = session.query(TaskModel).filter(TaskModel.id == item.task_id).first()
+            task = task_model.to_dict() if task_model else None
+        data["task"] = task
+        data["status"] = str((task or {}).get("status") or "PENDING")
+        return data
+
+    def create_collection_job(self, job_data: Dict[str, Any], items_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+        session: Session = self.SessionLocal()
+        try:
+            job_payload = dict(job_data)
+            job_payload["total_items"] = len(items_data)
+            job_payload.setdefault("completed_items", 0)
+            job_payload.setdefault("failed_items", 0)
+            job_payload.setdefault("status", "PENDING")
+            job = CollectionJobModel(**job_payload)
+            session.add(job)
+            for index, item_data in enumerate(items_data):
+                item_payload = dict(item_data)
+                item_payload.setdefault("job_id", job.id)
+                item_payload.setdefault("sort_order", index)
+                session.add(CollectionItemModel(**item_payload))
+            session.commit()
+            return self.get_collection_job(job.id, include_items=True) or job.to_dict()
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Failed to create collection job: {e}")
+            raise
+        finally:
+            session.close()
+
+    def get_collection_job(self, job_id: str, include_items: bool = False) -> Optional[Dict[str, Any]]:
+        session: Session = self.SessionLocal()
+        try:
+            job = session.query(CollectionJobModel).filter(CollectionJobModel.id == job_id).first()
+            if not job:
+                return None
+            data = job.to_dict()
+            item_models = (
+                session.query(CollectionItemModel)
+                .filter(CollectionItemModel.job_id == job_id)
+                .order_by(CollectionItemModel.sort_order, CollectionItemModel.created_at)
+                .all()
+            )
+            items = [self._collection_item_to_dict(session, item) for item in item_models]
+            data.update(self._collection_counts_from_items(items))
+            if include_items:
+                data["items"] = items
+            return data
+        finally:
+            session.close()
+
+    def list_collection_jobs(self, include_items: bool = False) -> List[Dict[str, Any]]:
+        session: Session = self.SessionLocal()
+        try:
+            jobs = session.query(CollectionJobModel).order_by(CollectionJobModel.created_at.desc()).all()
+            result = []
+            for job in jobs:
+                data = job.to_dict()
+                item_models = (
+                    session.query(CollectionItemModel)
+                    .filter(CollectionItemModel.job_id == job.id)
+                    .order_by(CollectionItemModel.sort_order, CollectionItemModel.created_at)
+                    .all()
+                )
+                items = [self._collection_item_to_dict(session, item) for item in item_models]
+                data.update(self._collection_counts_from_items(items))
+                if include_items:
+                    data["items"] = items
+                result.append(data)
+            return result
+        finally:
+            session.close()
+
+    def list_collection_items(self, job_id: str) -> List[Dict[str, Any]]:
+        session: Session = self.SessionLocal()
+        try:
+            items = (
+                session.query(CollectionItemModel)
+                .filter(CollectionItemModel.job_id == job_id)
+                .order_by(CollectionItemModel.sort_order, CollectionItemModel.created_at)
+                .all()
+            )
+            return [self._collection_item_to_dict(session, item) for item in items]
+        finally:
+            session.close()
+
+    def link_collection_item_task(self, item_id: str, task_id: str) -> Optional[Dict[str, Any]]:
+        session: Session = self.SessionLocal()
+        try:
+            item = session.query(CollectionItemModel).filter(CollectionItemModel.id == item_id).first()
+            if not item:
+                return None
+            item.task_id = task_id
+            item.updated_at = datetime.utcnow()
+            session.commit()
+            session.refresh(item)
+            return self._collection_item_to_dict(session, item)
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Failed to link collection item task: {e}")
+            raise
+        finally:
+            session.close()
+
+    def update_collection_job(self, job_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        session: Session = self.SessionLocal()
+        try:
+            job = session.query(CollectionJobModel).filter(CollectionJobModel.id == job_id).first()
+            if not job:
+                return None
+            for key, value in updates.items():
+                if hasattr(job, key):
+                    setattr(job, key, value)
+            job.updated_at = datetime.utcnow()
+            session.commit()
+            return self.get_collection_job(job_id, include_items=True)
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Failed to update collection job: {e}")
+            raise
         finally:
             session.close()
 

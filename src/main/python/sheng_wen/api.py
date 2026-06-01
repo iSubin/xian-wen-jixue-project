@@ -26,6 +26,11 @@ from .utils.media import (
     SUPPORTED_MEDIA_EXTENSIONS,
     build_transcriber_payload,
 )
+from .collection_jobs import (
+    build_aggregate_markdown,
+    build_bilibili_parts_collection,
+    extract_urls_from_text,
+)
 from .downloader.bilibili_author_resolver import (
     resolve_bilibili_author,
     BilibiliAuthorResolveError,
@@ -462,6 +467,73 @@ class BilibiliVideoInfo(BaseModel):
 class BilibiliPartsConfig(BaseModel):
     mode: str = Field(description="处理模式: merge（合并）或 separate（拆分）")
     indices: List[int] = Field(description="要处理的分P索引列表")
+
+
+class CollectionPreviewItem(BaseModel):
+    provider: str = Field(default="bilibili", description="条目所属采集站点")
+    source_url: str = Field(description="条目原始链接")
+    title: str = Field(description="条目标题")
+    part_index: Optional[int] = Field(default=None, description="B 站分P索引（0-based）")
+    duration: Optional[int] = Field(default=None, description="时长（秒）")
+
+
+class CollectionPreviewRequest(BaseModel):
+    source: str = Field(..., min_length=1, description="合集链接、视频链接列表或粘贴文本")
+    title: Optional[str] = Field(default=None, description="用户指定的合集标题")
+
+
+class CollectionPreview(BaseModel):
+    provider: str
+    source_type: str
+    source_url: Optional[str] = None
+    title: str
+    total_items: int
+    items: List[CollectionPreviewItem]
+
+
+class CollectionCreateRequest(BaseModel):
+    provider: str = Field(default="mixed")
+    source_type: str = Field(default="url_list")
+    source_url: Optional[str] = None
+    title: str = Field(..., min_length=1)
+    quality: Optional[str] = "audio_only"
+    summary_mode: Optional[str] = Field(default=None, description="总结模式: standard | agent | auto")
+    items: List[CollectionPreviewItem] = Field(default_factory=list)
+
+
+class CollectionItemView(BaseModel):
+    id: str
+    job_id: str
+    sort_order: int
+    provider: str
+    source_url: str
+    title: str
+    part_index: Optional[int] = None
+    duration: Optional[int] = None
+    task_id: Optional[str] = None
+    status: str = "PENDING"
+    task: Optional[Dict[str, Any]] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class CollectionJobView(BaseModel):
+    id: str
+    provider: str
+    source_type: str
+    source_url: Optional[str] = None
+    title: str
+    folder_id: Optional[str] = None
+    status: str
+    total_items: int
+    completed_items: int = 0
+    failed_items: int = 0
+    running_items: int = 0
+    aggregate_markdown: Optional[str] = None
+    error_message: Optional[str] = None
+    items: Optional[List[CollectionItemView]] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
 
 class TaskCreate(BaseModel):
@@ -1316,6 +1388,228 @@ async def create_task(task_in: TaskCreate, request: Request):
 
     await notify_task_update(task_id)
     return task_data
+
+
+def _guess_collection_provider(urls: List[str]) -> str:
+    providers = set()
+    for url in urls:
+        if _is_bilibili_video_url(url):
+            providers.add("bilibili")
+        elif is_xiaoet_video_url(url):
+            providers.add("xiaoetong")
+        elif is_homeway_graphic_video_url(url):
+            providers.add("homeway")
+        else:
+            providers.add("generic")
+    return providers.pop() if len(providers) == 1 else "mixed"
+
+
+def _title_from_collection_url(url: str, index: int) -> str:
+    try:
+        parsed = urlparse(url)
+        host = parsed.hostname or "视频"
+        path_tail = (parsed.path.rstrip("/").split("/")[-1] or "").strip()
+        return path_tail or f"{host} #{index + 1}"
+    except Exception:
+        return f"视频 #{index + 1}"
+
+
+def _build_url_list_collection_preview(source: str, title: str | None = None) -> Dict[str, Any]:
+    urls = extract_urls_from_text(source)
+    if not urls:
+        raise HTTPException(status_code=400, detail="未找到可用的视频链接")
+
+    provider = _guess_collection_provider(urls)
+    items = []
+    for index, url in enumerate(urls):
+        items.append(
+            {
+                "provider": _guess_collection_provider([url]),
+                "source_url": url,
+                "title": _title_from_collection_url(url, index),
+                "part_index": None,
+                "duration": None,
+            }
+        )
+
+    return {
+        "provider": provider,
+        "source_type": "url_list",
+        "source_url": urls[0] if len(urls) == 1 else None,
+        "title": (title or f"合集任务（{len(items)} 个视频）").strip(),
+        "total_items": len(items),
+        "items": items,
+    }
+
+
+async def _create_task_for_collection_item(
+    request: Request,
+    item: Dict[str, Any],
+    folder_id: str,
+    quality: str,
+    summary_mode: str,
+) -> str:
+    task_id = str(uuid.uuid4())
+    source_url = str(item.get("source_url") or "").strip()
+    title = str(item.get("title") or source_url or "合集条目")
+    task_data = {
+        "id": task_id,
+        "video_url": source_url,
+        "status": TaskStatus.PENDING,
+        "created_at": datetime.utcnow(),
+        "latest_modified_at": datetime.utcnow(),
+        "progress": 0.0,
+        "title": title,
+        "folder_id": folder_id,
+        "author_name": None,
+        "author_url": None,
+        "summary_mode": summary_mode,
+        "summary_chunk_total": None,
+        "summary_chunk_done": None,
+        "summary_meta": None,
+    }
+    db.save_task(task_id, task_data)
+
+    task_payload = {
+        "task_id": task_id,
+        "video_url": source_url,
+        "quality": quality,
+        "summary_mode": summary_mode,
+    }
+
+    part_index = item.get("part_index")
+    if _is_bilibili_video_url(source_url) and part_index is not None:
+        task_payload["bilibili_parts"] = {
+            "mode": "merge",
+            "indices": [int(part_index)],
+        }
+
+    credential_task = TaskCreate(
+        video_url=source_url,
+        quality=quality,
+        summary_mode=summary_mode,
+    )
+    _attach_connected_account_credentials(request, source_url, task_payload, credential_task)
+
+    worker = await _resolve_worker_or_raise(get_downloader_worker, task_id=task_id)
+    await worker.add_task(task_payload)
+    await notify_task_update(task_id)
+    return task_id
+
+
+@app.post("/collections/preview", response_model=CollectionPreview)
+async def preview_collection(payload: CollectionPreviewRequest):
+    """预览合集任务：优先识别 B 站多P，否则按粘贴链接列表处理。"""
+    source = str(payload.source or "").strip()
+    urls = extract_urls_from_text(source)
+    if not urls:
+        raise HTTPException(status_code=400, detail="未找到可用的视频链接")
+
+    if len(urls) == 1 and _is_bilibili_video_url(urls[0]):
+        video_info = await get_bilibili_video_info(BilibiliVideoInfoRequest(url=urls[0]))
+        video_info_dict = video_info.model_dump()
+        if video_info_dict.get("is_multi_part"):
+            preview = build_bilibili_parts_collection(urls[0], video_info_dict)
+            if payload.title:
+                preview["title"] = payload.title.strip()
+            return preview
+
+    return _build_url_list_collection_preview(source, payload.title)
+
+
+@app.post("/collections/", response_model=CollectionJobView, status_code=201)
+async def create_collection_job(payload: CollectionCreateRequest, request: Request):
+    """创建合集任务，并为每个条目创建普通处理任务。"""
+    if not payload.items:
+        raise HTTPException(status_code=400, detail="合集至少需要一个视频条目")
+
+    resolved_summary_mode = _normalize_summary_mode(payload.summary_mode)
+    quality = str(payload.quality or "audio_only")
+    job_id = str(uuid.uuid4())
+    folder_id = str(uuid.uuid4())
+
+    folder_data = {
+        "id": folder_id,
+        "name": payload.title,
+        "parent_id": None,
+        "folder_type": "auto",
+        "source_video_url": payload.source_url,
+        "sort_order": 0,
+        "created_at": datetime.utcnow(),
+    }
+    db.create_folder(folder_data)
+    await manager.broadcast(json.dumps({"type": "folder_created", "folder": db.get_folder(folder_id)}))
+
+    items_data = []
+    for index, item in enumerate(payload.items):
+        items_data.append(
+            {
+                "id": str(uuid.uuid4()),
+                "job_id": job_id,
+                "sort_order": index,
+                "provider": item.provider,
+                "source_url": item.source_url,
+                "title": item.title,
+                "part_index": item.part_index,
+                "duration": item.duration,
+            }
+        )
+
+    db.create_collection_job(
+        {
+            "id": job_id,
+            "provider": payload.provider,
+            "source_type": payload.source_type,
+            "source_url": payload.source_url,
+            "title": payload.title,
+            "folder_id": folder_id,
+            "status": "PENDING",
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow(),
+        },
+        items_data,
+    )
+
+    for item_data in items_data:
+        task_id = await _create_task_for_collection_item(
+            request=request,
+            item=item_data,
+            folder_id=folder_id,
+            quality=quality,
+            summary_mode=resolved_summary_mode,
+        )
+        db.link_collection_item_task(item_data["id"], task_id)
+
+    result = db.get_collection_job(job_id, include_items=True)
+    await manager.broadcast(json.dumps({"type": "collection_created", "collection": result}, ensure_ascii=False))
+    return result
+
+
+@app.get("/collections/", response_model=List[CollectionJobView])
+async def list_collection_jobs(include_items: bool = False):
+    return db.list_collection_jobs(include_items=include_items)
+
+
+@app.get("/collections/{job_id}", response_model=CollectionJobView)
+async def get_collection_job(job_id: str):
+    job = db.get_collection_job(job_id, include_items=True)
+    if not job:
+        raise HTTPException(status_code=404, detail="Collection job not found")
+    return job
+
+
+@app.post("/collections/{job_id}/aggregate", response_model=CollectionJobView)
+async def aggregate_collection_job(job_id: str):
+    job = db.get_collection_job(job_id, include_items=True)
+    if not job:
+        raise HTTPException(status_code=404, detail="Collection job not found")
+
+    markdown = build_aggregate_markdown(job, job.get("items") or [])
+    updated = db.update_collection_job(job_id, {"aggregate_markdown": markdown})
+    if not updated:
+        raise HTTPException(status_code=404, detail="Collection job not found")
+    return updated
+
 
 @app.get("/tasks/", response_model=List[Task])
 async def list_tasks():
