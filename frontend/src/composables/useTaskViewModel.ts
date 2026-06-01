@@ -21,6 +21,9 @@ import type {
   ConnectedAccountBrowserImportRequest,
   ConnectedAccountBrowserImportResult,
   ConnectedAccountUpsertRequest,
+  CollectionJob,
+  CollectionPreview,
+  CreateCollectionRequest,
   BilibiliVideoInfo,
   BilibiliPartsConfig,
   LocalPathCheckResult,
@@ -167,8 +170,10 @@ export function useTaskViewModel() {
   const isReadingBilibiliCookieFromBrowser = ref(false)
   const captureProviders = ref<CaptureProviderInfo[]>([])
   const connectedAccounts = ref<ConnectedAccount[]>([])
+  const collections = ref<CollectionJob[]>([])
   const isUpdatingConnectedAccount = ref(false)
   const isImportingConnectedAccount = ref(false)
+  const isCreatingCollection = ref(false)
 
   // --- Multi-select State ---
   const isMultiSelectMode = ref(false)
@@ -414,6 +419,7 @@ export function useTaskViewModel() {
       console.log('WebSocket connected')
       // Fetch latest state on reconnection to sync any missed updates
       fetchTasks()
+      fetchCollections()
       // Also refresh the selected task details if one is selected
       if (selectedTask.value) {
         selectTask(selectedTask.value).catch(err => {
@@ -427,6 +433,8 @@ export function useTaskViewModel() {
       if (data.type === 'prewarm_status') {
         isPrewarming.value = !data.ready
         return
+      } else if (data.type === 'collection_created') {
+        fetchCollections()
       } else if (data.type === 'task_update') {
         const updatedTask = data.task
         const index = tasks.value.findIndex(t => t.id === updatedTask.id)
@@ -728,6 +736,64 @@ export function useTaskViewModel() {
     }
   }
 
+  const fetchCollections = async () => {
+    try {
+      const response = await axios.get(`${apiBaseUrl}/collections/`)
+      collections.value = response.data
+    } catch (err) {
+      console.error('Failed to fetch collections:', err)
+      error.value = '获取合集任务失败'
+    }
+  }
+
+  const previewCollection = async (source: string, title?: string): Promise<CollectionPreview> => {
+    try {
+      const response = await axios.post(`${apiBaseUrl}/collections/preview`, {
+        source,
+        title,
+      })
+      return response.data as CollectionPreview
+    } catch (err) {
+      console.error('Failed to preview collection:', err)
+      error.value = getAxiosErrorMessage(err, '合集预览失败')
+      throw err
+    }
+  }
+
+  const createCollection = async (payload: CreateCollectionRequest): Promise<CollectionJob> => {
+    isCreatingCollection.value = true
+    try {
+      const response = await axios.post(`${apiBaseUrl}/collections/`, payload)
+      await fetchCollections()
+      await fetchTasks()
+      return response.data as CollectionJob
+    } catch (err) {
+      console.error('Failed to create collection:', err)
+      error.value = getAxiosErrorMessage(err, '创建合集任务失败')
+      throw err
+    } finally {
+      isCreatingCollection.value = false
+    }
+  }
+
+  const aggregateCollection = async (collectionId: string): Promise<CollectionJob> => {
+    try {
+      const response = await axios.post(`${apiBaseUrl}/collections/${collectionId}/aggregate`)
+      const updated = response.data as CollectionJob
+      const index = collections.value.findIndex(item => item.id === collectionId)
+      if (index >= 0) {
+        collections.value[index] = updated
+      } else {
+        collections.value.unshift(updated)
+      }
+      return updated
+    } catch (err) {
+      console.error('Failed to aggregate collection:', err)
+      error.value = getAxiosErrorMessage(err, '生成聚合笔记失败')
+      throw err
+    }
+  }
+
   const upsertConnectedAccount = async (
     provider: string,
     payload: ConnectedAccountUpsertRequest
@@ -910,6 +976,7 @@ export function useTaskViewModel() {
     fetchSummarizationSettings()
     fetchCaptureProviders()
     fetchConnectedAccounts()
+    fetchCollections()
     connectWebSocket()
     // 通过 HTTP 获取预热状态作为兜底（WS 可能还没连上）
     fetch(`${apiBaseUrl}/prewarm/status`).then(r => r.json()).then(d => {
@@ -951,8 +1018,10 @@ export function useTaskViewModel() {
     isReadingBilibiliCookieFromBrowser,
     captureProviders,
     connectedAccounts,
+    collections,
     isUpdatingConnectedAccount,
     isImportingConnectedAccount,
+    isCreatingCollection,
     isMultiSelectMode,
     selectedTaskIds,
     streamingBuffer: streamingBlocks,
@@ -986,9 +1055,13 @@ export function useTaskViewModel() {
     readBilibiliCookieFromBrowser,
     fetchCaptureProviders,
     fetchConnectedAccounts,
+    fetchCollections,
     upsertConnectedAccount,
     deleteConnectedAccount,
     importConnectedAccountFromBrowser,
+    previewCollection,
+    createCollection,
+    aggregateCollection,
     checkBilibiliVideoInfo,
     submitTaskWithParts,
     checkLocalPath,

@@ -22,6 +22,7 @@ import {
   PhBrain,
   PhFile,
   PhQuestion,
+  PhBooks,
 } from '@phosphor-icons/vue'
 import {
   TaskStatus,
@@ -98,6 +99,7 @@ const emit = defineEmits<{
   batchDownloadMarkdown: [taskIds: string[]]
   batchDelete: [taskIds: string[]]
   toggleFolderSelection: [taskIds: string[], selected: boolean]
+  openCollectionCapture: []
   focusSearchMatch: [payload: {
     taskId: string
     keyword: string
@@ -1301,6 +1303,15 @@ watch(() => props.summarizationSettings, (settings) => {
                 <PhSpinner v-else-if="isSubmitting" :size="18" class="animate-spin" />
                 <PhPlayCircle v-else :size="18" />
                 {{ props.isPrewarming ? '正在初始化...' : isSubmitting ? '取消提交' : '开始处理' }}
+              </button>
+
+              <button
+                type="button"
+                class="w-full rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2.5 text-sm font-semibold text-blue-700 transition hover:border-blue-200 hover:bg-blue-50 active:scale-95 flex items-center justify-center gap-2"
+                @click="emit('openCollectionCapture')"
+              >
+                <PhBooks :size="17" weight="fill" />
+                合集采集
               </button>
             </div>
           </div>

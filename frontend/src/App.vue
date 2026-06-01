@@ -35,6 +35,7 @@ import MermaidViewerModal from './components/MermaidViewerModal.vue'
 import SummaryImageWorkbenchModal from './components/SummaryImageWorkbenchModal.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import BilibiliPartsSelector from './components/BilibiliPartsSelector.vue'
+import CollectionCaptureModal from './components/CollectionCaptureModal.vue'
 import LocalFolderSelector from './components/LocalFolderSelector.vue'
 import ToastContainer from './components/ToastContainer.vue'
 
@@ -66,6 +67,7 @@ const {
   connectedAccounts,
   isUpdatingConnectedAccount,
   isImportingConnectedAccount,
+  isCreatingCollection,
   isMultiSelectMode,
   selectedTaskIds,
   streamingBuffer,
@@ -95,6 +97,8 @@ const {
   upsertConnectedAccount,
   deleteConnectedAccount,
   importConnectedAccountFromBrowser,
+  previewCollection,
+  createCollection,
   testLlm,
   readBilibiliCookieFromBrowser,
   checkBilibiliVideoInfo,
@@ -146,6 +150,7 @@ const isBilibiliPartsSelectorOpen = ref(false)
 const bilibiliVideoInfo = ref<BilibiliVideoInfo | null>(null)
 const isCheckingBilibiliVideoInfo = ref(false)
 const pendingBilibiliUrl = ref('')
+const isCollectionCaptureOpen = ref(false)
 
 // 本地文件夹选择器状态
 const isLocalFolderSelectorOpen = ref(false)
@@ -668,6 +673,10 @@ const handleBilibiliPartsClose = () => {
   pendingBilibiliUrl.value = ''
 }
 
+const handleCollectionCreated = () => {
+  success('合集任务已创建')
+}
+
 const handleLocalFolderConfirm = async (config: { mode: 'merge' | 'separate'; paths: string[] }) => {
   isLocalFolderSelectorOpen.value = false
   try {
@@ -985,6 +994,7 @@ watch(
       @batchDownloadMarkdown="batchDownloadMarkdown"
       @batchDelete="batchDelete"
       @toggleFolderSelection="toggleFolderSelection"
+      @openCollectionCapture="isCollectionCaptureOpen = true"
     />
 
     <!-- 右侧内容区 -->
@@ -1101,6 +1111,16 @@ watch(
       :isLoading="isCheckingBilibiliVideoInfo"
       @close="handleBilibiliPartsClose"
       @confirm="handleBilibiliPartsConfirm"
+    />
+
+    <CollectionCaptureModal
+      :isOpen="isCollectionCaptureOpen"
+      :summaryMode="summaryMode"
+      :isCreatingCollection="isCreatingCollection"
+      :previewCollection="previewCollection"
+      :createCollection="createCollection"
+      @close="isCollectionCaptureOpen = false"
+      @created="handleCollectionCreated"
     />
 
     <!-- 本地文件夹选择器 -->

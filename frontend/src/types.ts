@@ -230,6 +230,68 @@ export interface BilibiliPartsConfig {
   indices: number[];
 }
 
+export interface CollectionPreviewItem {
+  provider: string;
+  source_url: string;
+  title: string;
+  part_index?: number | null;
+  duration?: number | null;
+}
+
+export interface CollectionPreview {
+  provider: string;
+  source_type: string;
+  source_url?: string | null;
+  title: string;
+  total_items: number;
+  items: CollectionPreviewItem[];
+}
+
+export interface CreateCollectionRequest {
+  provider: string;
+  source_type: string;
+  source_url?: string | null;
+  title: string;
+  quality?: string;
+  summary_mode?: SummaryMode;
+  items: CollectionPreviewItem[];
+}
+
+export interface CollectionItem {
+  id: string;
+  job_id: string;
+  sort_order: number;
+  provider: string;
+  source_url: string;
+  title: string;
+  part_index?: number | null;
+  duration?: number | null;
+  task_id?: string | null;
+  status: string;
+  task?: Task | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface CollectionJob {
+  id: string;
+  provider: string;
+  source_type: string;
+  source_url?: string | null;
+  title: string;
+  folder_id?: string | null;
+  status: string;
+  total_items: number;
+  completed_items: number;
+  failed_items: number;
+  running_items?: number;
+  aggregate_markdown?: string | null;
+  error_message?: string | null;
+  items?: CollectionItem[];
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
 export interface LocalFolderFile {
   name: string;
   path: string;
