@@ -72,6 +72,11 @@ const statusLabel = computed(() => {
 
 const progress = computed(() => Math.min(100, Math.round(props.task.progress || 0)))
 
+const sourceLabel = computed(() => {
+  if (props.task.source_type === 'wechat_article') return '公众号'
+  return ''
+})
+
 const formatDate = (dateStr: string) => {
   if (!dateStr) return ''
   const d = new Date(dateStr)
@@ -99,14 +104,22 @@ const formatDate = (dateStr: string) => {
     </div>
     <div :class="multiSelectMode ? 'pl-5' : ''">
     <div class="flex justify-between items-start mb-1">
-      <span :class="['text-xs font-medium px-2 py-0.5 rounded-full flex items-center gap-1', getStatusClass(task.status)]">
-        <component
-          :is="getStatusIcon(task.status)"
-          :size="12"
-          :class="isInProgress ? 'animate-spin' : ''"
-        />
-        {{ statusLabel }}
-      </span>
+      <div class="flex flex-wrap items-center gap-1.5">
+        <span :class="['text-xs font-medium px-2 py-0.5 rounded-full flex items-center gap-1', getStatusClass(task.status)]">
+          <component
+            :is="getStatusIcon(task.status)"
+            :size="12"
+            :class="isInProgress ? 'animate-spin' : ''"
+          />
+          {{ statusLabel }}
+        </span>
+        <span
+          v-if="sourceLabel"
+          class="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700"
+        >
+          {{ sourceLabel }}
+        </span>
+      </div>
       <div class="flex items-center gap-2">
         <span class="text-[10px] text-slate-400">{{ formatDate(task.created_at) }}</span>
         <div class="flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 md:transition-opacity">

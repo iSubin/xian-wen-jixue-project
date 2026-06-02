@@ -32,12 +32,21 @@ export interface Task {
   summary_chunk_done?: number;
   summary_meta?: string;
   folder_id?: string | null;
+  source_type?: 'video' | 'wechat_article' | string;
+  source_url?: string | null;
+  source_meta?: string | null;
 }
 
 export interface CreateTaskRequest {
   video_url: string;
   quality: string;
   summary_mode?: Exclude<SummaryMode, 'auto'> | SummaryMode;
+}
+
+export interface CreateWechatArticleRequest {
+  url: string;
+  folder_id?: string | null;
+  summary_mode?: SummaryMode;
 }
 
 export interface MarkdownHeadingItem {

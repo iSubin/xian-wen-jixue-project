@@ -8,6 +8,7 @@
     "build": "vue-tsc -b && vite build",
     "test:accounts-ui": "node src/components/ConnectedAccountsSettings.test.mjs",
     "test:collection-ui": "node src/components/CollectionCaptureModal.test.mjs",
+    "test:wechat-ui": "node src/components/WechatArticleCaptureModal.test.mjs",
     "test:transcript": "node src/utils/transcriptFormatter.test.mjs",
     "preview": "vite preview"
   },

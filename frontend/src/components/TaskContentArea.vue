@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { PhDownloadSimple, PhXCircle } from '@phosphor-icons/vue'
 import { computed, watch, nextTick, ref, onBeforeUnmount } from 'vue'
+import { marked } from 'marked'
 import type { Task, MarkdownHeadingItem } from '../types'
 import { TaskStatus } from '../types'
 import { Incremark } from '@incremark/vue'
@@ -67,7 +68,14 @@ const summaryWordCount = computed(() => {
 })
 
 const formattedTranscript = computed(() => {
-  return formatTranscriptForDisplay(props.task.transcript || '', { videoUrl: props.task.video_url })
+  return formatTranscriptForDisplay(props.task.transcript || '', { videoUrl: props.task.source_url || props.task.video_url })
+})
+
+const isArticleTask = computed(() => props.task.source_type === 'wechat_article')
+
+const compiledTranscriptMarkdown = computed(() => {
+  if (!isArticleTask.value || !props.task.transcript) return ''
+  return marked.parse(props.task.transcript) as string
 })
 
 const showContent = computed(() => {
@@ -588,19 +596,19 @@ watch(() => props.streamingBlocks, () => {
         <!-- 转录文本 Tab -->
         <div v-show="activeTab === 'transcript'" class="px-8 py-8">
           <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
-            <h3 class="text-lg font-bold text-slate-800">全文转录</h3>
+            <h3 class="text-lg font-bold text-slate-800">{{ isArticleTask ? '文章原文' : '全文转录' }}</h3>
             <div class="flex flex-wrap items-center justify-end gap-2">
               <button
-                v-if="task.transcript && formattedTranscript.segments.length"
+                v-if="task.transcript && (isArticleTask || formattedTranscript.segments.length)"
                 type="button"
                 @click="emit('download-plain-transcript')"
                 class="inline-flex h-8 items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 text-xs font-semibold text-blue-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-100"
               >
                 <PhDownloadSimple :size="14" />
-                下载逐字稿
+                {{ isArticleTask ? '下载原文' : '下载逐字稿' }}
               </button>
               <div
-                v-if="task.transcript && formattedTranscript.segments.length"
+                v-if="task.transcript && !isArticleTask && formattedTranscript.segments.length"
                 class="text-xs font-medium text-slate-500 bg-slate-100 border border-slate-200 rounded-full px-3 py-1"
               >
                 共 {{ formattedTranscript.segments.length }} 段
@@ -608,8 +616,13 @@ watch(() => props.streamingBlocks, () => {
             </div>
           </div>
           <div class="text-slate-700 leading-relaxed font-normal">
+            <article
+              v-if="task.transcript && isArticleTask"
+              class="prose prose-slate max-w-none prose-headings:scroll-mt-24 prose-p:leading-8 prose-img:rounded-xl prose-img:border prose-img:border-slate-100"
+              v-html="compiledTranscriptMarkdown"
+            ></article>
             <div
-              v-if="task.transcript && formattedTranscript.hasTimestampedSegments"
+              v-else-if="task.transcript && formattedTranscript.hasTimestampedSegments"
               class="relative space-y-1 before:absolute before:left-[3.75rem] before:top-2 before:bottom-2 before:w-px before:bg-slate-200"
             >
               <div

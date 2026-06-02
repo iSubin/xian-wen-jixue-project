@@ -23,6 +23,7 @@ import type {
   ConnectedAccountUpsertRequest,
   CollectionJob,
   CollectionPreview,
+  CreateWechatArticleRequest,
   CreateCollectionRequest,
   BilibiliVideoInfo,
   BilibiliPartsConfig,
@@ -174,6 +175,7 @@ export function useTaskViewModel() {
   const isUpdatingConnectedAccount = ref(false)
   const isImportingConnectedAccount = ref(false)
   const isCreatingCollection = ref(false)
+  const isCreatingWechatArticle = ref(false)
 
   // --- Multi-select State ---
   const isMultiSelectMode = ref(false)
@@ -776,6 +778,21 @@ export function useTaskViewModel() {
     }
   }
 
+  const createWechatArticleTask = async (payload: CreateWechatArticleRequest): Promise<Task> => {
+    isCreatingWechatArticle.value = true
+    try {
+      const response = await axios.post(`${apiBaseUrl}/articles/wechat`, payload)
+      await fetchTasks()
+      return response.data as Task
+    } catch (err) {
+      console.error('Failed to create WeChat article task:', err)
+      error.value = getAxiosErrorMessage(err, '公众号文章采集失败')
+      throw err
+    } finally {
+      isCreatingWechatArticle.value = false
+    }
+  }
+
   const aggregateCollection = async (collectionId: string): Promise<CollectionJob> => {
     try {
       const response = await axios.post(`${apiBaseUrl}/collections/${collectionId}/aggregate`)
@@ -1022,6 +1039,7 @@ export function useTaskViewModel() {
     isUpdatingConnectedAccount,
     isImportingConnectedAccount,
     isCreatingCollection,
+    isCreatingWechatArticle,
     isMultiSelectMode,
     selectedTaskIds,
     streamingBuffer: streamingBlocks,
@@ -1061,6 +1079,7 @@ export function useTaskViewModel() {
     importConnectedAccountFromBrowser,
     previewCollection,
     createCollection,
+    createWechatArticleTask,
     aggregateCollection,
     checkBilibiliVideoInfo,
     submitTaskWithParts,

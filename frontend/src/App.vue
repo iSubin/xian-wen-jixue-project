@@ -36,6 +36,7 @@ import SummaryImageWorkbenchModal from './components/SummaryImageWorkbenchModal.
 import SettingsModal from './components/SettingsModal.vue'
 import BilibiliPartsSelector from './components/BilibiliPartsSelector.vue'
 import CollectionCaptureModal from './components/CollectionCaptureModal.vue'
+import WechatArticleCaptureModal from './components/WechatArticleCaptureModal.vue'
 import LocalFolderSelector from './components/LocalFolderSelector.vue'
 import ToastContainer from './components/ToastContainer.vue'
 
@@ -68,6 +69,7 @@ const {
   isUpdatingConnectedAccount,
   isImportingConnectedAccount,
   isCreatingCollection,
+  isCreatingWechatArticle,
   isMultiSelectMode,
   selectedTaskIds,
   streamingBuffer,
@@ -99,6 +101,7 @@ const {
   importConnectedAccountFromBrowser,
   previewCollection,
   createCollection,
+  createWechatArticleTask,
   testLlm,
   readBilibiliCookieFromBrowser,
   checkBilibiliVideoInfo,
@@ -151,6 +154,7 @@ const bilibiliVideoInfo = ref<BilibiliVideoInfo | null>(null)
 const isCheckingBilibiliVideoInfo = ref(false)
 const pendingBilibiliUrl = ref('')
 const isCollectionCaptureOpen = ref(false)
+const isWechatArticleCaptureOpen = ref(false)
 
 // 本地文件夹选择器状态
 const isLocalFolderSelectorOpen = ref(false)
@@ -731,6 +735,11 @@ const handleSelectTask = async (task: Task) => {
   }
 }
 
+const handleWechatArticleCreated = async (task: Task) => {
+  success('公众号文章任务已创建')
+  await handleSelectTask(task)
+}
+
 const handleFocusSearchMatch = (payload: {
   taskId: string
   keyword: string
@@ -995,6 +1004,7 @@ watch(
       @batchDelete="batchDelete"
       @toggleFolderSelection="toggleFolderSelection"
       @openCollectionCapture="isCollectionCaptureOpen = true"
+      @openWechatArticleCapture="isWechatArticleCaptureOpen = true"
     />
 
     <!-- 右侧内容区 -->
@@ -1121,6 +1131,17 @@ watch(
       :createCollection="createCollection"
       @close="isCollectionCaptureOpen = false"
       @created="handleCollectionCreated"
+    />
+
+    <WechatArticleCaptureModal
+      :isOpen="isWechatArticleCaptureOpen"
+      :folders="folders"
+      :currentFolderId="selectedTask?.folder_id || null"
+      :summaryMode="summaryMode"
+      :isCreatingWechatArticle="isCreatingWechatArticle"
+      :createWechatArticleTask="createWechatArticleTask"
+      @close="isWechatArticleCaptureOpen = false"
+      @created="handleWechatArticleCreated"
     />
 
     <!-- 本地文件夹选择器 -->

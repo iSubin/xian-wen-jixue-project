@@ -23,6 +23,7 @@ import {
   PhFile,
   PhQuestion,
   PhBooks,
+  PhArticle,
 } from '@phosphor-icons/vue'
 import {
   TaskStatus,
@@ -100,6 +101,7 @@ const emit = defineEmits<{
   batchDelete: [taskIds: string[]]
   toggleFolderSelection: [taskIds: string[], selected: boolean]
   openCollectionCapture: []
+  openWechatArticleCapture: []
   focusSearchMatch: [payload: {
     taskId: string
     keyword: string
@@ -1312,6 +1314,15 @@ watch(() => props.summarizationSettings, (settings) => {
               >
                 <PhBooks :size="17" weight="fill" />
                 合集采集
+              </button>
+
+              <button
+                type="button"
+                class="w-full rounded-xl border border-emerald-100 bg-emerald-50/80 px-3 py-2.5 text-sm font-semibold text-emerald-700 transition hover:border-emerald-200 hover:bg-emerald-50 active:scale-95 flex items-center justify-center gap-2"
+                @click="emit('openWechatArticleCapture')"
+              >
+                <PhArticle :size="17" weight="fill" />
+                公众号文章
               </button>
             </div>
           </div>
