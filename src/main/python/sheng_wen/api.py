@@ -240,6 +240,11 @@ class LocalPathTaskCreate(BaseModel):
         description="总结模式: standard | agent | auto（前端建议仅 standard/agent）",
     )
 
+class WechatArticleCreate(BaseModel):
+    url: HttpUrl
+    folder_id: Optional[str] = Field(default=None, description="目标文件夹，NULL 为根目录")
+    summary_mode: Optional[str] = Field(default=None, description="总结模式: standard | agent | auto")
+
 class TaskUpdate(BaseModel):
     topic: Optional[str] = None
 
@@ -264,6 +269,9 @@ class Task(BaseModel):
     summary_chunk_done: Optional[int] = None
     summary_meta: Optional[str] = None
     folder_id: Optional[str] = None
+    source_type: Optional[str] = "video"
+    source_url: Optional[str] = None
+    source_meta: Optional[str] = None
 
 
 class FolderCreate(BaseModel):
@@ -915,6 +923,35 @@ def _normalize_summary_mode(raw_value: str | None, fallback: str | None = None) 
     return _resolve_default_summary_mode()
 
 
+def _build_wechat_article_task_data(task_id: str, article: Any, folder_id: str | None, summary_mode: str) -> dict:
+    source_meta = json.dumps(article.metadata or {}, ensure_ascii=False)
+    return {
+        "id": task_id,
+        "video_url": article.source_url,
+        "source_type": "wechat_article",
+        "source_url": article.source_url,
+        "source_meta": source_meta,
+        "status": TaskStatus.SUMMARIZING,
+        "created_at": datetime.utcnow(),
+        "latest_modified_at": datetime.utcnow(),
+        "progress": 0.0,
+        "title": article.title,
+        "transcript": article.raw_markdown,
+        "summary": "",
+        "error_message": None,
+        "audio_duration": None,
+        "transcription_time": None,
+        "topic": None,
+        "author_name": article.author,
+        "author_url": article.source_url,
+        "summary_mode": summary_mode,
+        "summary_chunk_total": None,
+        "summary_chunk_done": None,
+        "summary_meta": source_meta,
+        "folder_id": folder_id,
+    }
+
+
 async def _try_resolve_and_persist_author(task_id: str, video_url: str) -> bool:
     try:
         from .task_updater import update_and_notify
@@ -1259,6 +1296,57 @@ async def _get_bilibili_video_title_and_parts(video_url: str) -> tuple[str, list
                 "title": str(page.get("part") or ""),
             })
     return (title, parts)
+
+
+@app.post("/articles/wechat", response_model=Task, status_code=201)
+async def create_wechat_article_task(payload: WechatArticleCreate):
+    from .wechat_article import WechatArticleCaptureError, capture_wechat_article
+
+    source_url = str(payload.url)
+    task_id = str(uuid.uuid4())
+    article_assets_dir = os.path.join(task_assets_dir, task_id)
+    resolved_summary_mode = _normalize_summary_mode(payload.summary_mode)
+
+    try:
+        article = capture_wechat_article(source_url, output_dir=article_assets_dir)
+    except WechatArticleCaptureError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    task_data = _build_wechat_article_task_data(
+        task_id,
+        article,
+        folder_id=payload.folder_id,
+        summary_mode=resolved_summary_mode,
+    )
+    db.save_task(task_id, task_data)
+
+    temp_dir = "temp"
+    os.makedirs(temp_dir, exist_ok=True)
+    intermediate_file = os.path.join(temp_dir, f"{task_id}_wechat_article.md")
+    with open(intermediate_file, "w", encoding="utf-8") as file:
+        file.write(article.raw_markdown)
+
+    try:
+        worker = await get_llm_worker()
+        await worker.add_task({
+            "task_id": task_id,
+            "intermediate_file_path": intermediate_file,
+            "output_file": os.path.join(temp_dir, f"{task_id}_wechat_summary.md"),
+            "summary_mode": resolved_summary_mode,
+        })
+    except Exception as exc:
+        from .task_updater import update_and_notify
+        await update_and_notify(
+            task_id,
+            {
+                "status": TaskStatus.FAILED,
+                "error_message": "文章已采集，但生成笔记任务启动失败，请稍后重试",
+            },
+        )
+        raise HTTPException(status_code=500, detail="文章已采集，但生成笔记任务启动失败，请稍后重试") from exc
+
+    await notify_task_update(task_id)
+    return task_data
 
 
 @app.post("/tasks/", response_model=Task, status_code=201)

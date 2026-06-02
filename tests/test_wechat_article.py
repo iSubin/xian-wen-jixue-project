@@ -119,5 +119,37 @@ class WechatArticleAdapterTest(unittest.TestCase):
             )
 
 
+class WechatArticleTaskPayloadTest(unittest.TestCase):
+    def test_article_task_payload_contains_source_metadata(self):
+        from sheng_wen.api import _build_wechat_article_task_data
+        from sheng_wen.wechat_article import CapturedArticle
+
+        article = CapturedArticle(
+            source_type="wechat_article",
+            source_url="https://mp.weixin.qq.com/s/example",
+            title="测试文章",
+            author="测试公众号",
+            publish_time="2026-04-09 16:58",
+            description="描述",
+            raw_markdown="# 测试文章\n\n正文",
+            plain_text="正文",
+            metadata={"author": "测试公众号", "publish_time": "2026-04-09 16:58", "image_count": 0},
+        )
+
+        payload = _build_wechat_article_task_data(
+            "task-1",
+            article,
+            folder_id="folder-1",
+            summary_mode="standard",
+        )
+
+        self.assertEqual(payload["source_type"], "wechat_article")
+        self.assertEqual(payload["source_url"], "https://mp.weixin.qq.com/s/example")
+        self.assertEqual(payload["video_url"], "https://mp.weixin.qq.com/s/example")
+        self.assertEqual(payload["folder_id"], "folder-1")
+        self.assertEqual(payload["transcript"], "# 测试文章\n\n正文")
+        self.assertEqual(payload["status"], TaskStatus.SUMMARIZING)
+
+
 if __name__ == "__main__":
     unittest.main()
