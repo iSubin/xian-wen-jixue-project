@@ -82,7 +82,12 @@ def _image_extension(url: str, content_type: str) -> str:
     return ".jpg"
 
 
-def _download_images(content_div, images: list[CapturedImage], output_dir: str | None) -> None:
+def _download_images(
+    content_div,
+    images: list[CapturedImage],
+    output_dir: str | None,
+    markdown_image_base: str | None = None,
+) -> None:
     if not output_dir:
         return
     images_dir = os.path.join(output_dir, "images")
@@ -107,6 +112,8 @@ def _download_images(content_div, images: list[CapturedImage], output_dir: str |
                     file.write(chunk)
 
             markdown_path = f"images/{filename}"
+            if markdown_image_base:
+                markdown_path = f"{markdown_image_base.rstrip('/')}/{markdown_path}"
             img["src"] = markdown_path
             img.attrs.pop("data-src", None)
             image_record.local_path = local_path
@@ -122,6 +129,7 @@ def capture_wechat_article_from_html(
     *,
     output_dir: str | None = None,
     download_images: bool = True,
+    markdown_image_base: str | None = None,
 ) -> CapturedArticle:
     if not is_wechat_article_url(url):
         raise WechatArticleCaptureError("请输入有效的微信公众号文章链接")
@@ -138,7 +146,7 @@ def capture_wechat_article_from_html(
 
     images = _collect_images(content_div)
     if download_images:
-        _download_images(content_div, images, output_dir)
+        _download_images(content_div, images, output_dir, markdown_image_base=markdown_image_base)
 
     markdown = html_to_markdown(str(content_div), heading_style="ATX").strip()
     if not markdown:
@@ -167,7 +175,12 @@ def capture_wechat_article_from_html(
     )
 
 
-def capture_wechat_article(url: str, *, output_dir: str | None = None) -> CapturedArticle:
+def capture_wechat_article(
+    url: str,
+    *,
+    output_dir: str | None = None,
+    markdown_image_base: str | None = None,
+) -> CapturedArticle:
     if not is_wechat_article_url(url):
         raise WechatArticleCaptureError("请输入有效的微信公众号文章链接")
 
@@ -184,4 +197,9 @@ def capture_wechat_article(url: str, *, output_dir: str | None = None) -> Captur
     except requests.RequestException as exc:
         raise WechatArticleCaptureError("公众号文章下载失败，请确认链接可访问后重试") from exc
 
-    return capture_wechat_article_from_html(url, response.text, output_dir=output_dir)
+    return capture_wechat_article_from_html(
+        url,
+        response.text,
+        output_dir=output_dir,
+        markdown_image_base=markdown_image_base,
+    )

@@ -1308,7 +1308,11 @@ async def create_wechat_article_task(payload: WechatArticleCreate):
     resolved_summary_mode = _normalize_summary_mode(payload.summary_mode)
 
     try:
-        article = capture_wechat_article(source_url, output_dir=article_assets_dir)
+        article = capture_wechat_article(
+            source_url,
+            output_dir=article_assets_dir,
+            markdown_image_base=f"/task-assets/{task_id}",
+        )
     except WechatArticleCaptureError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

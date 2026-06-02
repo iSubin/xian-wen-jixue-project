@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
@@ -109,6 +110,36 @@ class WechatArticleAdapterTest(unittest.TestCase):
         self.assertIn("## 第一节", result.raw_markdown)
         self.assertIn("正文内容", result.raw_markdown)
         self.assertEqual(result.metadata["image_count"], 1)
+
+    def test_capture_from_html_rewrites_downloaded_image_to_public_asset_path(self):
+        class FakeResponse:
+            headers = {"Content-Type": "image/jpeg"}
+
+            def raise_for_status(self):
+                return None
+
+            def iter_content(self, chunk_size=8192):
+                yield b"fake image"
+
+        class FakeSession:
+            def __init__(self):
+                self.headers = {}
+
+            def get(self, url, timeout=20, stream=True):
+                return FakeResponse()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch("sheng_wen.wechat_article.requests.Session", FakeSession):
+                result = capture_wechat_article_from_html(
+                    "https://mp.weixin.qq.com/s/example",
+                    SAMPLE_WECHAT_HTML,
+                    output_dir=tmpdir,
+                    markdown_image_base="/task-assets/task-1",
+                )
+
+            self.assertIn("/task-assets/task-1/images/wechat_01.jpg", result.raw_markdown)
+            self.assertTrue(os.path.exists(os.path.join(tmpdir, "images", "wechat_01.jpg")))
+            self.assertEqual(result.images[0].status, "downloaded")
 
     def test_capture_from_html_rejects_missing_body(self):
         with self.assertRaisesRegex(WechatArticleCaptureError, "无法找到文章正文"):
