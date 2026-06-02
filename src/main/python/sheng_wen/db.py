@@ -47,6 +47,9 @@ class TaskModel(Base):
     summary_chunk_done = Column(Integer, nullable=True)
     summary_meta = Column(Text, nullable=True)
     folder_id = Column(String, nullable=True)
+    source_type = Column(String, nullable=False, default="video")
+    source_url = Column(Text, nullable=True)
+    source_meta = Column(Text, nullable=True)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -70,6 +73,9 @@ class TaskModel(Base):
             "summary_chunk_done": self.summary_chunk_done,
             "summary_meta": self.summary_meta,
             "folder_id": self.folder_id,
+            "source_type": self.source_type or "video",
+            "source_url": self.source_url or self.video_url,
+            "source_meta": self.source_meta,
         }
 
 
@@ -301,6 +307,9 @@ class TaskDB:
             has_summary_chunk_done = "summary_chunk_done" in columns
             has_summary_meta = "summary_meta" in columns
             has_folder_id = "folder_id" in columns
+            has_source_type = "source_type" in columns
+            has_source_url = "source_url" in columns
+            has_source_meta = "source_meta" in columns
             if (
                 has_latest_modified_at
                 and has_author_name
@@ -310,6 +319,9 @@ class TaskDB:
                 and has_summary_chunk_done
                 and has_summary_meta
                 and has_folder_id
+                and has_source_type
+                and has_source_url
+                and has_source_meta
             ):
                 return
 
@@ -339,6 +351,17 @@ class TaskDB:
                 if not has_folder_id:
                     conn.execute(text("ALTER TABLE tasks ADD COLUMN folder_id VARCHAR"))
                     logger.info("Database schema updated: added tasks.folder_id")
+                if not has_source_type:
+                    conn.execute(text("ALTER TABLE tasks ADD COLUMN source_type VARCHAR"))
+                    conn.execute(text("UPDATE tasks SET source_type = 'video' WHERE source_type IS NULL"))
+                    logger.info("Database schema updated: added tasks.source_type")
+                if not has_source_url:
+                    conn.execute(text("ALTER TABLE tasks ADD COLUMN source_url TEXT"))
+                    conn.execute(text("UPDATE tasks SET source_url = video_url WHERE source_url IS NULL"))
+                    logger.info("Database schema updated: added tasks.source_url")
+                if not has_source_meta:
+                    conn.execute(text("ALTER TABLE tasks ADD COLUMN source_meta TEXT"))
+                    logger.info("Database schema updated: added tasks.source_meta")
         except Exception as e:
             logger.error(f"Failed to ensure database schema: {e}")
 
@@ -394,6 +417,9 @@ class TaskDB:
                     summary_chunk_total=task_data.get("summary_chunk_total"),
                     summary_chunk_done=task_data.get("summary_chunk_done"),
                     summary_meta=task_data.get("summary_meta"),
+                    source_type=task_data.get("source_type") or "video",
+                    source_url=task_data.get("source_url") or task_data.get("video_url"),
+                    source_meta=task_data.get("source_meta"),
                 )
                 session.add(task)
             
@@ -421,6 +447,9 @@ class TaskDB:
             data["latest_modified_at"] = datetime.fromisoformat(data["latest_modified_at"])
         elif data.get("created_at"):
             data["latest_modified_at"] = data["created_at"]
+        data.setdefault("source_type", "video")
+        data.setdefault("source_url", data.get("video_url"))
+        data.setdefault("source_meta", None)
         return data
 
     def save_task(self, task_id: str, task_data: Dict[str, Any]):
@@ -447,6 +476,9 @@ class TaskDB:
                         task_data_copy["latest_modified_at"] = datetime.fromisoformat(task_data_copy["latest_modified_at"])
                     if "latest_modified_at" not in task_data_copy:
                         task_data_copy["latest_modified_at"] = task_data_copy.get("created_at", datetime.utcnow())
+                    task_data_copy.setdefault("source_type", "video")
+                    task_data_copy.setdefault("source_url", task_data_copy.get("video_url"))
+                    task_data_copy.setdefault("source_meta", None)
                     
                     # 确保 'id' 不在 task_data_copy 中，因为它已经作为关键字参数传递
                     task_data_copy.pop('id', None)
