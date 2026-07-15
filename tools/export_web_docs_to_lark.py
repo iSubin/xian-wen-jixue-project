@@ -12,9 +12,10 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from html import escape as html_escape
 from pathlib import Path
-from typing import Any
-from urllib.parse import urlparse, urlunparse
+from typing import Any, Callable
+from urllib.parse import urljoin, urlparse, urlunparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -121,8 +122,6 @@ def canonical_url(url: str) -> str:
 
 def resolve_url(href: str, base_url: str) -> str:
     try:
-        from urllib.parse import urljoin
-
         return canonical_url(urljoin(base_url, href))
     except Exception:
         return ""
@@ -164,6 +163,11 @@ def markdown_filename(page: CapturedPage, index: int) -> str:
     return f"{index:03d}-{slug or 'page'}.md"
 
 
+def xml_filename(page: CapturedPage, index: int) -> str:
+    slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", page.path.strip("/"))[:80].strip("-")
+    return f"{index:03d}-{slug or 'page'}.xml"
+
+
 def clean_markdown(markdown: str) -> str:
     lines: list[str] = []
     blank = 0
@@ -179,6 +183,54 @@ def clean_markdown(markdown: str) -> str:
     return "\n".join(lines).strip()
 
 
+def separate_adjacent_markdown_links(markdown: str) -> str:
+    return re.sub(r"(\]\([^)\n]+?\))(?=\[)", r"\1\n\n", markdown)
+
+
+def xml_text(value: Any) -> str:
+    return html_escape(str(value or ""), quote=True)
+
+
+def normalize_anchor_text(anchor: Any) -> None:
+    link_text = re.sub(r"\s+", " ", anchor.get_text(" ", strip=True)).strip()
+    if link_text:
+        anchor.clear()
+        anchor.append(link_text)
+
+
+def absolute_link_url(href: str, base_url: str) -> str:
+    value = str(href or "").strip()
+    if not value:
+        return ""
+    if value.startswith(("#", "mailto:", "tel:", "javascript:")):
+        return value
+    try:
+        return urljoin(base_url, value)
+    except Exception:
+        return value
+
+
+def prepared_link_href(
+    href: str,
+    base_url: str,
+    link_resolver: Callable[[str, str], str | None] | None = None,
+) -> str:
+    value = str(href or "").strip()
+    if not value:
+        return ""
+    replacement = link_resolver(value, base_url) if link_resolver else None
+    if replacement:
+        return replacement
+    absolute = absolute_link_url(value, base_url)
+    if not absolute:
+        return ""
+    parsed = urlparse(absolute)
+    base = urlparse(base_url)
+    if parsed.netloc and parsed.netloc == base.netloc:
+        return ""
+    return absolute
+
+
 def page_to_markdown(page: CapturedPage, link_resolver: Any | None = None) -> str:
     soup = BeautifulSoup(page.content_html or "", "lxml")
     for selector in ("script", "style", "noscript", "button", "svg"):
@@ -189,13 +241,281 @@ def page_to_markdown(page: CapturedPage, link_resolver: Any | None = None) -> st
             replacement = link_resolver(str(anchor.get("href") or ""), page.url)
             if replacement:
                 anchor["href"] = replacement
-    markdown = clean_markdown(html_to_markdown(str(soup), heading_style="ATX"))
+            normalize_anchor_text(anchor)
+    markdown = clean_markdown(separate_adjacent_markdown_links(html_to_markdown(str(soup), heading_style="ATX")))
     title = sanitize_title(page.title)
     if markdown.startswith(f"# {title}"):
         body = markdown
     else:
         body = f"# {title}\n\n{markdown}".strip()
-    return f"> 原文链接：{page.url}\n\n{body}\n"
+    return f"{body}\n"
+
+
+def inline_xml(node: Any) -> str:
+    from bs4 import NavigableString, Tag
+
+    if isinstance(node, NavigableString):
+        return xml_text(node)
+    if not isinstance(node, Tag):
+        return ""
+
+    name = node.name.lower()
+    if name == "br":
+        return "<br/>"
+    if name == "a":
+        href = str(node.get("href") or "").strip()
+        content = inline_children_xml(node) or xml_text(node.get_text(" ", strip=True))
+        if not href:
+            return content
+        return f'<a href="{xml_text(href)}">{content}</a>'
+    if name in {"b", "strong"}:
+        return f"<b>{inline_children_xml(node)}</b>"
+    if name in {"em", "i"}:
+        return f"<em>{inline_children_xml(node)}</em>"
+    if name == "u":
+        return f"<u>{inline_children_xml(node)}</u>"
+    if name in {"del", "s"}:
+        return f"<del>{inline_children_xml(node)}</del>"
+    if name == "code" and node.find_parent("pre") is None:
+        return f"<code>{xml_text(node.get_text())}</code>"
+    if name == "span":
+        return inline_children_xml(node)
+    return inline_children_xml(node)
+
+
+def inline_children_xml(node: Any) -> str:
+    return "".join(inline_xml(child) for child in getattr(node, "children", []))
+
+
+def tag_name(node: Any) -> str:
+    return str(getattr(node, "name", "") or "").lower()
+
+
+def list_item_xml(node: Any) -> str:
+    from bs4 import NavigableString
+
+    parts: list[str] = []
+    for child in node.children:
+        if isinstance(child, NavigableString):
+            text = re.sub(r"\s+", " ", str(child)).strip()
+            if text:
+                parts.append(xml_text(text))
+            continue
+        if tag_name(child) in {"ul", "ol"}:
+            parts.append(block_xml(child))
+        else:
+            parts.append(inline_xml(child))
+    return f"<li>{''.join(parts)}</li>"
+
+
+def table_to_xml(node: Any) -> str:
+    rows = node.find_all("tr", recursive=True)
+    if not rows:
+        return ""
+
+    head_rows: list[str] = []
+    body_rows: list[str] = []
+    for index, row in enumerate(rows):
+        cells = row.find_all(["th", "td"], recursive=False)
+        if not cells:
+            continue
+        use_header = index == 0 and any(cell.name.lower() == "th" for cell in cells)
+        cell_tag = "th" if use_header else "td"
+        rendered_cells = []
+        for cell in cells:
+            attrs = []
+            if cell.get("colspan"):
+                attrs.append(f'colspan="{xml_text(cell.get("colspan"))}"')
+            if cell.get("rowspan"):
+                attrs.append(f'rowspan="{xml_text(cell.get("rowspan"))}"')
+            if use_header:
+                attrs.append('background-color="light-gray"')
+            attr_text = (" " + " ".join(attrs)) if attrs else ""
+            rendered_cells.append(f"<{cell_tag}{attr_text}>{inline_children_xml(cell)}</{cell_tag}>")
+        row_xml = f"<tr>{''.join(rendered_cells)}</tr>"
+        if use_header:
+            head_rows.append(row_xml)
+        else:
+            body_rows.append(row_xml)
+
+    parts = ["<table>"]
+    if head_rows:
+        parts.append(f"<thead>{''.join(head_rows)}</thead>")
+    if body_rows:
+        parts.append(f"<tbody>{''.join(body_rows)}</tbody>")
+    parts.append("</table>")
+    return "".join(parts)
+
+
+def block_xml(node: Any) -> str:
+    from bs4 import NavigableString, Tag
+
+    if isinstance(node, NavigableString):
+        text = re.sub(r"\s+", " ", str(node)).strip()
+        return f"<p>{xml_text(text)}</p>" if text else ""
+    if not isinstance(node, Tag):
+        return ""
+
+    name = node.name.lower()
+    if name in {"script", "style", "noscript", "button", "svg"}:
+        return ""
+    if name == "a":
+        href = str(node.get("href") or "").strip()
+        text = re.sub(r"\s+", " ", node.get_text(" ", strip=True)).strip()
+        if href and text:
+            return f'<p><a href="{xml_text(href)}">{xml_text(text)}</a></p>'
+        return f"<p>{xml_text(text)}</p>" if text else ""
+    if name in {"h1", "h2", "h3", "h4", "h5", "h6"}:
+        return f"<{name}>{inline_children_xml(node)}</{name}>"
+    if name == "p":
+        content = inline_children_xml(node).strip()
+        return f"<p>{content}</p>" if content else ""
+    if name in {"ul", "ol"}:
+        items = [list_item_xml(child) for child in node.find_all("li", recursive=False)]
+        return f"<{name}>{''.join(items)}</{name}>" if items else ""
+    if name == "blockquote":
+        content = block_children_xml(node)
+        if not content:
+            content = f"<p>{inline_children_xml(node)}</p>"
+        return f"<blockquote>{content}</blockquote>"
+    if name == "pre":
+        code = node.find("code")
+        text = code.get_text() if code else node.get_text()
+        lang = ""
+        if code:
+            classes = code.get("class") or []
+            for class_name in classes:
+                if str(class_name).startswith("language-"):
+                    lang = str(class_name).removeprefix("language-")
+                    break
+        lang = lang or "text"
+        return f'<pre lang="{xml_text(lang)}"><code>{xml_text(text.strip())}</code></pre>'
+    if name == "table":
+        return table_to_xml(node)
+    if name == "hr":
+        return "<hr/>"
+    if name == "img":
+        src = str(node.get("src") or node.get("href") or "").strip()
+        if src.startswith(("http://", "https://")):
+            return f'<img href="{xml_text(src)}"/>'
+        return ""
+    if name == "br":
+        return "<p><br/></p>"
+    if name in {"article", "main", "section", "div", "figure", "body", "html"}:
+        return block_children_xml(node)
+    text = re.sub(r"\s+", " ", node.get_text(" ", strip=True)).strip()
+    return f"<p>{xml_text(text)}</p>" if text else ""
+
+
+def block_children_xml(node: Any) -> str:
+    return "".join(block_xml(child) for child in getattr(node, "children", []))
+
+
+def polish_task_completion_section(xml: str) -> str:
+    def replacement(match: re.Match[str]) -> str:
+        section = match.group("section")
+        memory = re.search(
+            r"<p><b>关于\s*(?P<link><a\b[^>]*>Memory</a>)</b>：(?P<body>.*?)</p>",
+            section,
+            flags=re.S,
+        )
+        next_step = re.search(
+            r"<p><b>下一步</b>：(?P<body>.*?)</p>",
+            section,
+            flags=re.S,
+        )
+        if not memory or not next_step:
+            return match.group(0)
+
+        memory_link = memory.group("link")
+        memory_body = memory.group("body").strip()
+        next_body = next_step.group("body").strip()
+        return "\n".join(
+            [
+                "<h2>任务完成后</h2>",
+                "<grid>",
+                '<column width-ratio="0.5">',
+                '<callout emoji="✅" background-color="light-green" border-color="green">',
+                "<h3>经验会自动沉淀</h3>",
+                f"<p><b>关于 {memory_link}</b></p>",
+                f"<p>{memory_body}</p>",
+                "</callout>",
+                "</column>",
+                '<column width-ratio="0.5">',
+                '<callout emoji="🏁" background-color="light-blue" border-color="blue">',
+                "<h3>继续进阶</h3>",
+                f"<p>{next_body}</p>",
+                "</callout>",
+                "</column>",
+                "</grid>",
+            ]
+        )
+
+    return re.sub(
+        r"<h2>任务完成后</h2>(?P<section>.*?)(?=<h2>|<hr/>|$)",
+        replacement,
+        xml,
+        flags=re.S,
+    )
+
+
+def prepare_content_soup(page: CapturedPage, link_resolver: Callable[[str, str], str | None] | None = None) -> BeautifulSoup:
+    soup = BeautifulSoup(page.content_html or "", "lxml")
+    for selector in ("script", "style", "noscript", "button", "svg", ".docs-nav"):
+        for tag in soup.select(selector):
+            tag.decompose()
+    for anchor in soup.find_all("a", href=True):
+        prepared_href = prepared_link_href(str(anchor.get("href") or ""), page.url, link_resolver)
+        if prepared_href:
+            anchor["href"] = prepared_href
+        elif anchor.has_attr("href"):
+            del anchor["href"]
+        normalize_anchor_text(anchor)
+
+    title = sanitize_title(page.title)
+    first_h1 = soup.find("h1")
+    if first_h1 and sanitize_title(first_h1.get_text(" ", strip=True)) == title:
+        first_h1.decompose()
+    return soup
+
+
+def page_to_xml(
+    page: CapturedPage,
+    link_resolver: Callable[[str, str], str | None] | None = None,
+    *,
+    previous_url: str | None = None,
+    next_url: str | None = None,
+) -> str:
+    title = sanitize_title(page.title)
+    soup = prepare_content_soup(page, link_resolver)
+    body = polish_task_completion_section(block_children_xml(soup.body or soup))
+    nav_links = []
+    if previous_url:
+        nav_links.append(f'<a href="{xml_text(previous_url)}">上一篇</a>')
+    if next_url:
+        nav_links.append(f'<a href="{xml_text(next_url)}">下一篇</a>')
+    lines = [
+        f"<title>{xml_text(title)}</title>",
+        "",
+        f"<h1>{xml_text(title)}</h1>",
+    ]
+    if nav_links:
+        lines.extend(
+            [
+                "",
+                '<callout emoji="📝" background-color="light-blue" border-color="blue">',
+                f"<p><b>导航：</b>{' ｜ '.join(nav_links)}</p>",
+                "</callout>",
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            body,
+            "",
+        ]
+    )
+    return "\n".join(lines)
 
 
 def extract_content_html(html: str) -> str:
@@ -447,7 +767,7 @@ def directory_markdown_path(export_dir: Path, path_key: str, title: str) -> Path
     slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", path_key.strip("/"))[:80].strip("-") or "root"
     path = dirs_dir / f"{slug}.md"
     path.write_text(
-        f"# {title}\n\n此节点用于保持原网站目录层级，子页面按原路径挂载在当前节点下。\n",
+        f"# {title}\n\n此节点用于承载当前主题下的课程内容，子页面按主题层级挂载在当前节点下。\n",
         encoding="utf-8",
     )
     return path
@@ -476,7 +796,7 @@ def linked_directory_markdown_path(
     lines = [
         f"# {title}",
         "",
-        "此节点用于保持原网站目录层级，子页面按原路径挂载在当前节点下。",
+        "此节点用于承载当前主题下的课程内容，子页面按主题层级挂载在当前节点下。",
     ]
     if direct_children:
         lines.extend(["", "## 子页面", ""])
@@ -485,6 +805,172 @@ def linked_directory_markdown_path(
             lines.append(f"- [{child_title}]({child_url})")
     path.write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
     return path
+
+
+def child_paths(path_key: str, url_by_path: dict[str, str]) -> list[str]:
+    normalized = normalize_export_path(path_key)
+    prefix = normalized.rstrip("/") + "/"
+    children = []
+    for child_path in sorted(url_by_path):
+        if child_path == "/" or not child_path.startswith(prefix):
+            continue
+        remainder = child_path[len(prefix) :].strip("/")
+        if remainder and "/" not in remainder:
+            children.append(child_path)
+    return children
+
+
+def sectioned_pages(pages: list[CapturedPage]) -> dict[str, list[CapturedPage]]:
+    grouped: dict[str, list[CapturedPage]] = {section: [] for section in DEFAULT_INCLUDE_PREFIXES}
+    for page in pages:
+        grouped.setdefault(page.section, []).append(page)
+    return {section: grouped[section] for section in grouped if grouped[section]}
+
+
+def build_index_xml(title: str, pages: list[CapturedPage], url_by_path: dict[str, str] | None = None) -> str:
+    url_by_path = url_by_path or {}
+    grouped = sectioned_pages(pages)
+    lines = [
+        f"<title>{xml_text(title)}</title>",
+        "",
+        f"<h1>{xml_text(title)}</h1>",
+        '<callout emoji="📚" background-color="light-blue" border-color="blue">',
+        "<p><b>定位：</b>这是系列课程的阅读入口。</p>",
+        f"<p><b>课程规模：</b>{len(pages)} 篇内容</p>",
+        "</callout>",
+        "",
+        "<h2>学习入口</h2>",
+        "<grid>",
+    ]
+
+    sections = [section for section in DEFAULT_INCLUDE_PREFIXES if grouped.get(section)]
+    split_at = (len(sections) + 1) // 2
+    for column_sections in (sections[:split_at], sections[split_at:]):
+        lines.append('<column width-ratio="0.5">')
+        for section in column_sections:
+            section_title = SECTION_TITLES.get(section, section)
+            section_path = f"/{section}"
+            section_url = url_by_path.get(section_path)
+            count = len(grouped.get(section) or [])
+            title_xml = (
+                f'<a href="{xml_text(section_url)}">{xml_text(section_title)}</a>'
+                if section_url
+                else xml_text(section_title)
+            )
+            lines.extend(
+                [
+                    '<callout emoji="📌" background-color="light-gray" border-color="gray">',
+                    f"<h3>{title_xml}</h3>",
+                    f"<p>{count} 篇内容</p>",
+                    "</callout>",
+                ]
+            )
+        lines.append("</column>")
+    lines.extend(["</grid>", "", "<h2>完整目录</h2>"])
+
+    for section in sections:
+        section_title = SECTION_TITLES.get(section, section)
+        lines.extend(["", f"<h3>{xml_text(section_title)}</h3>", "<ul>"])
+        for page in grouped.get(section) or []:
+            page_url = url_by_path.get(page.path)
+            page_title = xml_text(page.title)
+            if page_url:
+                lines.append(f'<li><a href="{xml_text(page_url)}">{page_title}</a></li>')
+            else:
+                lines.append(f"<li>{page_title}</li>")
+        lines.append("</ul>")
+
+    return "\n".join(lines).strip() + "\n"
+
+
+def build_directory_xml(
+    path_key: str,
+    title: str,
+    path_titles: dict[str, str],
+    url_by_path: dict[str, str],
+) -> str:
+    children = child_paths(path_key, url_by_path)
+    lines = [
+        f"<title>{xml_text(title)}</title>",
+        "",
+        f"<h1>{xml_text(title)}</h1>",
+        '<callout emoji="🗂️" background-color="light-blue" border-color="blue">',
+        "<p>本页用于承载当前主题下的文章入口，方便按主题连续阅读。</p>",
+        f"<p><b>子页面数量：</b>{len(children)}</p>",
+        "</callout>",
+        "",
+    ]
+    if children:
+        lines.extend(["<h2>目录导航</h2>", "<grid>"])
+        split_at = (len(children) + 1) // 2
+        for column_children in (children[:split_at], children[split_at:]):
+            lines.append('<column width-ratio="0.5">')
+            lines.append("<ul>")
+            for child_path in column_children:
+                child_title = path_titles.get(child_path) or title_from_segment(child_path.rsplit("/", 1)[-1])
+                child_url = url_by_path.get(child_path)
+                if child_url:
+                    lines.append(f'<li><a href="{xml_text(child_url)}">{xml_text(child_title)}</a></li>')
+                else:
+                    lines.append(f"<li>{xml_text(child_title)}</li>")
+            lines.append("</ul>")
+            lines.append("</column>")
+        lines.extend(["</grid>", ""])
+    lines.extend(
+        [
+            "<h2>飞书子页面</h2>",
+            "<p>下面的子页面列表由飞书知识库自动维护，适合快速跳转和检查层级。</p>",
+            "<sub-page-list></sub-page-list>",
+            "",
+        ]
+    )
+    return "\n".join(lines).strip() + "\n"
+
+
+def styled_directory_xml_path(
+    export_dir: Path,
+    path_key: str,
+    title: str,
+    path_titles: dict[str, str],
+    url_by_path: dict[str, str],
+) -> Path:
+    dirs_dir = export_dir / "styled-directories"
+    dirs_dir.mkdir(parents=True, exist_ok=True)
+    slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", path_key.strip("/"))[:80].strip("-") or "root"
+    path = dirs_dir / f"{slug}.xml"
+    path.write_text(build_directory_xml(path_key, title, path_titles, url_by_path), encoding="utf-8")
+    return path
+
+
+def write_linked_xml_files_by_path(
+    pages: list[CapturedPage],
+    export_dir: Path,
+    url_by_path: dict[str, str],
+    include_prefixes: tuple[str, ...],
+) -> dict[str, Path]:
+    pages_dir = export_dir / "styled-pages"
+    pages_dir.mkdir(parents=True, exist_ok=True)
+    files: dict[str, Path] = {}
+    for index, page in enumerate(pages, start=1):
+        previous_url = url_by_path.get(pages[index - 2].path) if index > 1 else None
+        next_url = url_by_path.get(pages[index].path) if index < len(pages) else None
+        path = pages_dir / xml_filename(page, index)
+        path.write_text(
+            page_to_xml(
+                page,
+                link_resolver=lambda href, base_url: resolve_lark_link(
+                    href,
+                    base_url,
+                    url_by_path,
+                    include_prefixes,
+                ),
+                previous_url=previous_url,
+                next_url=next_url,
+            ),
+            encoding="utf-8",
+        )
+        files[page.path] = path
+    return files
 
 
 def title_from_segment(segment: str) -> str:
@@ -682,12 +1168,34 @@ def update_lark_doc(doc_token: str, markdown_path: Path) -> dict[str, Any]:
     )
 
 
+def update_lark_doc_xml(doc_token: str, xml_path: Path) -> dict[str, Any]:
+    relative = xml_path.resolve().relative_to(REPO_ROOT)
+    return run_lark_cli(
+        [
+            "docs",
+            "+update",
+            "--as",
+            "user",
+            "--doc",
+            doc_token,
+            "--command",
+            "overwrite",
+            "--doc-format",
+            "xml",
+            "--content",
+            f"@{relative.as_posix()}",
+            "--format",
+            "json",
+        ],
+        timeout=240,
+    )
+
+
 def build_index_markdown(title: str, pages: list[CapturedPage], url_by_path: dict[str, str] | None = None) -> str:
     lines = [
         f"# {title}",
         "",
-        f"> 采集时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-        f"> 页面数量：{len(pages)}",
+        f"> 课程规模：{len(pages)} 篇内容",
         "",
     ]
     current_section = ""
@@ -697,9 +1205,9 @@ def build_index_markdown(title: str, pages: list[CapturedPage], url_by_path: dic
             current_section = page.section
             lines.extend([f"## {section_title}", ""])
         if url_by_path and page.path in url_by_path:
-            lines.append(f"- [{page.title}]({url_by_path[page.path]})： [原文]({page.url})")
+            lines.append(f"- [{page.title}]({url_by_path[page.path]})")
         else:
-            lines.append(f"- {page.title}：{page.url}")
+            lines.append(f"- {page.title}")
     return "\n".join(lines).strip() + "\n"
 
 
@@ -766,6 +1274,55 @@ def build_node_maps(export_result: dict[str, Any]) -> tuple[dict[str, dict[str, 
         }
     url_by_path = {path: item["url"] for path, item in node_by_path.items() if item.get("url")}
     return node_by_path, url_by_path
+
+
+def markdown_table_cell(value: Any) -> str:
+    return str(value or "").replace("|", "\\|").replace("\n", " ").strip()
+
+
+def write_source_url_map(
+    *,
+    pages: list[CapturedPage],
+    export_dir: Path,
+    node_by_path: dict[str, dict[str, str]],
+) -> dict[str, str]:
+    records: list[dict[str, str]] = []
+    for page in pages:
+        node = node_by_path.get(page.path) or {}
+        records.append(
+            {
+                "path": page.path,
+                "title": page.title,
+                "feishu_url": str(node.get("url") or ""),
+                "source_url": page.url,
+                "doc_token": str(node.get("doc_token") or ""),
+                "node_token": str(node.get("node_token") or ""),
+            }
+        )
+
+    json_path = export_dir / "source-url-map.json"
+    md_path = export_dir / "source-url-map.md"
+    json_path.write_text(json.dumps(records, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    lines = [
+        "# Source URL Map",
+        "",
+        f"Generated at: {datetime.now().isoformat(timespec='seconds')}",
+        "",
+        "| Path | Title | Feishu URL | Source URL |",
+        "|---|---|---|---|",
+    ]
+    for record in records:
+        lines.append(
+            "| "
+            + " | ".join(
+                markdown_table_cell(record[key])
+                for key in ("path", "title", "feishu_url", "source_url")
+            )
+            + " |"
+        )
+    md_path.write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
+    return {"json": str(json_path), "markdown": str(md_path)}
 
 
 def resolve_lark_link(
@@ -846,6 +1403,7 @@ def backfill_lark_links(
     export_result = json.loads((export_dir / "lark-export-result.json").read_text(encoding="utf-8"))
     pages = dedupe_pages(pages)
     node_by_path, url_by_path = build_node_maps(export_result)
+    source_map = write_source_url_map(pages=pages, export_dir=export_dir, node_by_path=node_by_path)
     path_titles = build_path_titles(pages)
     page_files = write_linked_markdown_files_by_path(pages, export_dir, url_by_path, include_prefixes)
     report = build_link_report(pages, url_by_path, include_prefixes)
@@ -893,7 +1451,58 @@ def backfill_lark_links(
             if limit and len(updated) >= limit:
                 break
 
-    return {"dry_run": dry_run, "link_report": report, "updated": updated, "skipped": skipped}
+    return {"dry_run": dry_run, "source_map": source_map, "link_report": report, "updated": updated, "skipped": skipped}
+
+
+def backfill_lark_style_samples(
+    *,
+    pages: list[CapturedPage],
+    export_dir: Path,
+    root_title: str,
+    dry_run: bool,
+    sample_paths: list[str],
+    include_prefixes: tuple[str, ...],
+) -> dict[str, Any]:
+    export_result = json.loads((export_dir / "lark-export-result.json").read_text(encoding="utf-8"))
+    pages = dedupe_pages(pages)
+    pages_by_path = {page.path: page for page in pages}
+    node_by_path, url_by_path = build_node_maps(export_result)
+    source_map = write_source_url_map(pages=pages, export_dir=export_dir, node_by_path=node_by_path)
+    path_titles = build_path_titles(pages)
+    page_files = write_linked_xml_files_by_path(pages, export_dir, url_by_path, include_prefixes)
+    updated: list[dict[str, Any]] = []
+    skipped: list[dict[str, Any]] = []
+
+    for raw_path in sample_paths:
+        path_key = normalize_export_path(raw_path)
+        node = node_by_path.get(path_key)
+        doc_token = (node or {}).get("doc_token") or ""
+        if not doc_token:
+            skipped.append({"path": path_key, "reason": "missing_doc_token"})
+            continue
+
+        if path_key == "/":
+            xml_path = export_dir / "styled-index.xml"
+            xml_path.write_text(build_index_xml(root_title, pages, url_by_path), encoding="utf-8")
+            title = root_title
+        elif child_paths(path_key, url_by_path):
+            title = (node or {}).get("title") or path_titles.get(path_key) or title_from_segment(path_key.rsplit("/", 1)[-1])
+            xml_path = styled_directory_xml_path(export_dir, path_key, title, path_titles, url_by_path)
+        else:
+            page = pages_by_path.get(path_key)
+            xml_path = page_files.get(path_key)
+            if not page or not xml_path:
+                skipped.append({"path": path_key, "reason": "missing_page_file"})
+                continue
+            title = page.title
+
+        updated.append({"path": path_key, "title": title, "doc_token": doc_token, "file": str(xml_path)})
+        if not dry_run:
+            print(f"[lark-style] update {path_key} -> {title}", file=sys.stderr, flush=True)
+            update_lark_doc_xml(doc_token, xml_path)
+            time.sleep(0.4)
+
+    return {"dry_run": dry_run, "source_map": source_map, "updated": updated, "skipped": skipped}
 
 
 def export_to_lark(
@@ -1032,6 +1641,12 @@ def main() -> int:
     parser.add_argument("--export-dir", default="")
     parser.add_argument("--update-links", action="store_true", help="Rewrite existing exported Feishu docs with internal Wiki links.")
     parser.add_argument("--update-limit", type=int, default=0, help="Only update the first N docs when --update-links is enabled; 0 means all.")
+    parser.add_argument("--update-style-samples", action="store_true", help="Rewrite a small set of exported Feishu docs with the richer XML reading style.")
+    parser.add_argument(
+        "--style-sample-paths",
+        default="/,/quickstart,/quickstart/first-task",
+        help="Comma-separated paths to update when --update-style-samples is enabled.",
+    )
     args = parser.parse_args()
 
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -1051,6 +1666,26 @@ def main() -> int:
             include_prefixes=include_prefixes,
         )
         (export_dir / "lark-link-backfill-result.json").write_text(
+            json.dumps(result, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        print(json.dumps({"export_dir": str(export_dir), **result}, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.update_style_samples:
+        payload = json.loads((export_dir / "capture.json").read_text(encoding="utf-8"))
+        pages = parse_captured_pages(payload, include_prefixes)
+        root_title = args.title or f"Claude Code 从入门到精通（采集 {datetime.now().strftime('%Y-%m-%d')}）"
+        sample_paths = [path.strip() for path in args.style_sample_paths.split(",") if path.strip()]
+        result = backfill_lark_style_samples(
+            pages=pages,
+            export_dir=export_dir,
+            root_title=root_title,
+            dry_run=args.dry_run,
+            sample_paths=sample_paths,
+            include_prefixes=include_prefixes,
+        )
+        (export_dir / "lark-style-sample-result.json").write_text(
             json.dumps(result, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
