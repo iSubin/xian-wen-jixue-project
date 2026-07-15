@@ -179,11 +179,16 @@ def clean_markdown(markdown: str) -> str:
     return "\n".join(lines).strip()
 
 
-def page_to_markdown(page: CapturedPage) -> str:
+def page_to_markdown(page: CapturedPage, link_resolver: Any | None = None) -> str:
     soup = BeautifulSoup(page.content_html or "", "lxml")
     for selector in ("script", "style", "noscript", "button", "svg"):
         for tag in soup.select(selector):
             tag.decompose()
+    if link_resolver:
+        for anchor in soup.find_all("a", href=True):
+            replacement = link_resolver(str(anchor.get("href") or ""), page.url)
+            if replacement:
+                anchor["href"] = replacement
     markdown = clean_markdown(html_to_markdown(str(soup), heading_style="ATX"))
     title = sanitize_title(page.title)
     if markdown.startswith(f"# {title}"):
@@ -409,6 +414,33 @@ def write_markdown_files_by_path(pages: list[CapturedPage], export_dir: Path) ->
     return files
 
 
+def write_linked_markdown_files_by_path(
+    pages: list[CapturedPage],
+    export_dir: Path,
+    url_by_path: dict[str, str],
+    include_prefixes: tuple[str, ...],
+) -> dict[str, Path]:
+    pages_dir = export_dir / "linked-pages"
+    pages_dir.mkdir(parents=True, exist_ok=True)
+    files: dict[str, Path] = {}
+    for index, page in enumerate(pages, start=1):
+        path = pages_dir / markdown_filename(page, index)
+        path.write_text(
+            page_to_markdown(
+                page,
+                link_resolver=lambda href, base_url: resolve_lark_link(
+                    href,
+                    base_url,
+                    url_by_path,
+                    include_prefixes,
+                ),
+            ),
+            encoding="utf-8",
+        )
+        files[page.path] = path
+    return files
+
+
 def directory_markdown_path(export_dir: Path, path_key: str, title: str) -> Path:
     dirs_dir = export_dir / "directories"
     dirs_dir.mkdir(parents=True, exist_ok=True)
@@ -418,6 +450,40 @@ def directory_markdown_path(export_dir: Path, path_key: str, title: str) -> Path
         f"# {title}\n\n此节点用于保持原网站目录层级，子页面按原路径挂载在当前节点下。\n",
         encoding="utf-8",
     )
+    return path
+
+
+def linked_directory_markdown_path(
+    export_dir: Path,
+    path_key: str,
+    title: str,
+    path_titles: dict[str, str],
+    url_by_path: dict[str, str],
+) -> Path:
+    dirs_dir = export_dir / "linked-directories"
+    dirs_dir.mkdir(parents=True, exist_ok=True)
+    slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", path_key.strip("/"))[:80].strip("-") or "root"
+    path = dirs_dir / f"{slug}.md"
+    direct_children = []
+    prefix = path_key.rstrip("/") + "/"
+    for child_path, child_url in sorted(url_by_path.items()):
+        if child_path == "/" or not child_path.startswith(prefix):
+            continue
+        remainder = child_path[len(prefix) :].strip("/")
+        if remainder and "/" not in remainder:
+            direct_children.append((child_path, child_url))
+
+    lines = [
+        f"# {title}",
+        "",
+        "此节点用于保持原网站目录层级，子页面按原路径挂载在当前节点下。",
+    ]
+    if direct_children:
+        lines.extend(["", "## 子页面", ""])
+        for child_path, child_url in direct_children:
+            child_title = path_titles.get(child_path) or title_from_segment(child_path.rsplit("/", 1)[-1])
+            lines.append(f"- [{child_title}]({child_url})")
+    path.write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
     return path
 
 
@@ -593,7 +659,30 @@ def created_doc_info(response: dict[str, Any]) -> tuple[str, str]:
     return doc_token, url
 
 
-def build_index_markdown(title: str, pages: list[CapturedPage]) -> str:
+def update_lark_doc(doc_token: str, markdown_path: Path) -> dict[str, Any]:
+    relative = markdown_path.resolve().relative_to(REPO_ROOT)
+    return run_lark_cli(
+        [
+            "docs",
+            "+update",
+            "--as",
+            "user",
+            "--doc",
+            doc_token,
+            "--command",
+            "overwrite",
+            "--doc-format",
+            "markdown",
+            "--content",
+            f"@{relative.as_posix()}",
+            "--format",
+            "json",
+        ],
+        timeout=240,
+    )
+
+
+def build_index_markdown(title: str, pages: list[CapturedPage], url_by_path: dict[str, str] | None = None) -> str:
     lines = [
         f"# {title}",
         "",
@@ -607,7 +696,10 @@ def build_index_markdown(title: str, pages: list[CapturedPage]) -> str:
         if page.section != current_section:
             current_section = page.section
             lines.extend([f"## {section_title}", ""])
-        lines.append(f"- {page.title}：{page.url}")
+        if url_by_path and page.path in url_by_path:
+            lines.append(f"- [{page.title}]({url_by_path[page.path]})： [原文]({page.url})")
+        else:
+            lines.append(f"- {page.title}：{page.url}")
     return "\n".join(lines).strip() + "\n"
 
 
@@ -647,6 +739,161 @@ def build_path_titles(pages: list[CapturedPage]) -> dict[str, str]:
                 titles[path_key] = candidate
                 used.add(candidate)
     return titles
+
+
+def normalize_export_path(path: str) -> str:
+    value = "/" + str(path or "").strip("/")
+    return "/" if value == "/" else value.rstrip("/")
+
+
+def build_node_maps(export_result: dict[str, Any]) -> tuple[dict[str, dict[str, str]], dict[str, str]]:
+    node_by_path: dict[str, dict[str, str]] = {}
+    root = export_result.get("root") or {}
+    if root:
+        node_by_path["/"] = {
+            "title": str(root.get("title") or "根目录"),
+            "doc_token": str(root.get("doc_token") or ""),
+            "node_token": str(root.get("node_token") or ""),
+            "url": str(root.get("url") or ""),
+        }
+    for item in list(export_result.get("directories") or []) + list(export_result.get("pages") or []):
+        path = normalize_export_path(str(item.get("path") or ""))
+        node_by_path[path] = {
+            "title": str(item.get("title") or ""),
+            "doc_token": str(item.get("doc_token") or ""),
+            "node_token": str(item.get("node_token") or ""),
+            "url": str(item.get("url") or ""),
+        }
+    url_by_path = {path: item["url"] for path, item in node_by_path.items() if item.get("url")}
+    return node_by_path, url_by_path
+
+
+def resolve_lark_link(
+    href: str,
+    base_url: str,
+    url_by_path: dict[str, str],
+    include_prefixes: tuple[str, ...],
+) -> str | None:
+    value = str(href or "").strip()
+    if not value or value.startswith(("#", "mailto:", "tel:", "javascript:")):
+        return None
+
+    target = resolve_url(value, base_url)
+    if not target:
+        return None
+    base = urlparse(base_url)
+    parsed = urlparse(target)
+    if parsed.netloc and parsed.netloc != base.netloc:
+        return None
+    if not is_valid_doc_path(target, include_prefixes):
+        return None
+
+    path = canonical_path(target)
+    candidates = [path]
+    if path.endswith("/index"):
+        candidates.append(path[: -len("/index")] or "/")
+    for candidate in candidates:
+        link = url_by_path.get(normalize_export_path(candidate))
+        if link:
+            return link
+    return None
+
+
+def build_link_report(pages: list[CapturedPage], url_by_path: dict[str, str], include_prefixes: tuple[str, ...]) -> dict[str, Any]:
+    pages_with_links = 0
+    total_internal_links = 0
+    resolved_internal_links = 0
+    unresolved: dict[str, int] = {}
+
+    for page in pages:
+        page_link_count = 0
+        soup = BeautifulSoup(page.content_html or "", "lxml")
+        for anchor in soup.find_all("a", href=True):
+            href = str(anchor.get("href") or "")
+            if href.strip().startswith("#"):
+                continue
+            target = resolve_url(href, page.url)
+            if not target or not is_valid_doc_path(target, include_prefixes):
+                continue
+            total_internal_links += 1
+            if resolve_lark_link(href, page.url, url_by_path, include_prefixes):
+                resolved_internal_links += 1
+                page_link_count += 1
+            else:
+                path = canonical_path(target)
+                unresolved[path] = unresolved.get(path, 0) + 1
+        if page_link_count:
+            pages_with_links += 1
+
+    return {
+        "pages_with_links": pages_with_links,
+        "total_internal_links": total_internal_links,
+        "resolved_internal_links": resolved_internal_links,
+        "unresolved_internal_links": sum(unresolved.values()),
+        "unresolved_paths": dict(sorted(unresolved.items(), key=lambda item: (-item[1], item[0]))[:50]),
+    }
+
+
+def backfill_lark_links(
+    *,
+    pages: list[CapturedPage],
+    export_dir: Path,
+    root_title: str,
+    dry_run: bool,
+    limit: int,
+    include_prefixes: tuple[str, ...],
+) -> dict[str, Any]:
+    export_result = json.loads((export_dir / "lark-export-result.json").read_text(encoding="utf-8"))
+    pages = dedupe_pages(pages)
+    node_by_path, url_by_path = build_node_maps(export_result)
+    path_titles = build_path_titles(pages)
+    page_files = write_linked_markdown_files_by_path(pages, export_dir, url_by_path, include_prefixes)
+    report = build_link_report(pages, url_by_path, include_prefixes)
+    updated: list[dict[str, Any]] = []
+    skipped: list[dict[str, Any]] = []
+
+    root_doc_token = (node_by_path.get("/") or {}).get("doc_token") or ""
+    if root_doc_token:
+        root_index_path = export_dir / "linked-index.md"
+        root_index_path.write_text(build_index_markdown(root_title, pages, url_by_path), encoding="utf-8")
+        updated.append({"path": "/", "title": root_title, "doc_token": root_doc_token, "file": str(root_index_path)})
+        if not dry_run:
+            print(f"[lark-link] update / -> {root_title}", file=sys.stderr, flush=True)
+            update_lark_doc(root_doc_token, root_index_path)
+
+    for item in export_result.get("directories") or []:
+        path_key = normalize_export_path(str(item.get("path") or ""))
+        doc_token = str(item.get("doc_token") or "")
+        title = str(item.get("title") or path_titles.get(path_key) or title_from_segment(path_key.rsplit("/", 1)[-1]))
+        if not doc_token:
+            skipped.append({"path": path_key, "reason": "missing_doc_token"})
+            continue
+        markdown_path = linked_directory_markdown_path(export_dir, path_key, title, path_titles, url_by_path)
+        updated.append({"path": path_key, "title": title, "doc_token": doc_token, "file": str(markdown_path)})
+        if not dry_run:
+            print(f"[lark-link] update {path_key} -> {title}", file=sys.stderr, flush=True)
+            update_lark_doc(doc_token, markdown_path)
+            time.sleep(0.4)
+        if limit and len(updated) >= limit:
+            break
+
+    if not limit or len(updated) < limit:
+        for page in pages:
+            node = node_by_path.get(page.path)
+            doc_token = (node or {}).get("doc_token") or ""
+            markdown_path = page_files.get(page.path)
+            if not doc_token or markdown_path is None:
+                skipped.append({"path": page.path, "reason": "missing_mapping"})
+                continue
+            updated.append({"path": page.path, "title": page.title, "doc_token": doc_token, "file": str(markdown_path)})
+            if not dry_run:
+                print(f"[lark-link] update {page.path} -> {page.title}", file=sys.stderr, flush=True)
+                update_lark_doc(doc_token, markdown_path)
+                time.sleep(0.4)
+            if limit and len(updated) >= limit:
+                break
+
+    return {"dry_run": dry_run, "link_report": report, "updated": updated, "skipped": skipped}
 
 
 def export_to_lark(
@@ -783,11 +1030,32 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--skip-capture", action="store_true")
     parser.add_argument("--export-dir", default="")
+    parser.add_argument("--update-links", action="store_true", help="Rewrite existing exported Feishu docs with internal Wiki links.")
+    parser.add_argument("--update-limit", type=int, default=0, help="Only update the first N docs when --update-links is enabled; 0 means all.")
     args = parser.parse_args()
 
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     export_dir = Path(args.export_dir).resolve() if args.export_dir else REPO_ROOT / "temp" / "web-doc-exports" / timestamp
     include_prefixes = DEFAULT_INCLUDE_PREFIXES
+
+    if args.update_links:
+        payload = json.loads((export_dir / "capture.json").read_text(encoding="utf-8"))
+        pages = parse_captured_pages(payload, include_prefixes)
+        root_title = args.title or f"Claude Code 从入门到精通（采集 {datetime.now().strftime('%Y-%m-%d')}）"
+        result = backfill_lark_links(
+            pages=pages,
+            export_dir=export_dir,
+            root_title=root_title,
+            dry_run=args.dry_run,
+            limit=args.update_limit,
+            include_prefixes=include_prefixes,
+        )
+        (export_dir / "lark-link-backfill-result.json").write_text(
+            json.dumps(result, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        print(json.dumps({"export_dir": str(export_dir), **result}, ensure_ascii=False, indent=2))
+        return 0
 
     if args.skip_capture:
         payload = json.loads((export_dir / "capture.json").read_text(encoding="utf-8"))
