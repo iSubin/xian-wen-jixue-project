@@ -1,7 +1,7 @@
 # 声文智汇（ShengWen）- Agent驱动的长视频总结工作流
 
 <p align="center">
-  <img src="prj-docs/images/web-wide.png" alt="最终生成图片预览" width="900">
+  <img src="docs/images/web-wide.png" alt="最终生成图片预览" width="900">
   <br>
 </p>
 
@@ -80,7 +80,7 @@
   - 就像管理内存一样管理AI上下文，实现跨分块总结而保持文章流畅完整
 - 📊 **效果对比**：
   - **⬇️点击查看对比**（均由 Gemini 2.5 Pro + tiny 转录模型生成）
-  - [🙂标准模式总结结果](prj-docs/长视频总结-非agent.md) vs **[😄Agent 增强模式总结结果](prj-docs/长视频总结-带agent.md)**
+  - [🙂标准模式总结结果](docs/examples/长视频总结-非agent.md) vs **[😄Agent 增强模式总结结果](docs/examples/长视频总结-带agent.md)**
   - 测试视频：[《如何像高级工程师一样设计API？REST、GraphQL、认证与安全核心要点》(时长01:23:21)](https://www.bilibili.com/video/BV16wZKBbEbd)
   - **Agent增强模式**：细节更丰富，更像是一篇详实的完整文章
 - ⚙️ **使用方式**：
@@ -106,7 +106,7 @@
 
 
 <p align="center">
-  <img src="prj-docs/images/picture-worker.png" alt="最终生成图片预览" width="900">
+  <img src="docs/images/picture-worker.png" alt="最终生成图片预览" width="900">
   <br>
 </p>
 
@@ -155,7 +155,7 @@
 - **字幕优先，回退语音识别**：可开启”优先使用字幕”，未获取到字幕时自动回退到本地语音识别
 
 <p align="center">
-  <img src="prj-docs/images/subtitle.png" alt="转录设置" width="600">
+  <img src="docs/images/subtitle.png" alt="转录设置" width="600">
   <br>
 </p>
 
@@ -447,7 +447,7 @@ ShengWen 当前版本以 **前端设置面板** 作为主要配置入口，同�
 
 凭据不会通过 API 回显明文；服务端只返回脱敏摘要。当前本地单用户模式使用 `local-user`，后续接入用户体系后会按真实用户隔离凭据。
 
-详细设计、接口、数据表、安全边界和后续阶段见：[用户级采集账号设计](prj-docs/用户级采集账号设计.md)。
+详细设计、接口、数据表、安全边界和后续阶段见：[用户级采集账号设计](docs/architecture/用户级采集账号设计.md)。
 
 ### PostgreSQL 开发实例
 
@@ -469,7 +469,7 @@ export SHENGWEN_DATABASE_URL='postgresql+psycopg://shengwen:shengwen_dev_passwor
 ---
 ## 🤔 常见 Q&A
 
-**刚部署下来不会用？先看**：[使用说明](prj-docs/使用说明.md)
+**刚部署下来不会用？先看**：[使用说明](docs/guides/使用说明.md)
 
 ### Q1. 怎么用转录模型？
 
@@ -525,9 +525,9 @@ export SHENGWEN_DATABASE_URL='postgresql+psycopg://shengwen:shengwen_dev_passwor
 
 | 大语言 AI 模型 | 总结风格（实测） |  总结效果示例<br>（总结至 [@林亦LYi](https://space.bilibili.com/4401694/?spm_id_from=333.788.upinfo.detail.click) 的 [一个视频搞懂OpenClaw！](https://www.bilibili.com/video/BV1jEAaz3E6K)） |
 | :--- | :--- | :--- | 
-| **Gemini 2.5/3.0 Pro** | 上下文能力较好 + 带思考，原文细节较为丰富（个人最习惯用） | [点击查看示例图](prj-docs/images/llm-gemini-25pro-summary-20260301-1214.png) |
-| **DeepSeek V4 Flash** | 输出迅速，性价比极高，长上下文天然适合该项目 | [点击查看示例图](prj-docs/images/llm-deepseek-v4flash-summary.png) |
-| **GPT 4.1 / 5.x** | 细节丰富，有专业感 | [点击查看示例图](prj-docs/images/llm-gpt52-summary-20260301-1213.png) |
+| **Gemini 2.5/3.0 Pro** | 上下文能力较好 + 带思考，原文细节较为丰富（个人最习惯用） | [点击查看示例图](docs/images/llm-gemini-25pro-summary-20260301-1214.png) |
+| **DeepSeek V3.2** | 输出迅速，性价比高，长上下文适合该项目 | [点击查看示例图](docs/images/llm-deepseek-v32-summary-20260301-1223.png) |
+| **GPT 4.1 / 5.x** | 细节丰富，有专业感 | [点击查看示例图](docs/images/llm-gpt52-summary-20260301-1213.png) |
 - 不同的模型会对最终总结文章的**风味造成影响**。
 - 可尝试用同一视频分别交给不同 AI 模型总结后横向对比，选择最符合自己口味的模型。
 - **模型风味测试实操**：

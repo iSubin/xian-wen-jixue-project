@@ -21,11 +21,11 @@ ShengWen 后续应作为一个独立产品继续维护，定位是：
 当前仓库：
 
 ```text
-路径：/Users/subin/Documents/Claude-Project/lessons/ShengWen
+路径：/Users/subin/Documents/Claude-Project/xian-wen-project
 当前分支：master
 主远程：git@github.com:iSubin/ShengWen.git
 上游远程：git@github.com:smileFAace/ShengWen.git
-当前 HEAD：adae0a6 feat: polish lark course export styling
+交接基线提交：f87fe71 docs: add shengwen handoff notes
 ```
 
 编写本文前，工作区为干净状态：
@@ -90,7 +90,7 @@ Homeway / 投研大师：web_qtstr
 已经沉淀的设计文档：
 
 ```text
-prj-docs/用户级采集账号设计.md
+docs/architecture/用户级采集账号设计.md
 ```
 
 关键结论：
@@ -225,11 +225,11 @@ http://127.0.0.1:8000/
 可以直接把下面这段给新的 ShengWen 开发主线 session：
 
 ```text
-请先阅读 /Users/subin/Documents/Claude-Project/lessons/ShengWen/docs/shengwen-session-handoff.md，
+请先阅读 /Users/subin/Documents/Claude-Project/xian-wen-project/docs/handoff/shengwen-session-handoff.md，
 再检查当前仓库状态。这个项目后续作为 ShengWen 独立产品维护，不要把新的学习平台能力混进来。
 
 如果涉及部署，请先阅读 README.md 并优先使用 deploy一键部署.sh 和 run一键启动.sh。
-如果涉及用户凭据，请遵守 prj-docs/用户级采集账号设计.md 的边界：凭据不可回显、日志脱敏、按用户隔离。
+如果涉及用户凭据，请遵守 docs/architecture/用户级采集账号设计.md 的边界：凭据不可回显、日志脱敏、按用户隔离。
 ```
 
 ---
