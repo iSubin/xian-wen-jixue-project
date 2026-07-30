@@ -26,6 +26,58 @@ export default defineConfig(({ mode }) => {
           target: devApiTarget,
           changeOrigin: true,
         },
+        '/local-path': {
+          target: devApiTarget,
+          changeOrigin: true,
+        },
+        '/local-folder': {
+          target: devApiTarget,
+          changeOrigin: true,
+        },
+        '/articles': {
+          target: devApiTarget,
+          changeOrigin: true,
+        },
+        '/collections': {
+          target: devApiTarget,
+          changeOrigin: true,
+        },
+        '/folders': {
+          target: devApiTarget,
+          changeOrigin: true,
+        },
+        '/library': {
+          target: devApiTarget,
+          changeOrigin: true,
+        },
+        '/git': {
+          target: devApiTarget,
+          changeOrigin: true,
+        },
+        '/providers': {
+          target: devApiTarget,
+          changeOrigin: true,
+        },
+        '/connected-accounts': {
+          target: devApiTarget,
+          changeOrigin: true,
+        },
+        '/bilibili': {
+          target: devApiTarget,
+          changeOrigin: true,
+        },
+        '/task-assets': {
+          target: devApiTarget,
+          changeOrigin: true,
+        },
+        '/prewarm': {
+          target: devApiTarget,
+          changeOrigin: true,
+        },
+        '/version': {
+          target: devApiTarget,
+          changeOrigin: true,
+        },
         '/llm': {
           target: devApiTarget,
           changeOrigin: true,

@@ -7,7 +7,7 @@ from urllib.parse import parse_qs, urlparse
 path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 sys.path.insert(0, path)
 
-from src.main.python.sheng_wen.downloader.xiaoet_resolver import (
+from src.main.python.xianwen.downloader.xiaoet_resolver import (
     XiaoetResolveError,
     XiaoetResolvedVideo,
     XiaoetVideoResolver,

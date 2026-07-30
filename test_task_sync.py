@@ -11,9 +11,9 @@ import os
 # 添加项目路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src', 'main', 'python'))
 
-from sheng_wen.db import db, TaskStatus
-from sheng_wen.task_updater import update_and_notify
-from sheng_wen.api import notify_task_update
+from xianwen.db import db, TaskStatus
+from xianwen.task_updater import update_and_notify
+from xianwen.api import notify_task_update
 
 
 async def test_update_and_notify():

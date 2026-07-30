@@ -9,9 +9,9 @@ path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..')
 sys.path.insert(0, path)
 print(f"已将 {path} 添加到 sys.path")
 
-from src.main.python.sheng_wen.llm.llm import LLMConfig, LLMMessage, LLMResponseError
-from src.main.python.sheng_wen.llm.mock_llm import MockLLM
-from src.main.python.sheng_wen.llm.litellm_client import LiteLLMClient
+from src.main.python.xianwen.llm.llm import LLMConfig, LLMMessage, LLMResponseError
+from src.main.python.xianwen.llm.mock_llm import MockLLM
+from src.main.python.xianwen.llm.litellm_client import LiteLLMClient
 
 # --- 测试 MockLLM ---
 class TestMockLLM(unittest.TestCase):
@@ -67,18 +67,19 @@ class TestMockLLM(unittest.TestCase):
 # --- 测试 LiteLLMClient ---
 # 注意：这些是集成测试，需要一个正在运行的、与OpenAI兼容的服务端点。
 # 在运行测试前，请确保设置了正确的环境变量或配置。
-# @unittest.skipUnless(
-#     os.environ.get("RUN_LITELLM_INTEGRATION_TESTS") == "true",
-#     "跳过 LiteLLM 集成测试。设置 RUN_LITELLM_INTEGRATION_TESTS=true 以运行。"
-# )
+@unittest.skipUnless(
+    os.environ.get("RUN_LITELLM_INTEGRATION_TESTS") == "true"
+    and bool(os.environ.get("NVIDIA_API_KEY")),
+    "跳过 LiteLLM 集成测试。设置 RUN_LITELLM_INTEGRATION_TESTS=true 和 NVIDIA_API_KEY 以运行。",
+)
 class TestLiteLLMClient(unittest.TestCase):
     
     def setUp(self):
         """设置集成测试的配置。"""
-        # 使用你提供的 NVIDIA 端点和 Kimi 模型进行测试
+        # 仅在显式开启集成测试并通过环境变量提供凭据时连接 NVIDIA 端点
         self.config = LLMConfig(
             base_url="https://integrate.api.nvidia.com/v1",
-            api_key="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",
+            api_key=os.environ.get("NVIDIA_API_KEY", ""),
             model_id="deepseek-ai/deepseek-r1"
         )
         self.messages = [LLMMessage(role="user", content="你好，请讲一个关于程序员的笑话。")]
@@ -120,4 +121,3 @@ class TestLiteLLMClient(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-

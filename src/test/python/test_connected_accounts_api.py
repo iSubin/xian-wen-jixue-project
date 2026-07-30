@@ -10,8 +10,8 @@ from fastapi.testclient import TestClient
 path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 sys.path.insert(0, path)
 
-from src.main.python.sheng_wen import api as api_module
-from src.main.python.sheng_wen.db import TaskDB
+from src.main.python.xianwen import api as api_module
+from src.main.python.xianwen.db import TaskDB
 
 
 class TestConnectedAccountsApi(unittest.TestCase):
@@ -39,7 +39,7 @@ class TestConnectedAccountsApi(unittest.TestCase):
     def test_connected_account_crud_is_user_scoped_and_redacted(self):
         create_response = self.client.put(
             "/connected-accounts/bilibili",
-            headers={"X-ShengWen-User-Id": "user-a"},
+            headers={"X-XianWen-User-Id": "user-a"},
             json={
                 "credential_type": "sessdata_bundle",
                 "payload": {"SESSDATA": "user-a-secret-value"},
@@ -57,11 +57,11 @@ class TestConnectedAccountsApi(unittest.TestCase):
 
         user_a_list = self.client.get(
             "/connected-accounts",
-            headers={"X-ShengWen-User-Id": "user-a"},
+            headers={"X-XianWen-User-Id": "user-a"},
         )
         user_b_list = self.client.get(
             "/connected-accounts",
-            headers={"X-ShengWen-User-Id": "user-b"},
+            headers={"X-XianWen-User-Id": "user-b"},
         )
 
         self.assertEqual(user_a_list.status_code, 200)
@@ -71,19 +71,19 @@ class TestConnectedAccountsApi(unittest.TestCase):
 
         forbidden_delete = self.client.delete(
             f"/connected-accounts/{account['id']}",
-            headers={"X-ShengWen-User-Id": "user-b"},
+            headers={"X-XianWen-User-Id": "user-b"},
         )
         self.assertEqual(forbidden_delete.status_code, 404)
 
         delete_response = self.client.delete(
             f"/connected-accounts/{account['id']}",
-            headers={"X-ShengWen-User-Id": "user-a"},
+            headers={"X-XianWen-User-Id": "user-a"},
         )
         self.assertEqual(delete_response.status_code, 204)
         self.assertEqual(
             self.client.get(
                 "/connected-accounts",
-                headers={"X-ShengWen-User-Id": "user-a"},
+                headers={"X-XianWen-User-Id": "user-a"},
             ).json(),
             [],
         )
@@ -91,7 +91,7 @@ class TestConnectedAccountsApi(unittest.TestCase):
     def test_connected_account_update_by_id_can_change_domain_scope(self):
         create_response = self.client.put(
             "/connected-accounts/xiaoetong",
-            headers={"X-ShengWen-User-Id": "user-a"},
+            headers={"X-XianWen-User-Id": "user-a"},
             json={
                 "credential_type": "cookie_header",
                 "payload": {"cookie_header": "xiaoet_session=first-cookie"},
@@ -103,7 +103,7 @@ class TestConnectedAccountsApi(unittest.TestCase):
 
         update_response = self.client.put(
             "/connected-accounts/xiaoetong",
-            headers={"X-ShengWen-User-Id": "user-a"},
+            headers={"X-XianWen-User-Id": "user-a"},
             json={
                 "account_id": account["id"],
                 "credential_type": "cookie_header",
@@ -120,7 +120,7 @@ class TestConnectedAccountsApi(unittest.TestCase):
         self.assertEqual(updated["display_name"], "小鹅通新店铺")
         account_list = self.client.get(
             "/connected-accounts",
-            headers={"X-ShengWen-User-Id": "user-a"},
+            headers={"X-XianWen-User-Id": "user-a"},
         ).json()
         self.assertEqual(len(account_list), 1)
         self.assertEqual(account_list[0]["domain_scope"], "second.h5.xiaoeknow.com")
@@ -133,7 +133,7 @@ class TestConnectedAccountsApi(unittest.TestCase):
         ):
             response = self.client.post(
                 "/connected-accounts/bilibili/from-browser",
-                headers={"X-ShengWen-User-Id": "user-a"},
+                headers={"X-XianWen-User-Id": "user-a"},
                 json={},
             )
 
@@ -163,7 +163,7 @@ class TestConnectedAccountsApi(unittest.TestCase):
         ):
             response = self.client.post(
                 "/connected-accounts/xiaoetong/from-browser",
-                headers={"X-ShengWen-User-Id": "user-a"},
+                headers={"X-XianWen-User-Id": "user-a"},
                 json={
                     "source_url": (
                         "https://appexpqpqic7617.h5.xiaoeknow.com/p/course/video/v_abc"
@@ -188,7 +188,7 @@ class TestConnectedAccountsApi(unittest.TestCase):
     def test_xiaoetong_browser_import_requires_supported_host(self):
         response = self.client.post(
             "/connected-accounts/xiaoetong/from-browser",
-            headers={"X-ShengWen-User-Id": "user-a"},
+            headers={"X-XianWen-User-Id": "user-a"},
             json={"source_url": "https://example.com/video"},
         )
 
@@ -207,7 +207,7 @@ class TestConnectedAccountsApi(unittest.TestCase):
         ):
             response = self.client.post(
                 "/connected-accounts/homeway/from-browser",
-                headers={"X-ShengWen-User-Id": "user-a"},
+                headers={"X-XianWen-User-Id": "user-a"},
                 json={},
             )
 
@@ -236,7 +236,7 @@ class TestConnectedAccountsApi(unittest.TestCase):
 
         self.client.put(
             "/connected-accounts/bilibili",
-            headers={"X-ShengWen-User-Id": "user-a"},
+            headers={"X-XianWen-User-Id": "user-a"},
             json={
                 "credential_type": "sessdata_bundle",
                 "payload": {"SESSDATA": "stored-user-a-secret"},
@@ -249,7 +249,7 @@ class TestConnectedAccountsApi(unittest.TestCase):
         ):
             response = self.client.post(
                 "/tasks/",
-                headers={"X-ShengWen-User-Id": "user-a"},
+                headers={"X-XianWen-User-Id": "user-a"},
                 json={
                     "video_url": "https://www.bilibili.com/video/BV1234567890",
                     "quality": "best",
@@ -275,7 +275,7 @@ class TestConnectedAccountsApi(unittest.TestCase):
 
         self.client.put(
             "/connected-accounts/bilibili",
-            headers={"X-ShengWen-User-Id": "user-a"},
+            headers={"X-XianWen-User-Id": "user-a"},
             json={
                 "credential_type": "sessdata_bundle",
                 "payload": {"SESSDATA": "stored-user-a-secret"},
@@ -287,7 +287,7 @@ class TestConnectedAccountsApi(unittest.TestCase):
         ):
             response = self.client.post(
                 "/tasks/",
-                headers={"X-ShengWen-User-Id": "user-a"},
+                headers={"X-XianWen-User-Id": "user-a"},
                 json={
                     "video_url": "https://www.bilibili.com/video/BV1234567890",
                     "quality": "best",
@@ -313,7 +313,7 @@ class TestConnectedAccountsApi(unittest.TestCase):
 
         self.client.put(
             "/connected-accounts/xiaoetong",
-            headers={"X-ShengWen-User-Id": "user-a"},
+            headers={"X-XianWen-User-Id": "user-a"},
             json={
                 "credential_type": "cookie_header",
                 "payload": {"cookie_header": "xiaoet_session=user-a-cookie"},
@@ -327,7 +327,7 @@ class TestConnectedAccountsApi(unittest.TestCase):
         ):
             response = self.client.post(
                 "/tasks/",
-                headers={"X-ShengWen-User-Id": "user-a"},
+                headers={"X-XianWen-User-Id": "user-a"},
                 json={
                     "video_url": (
                         "https://appexpqpqic7617.h5.xiaoeknow.com/p/course/video/v_abc"
@@ -355,7 +355,7 @@ class TestConnectedAccountsApi(unittest.TestCase):
 
         self.client.put(
             "/connected-accounts/homeway",
-            headers={"X-ShengWen-User-Id": "user-a"},
+            headers={"X-XianWen-User-Id": "user-a"},
             json={
                 "credential_type": "web_qtstr",
                 "payload": {"web_qtstr": "homeway-user-a-token"},
@@ -368,7 +368,7 @@ class TestConnectedAccountsApi(unittest.TestCase):
         ):
             response = self.client.post(
                 "/tasks/",
-                headers={"X-ShengWen-User-Id": "user-a"},
+                headers={"X-XianWen-User-Id": "user-a"},
                 json={
                     "video_url": "https://tyds.homeway.com.cn/#/GraphicVideo?key=5269",
                     "quality": "best",

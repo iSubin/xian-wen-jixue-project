@@ -13,7 +13,7 @@ from Cryptodome.Util.Padding import pad
 path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 sys.path.insert(0, path)
 
-from src.main.python.sheng_wen.transcriber.settings_manager import (
+from src.main.python.xianwen.transcriber.settings_manager import (
     TranscriptionSettingsManager,
     _decrypt_macos_chrome_v10_cookie,
 )
@@ -79,7 +79,7 @@ class TestTranscriptionSettingsManager(unittest.TestCase):
     def test_update_device_without_worker_should_not_rebuild_transcriber(self):
         manager = TranscriptionSettingsManager(initial_device="cuda", model_size="tiny")
 
-        with patch("src.main.python.sheng_wen.transcriber.settings_manager.get_transcriber") as mocked_get_transcriber:
+        with patch("src.main.python.xianwen.transcriber.settings_manager.get_transcriber") as mocked_get_transcriber:
             settings = manager.update_settings(device="cpu")
 
         mocked_get_transcriber.assert_not_called()
@@ -93,7 +93,7 @@ class TestTranscriptionSettingsManager(unittest.TestCase):
 
         sentinel_transcriber = object()
         with patch(
-            "src.main.python.sheng_wen.transcriber.settings_manager.get_transcriber",
+            "src.main.python.xianwen.transcriber.settings_manager.get_transcriber",
             return_value=sentinel_transcriber,
         ) as mocked_get_transcriber:
             settings = manager.update_settings(device="cpu")
@@ -108,7 +108,7 @@ class TestTranscriptionSettingsManager(unittest.TestCase):
         worker = _DummyTranscriberWorker()
         manager.bind_transcriber_worker(worker)
 
-        with patch("src.main.python.sheng_wen.transcriber.settings_manager.get_transcriber") as mocked_get_transcriber:
+        with patch("src.main.python.xianwen.transcriber.settings_manager.get_transcriber") as mocked_get_transcriber:
             settings = manager.update_settings(device="cpu")
 
         mocked_get_transcriber.assert_not_called()

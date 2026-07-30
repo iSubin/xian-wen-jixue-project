@@ -1,7 +1,7 @@
-# 声文智汇（ShengWen）- Agent驱动的长视频总结工作流
+# 先闻继学（XianWen）｜采集、整理与持续学习的个人文库
 
 <p align="center">
-  <img src="docs/images/web-wide.png" alt="最终生成图片预览" width="900">
+  <img src="docs/images/web-wide.jpg" alt="先闻继学界面预览" width="900">
   <br>
 </p>
 
@@ -21,7 +21,7 @@
 > **AI总结工具只给你一个大纲，细节全丢了？**
 > **想要的是详实的笔记，而不是概略的摘要？**
 
-**声文智汇（ShengWen）** 就是为了解决这些问题而生的。
+**先闻继学（XianWen）** 就是为了解决这些问题而生的。
 
 ---
 
@@ -33,7 +33,7 @@
 - 📝 **现有的AI总结工具**只能生成"大纲式"的概略总结，细节全丢了
 - 🤖 **即使是长上下文模型**（如Gemini 2.5 Pro），面对超长视频也会"注意力涣散"
 
-于是我做了ShengWen，核心创新是**智能上下文技术**：
+于是我做了先闻继学：先把散落在外部世界的内容采回来，再通过持续整理与学习，让它们真正成为自己的知识。
 
 > 💡 **就像旧时代需要管理内存一样，AI时代需要管理AI上下文**
 
@@ -105,11 +105,6 @@
 **一键成图导出**：
 
 
-<p align="center">
-  <img src="docs/images/picture-worker.png" alt="最终生成图片预览" width="900">
-  <br>
-</p>
-
 - **成图工作台**：支持先预览再导出，避免反复试错
   - 可调输出宽度、页面比例（如 9:64 超长图）
   - 可配置元信息显示策略（如仅首图显示）
@@ -122,21 +117,33 @@
 - 每个总结都包含**原视频链接**和**UP主主页链接**
 - 方便回溯原始内容和原作者
 
-### **4. 多任务管理 🧾**
+### **4. 继学文库与目录组织 📚**
 
 - 进度条实时显示任务状态
 - 任务元数据、视频链接可追溯
 - 支持任务处理流水线（下载 → 转录 → 摘要）
-- **文件管理系统**：嵌套文件夹组织、拖拽移动、B站多P视频自动建文件夹
+- **树形文库**：完成转写或提炼的内容自动成为可阅读文档
+- **目录组织**：嵌套目录、拖拽移动、B站多P视频自动成册
+- **双工作区**：采集台负责带回材料，继学文库负责阅读与持续学习
+- **全文检索**：按题名、主题和整理正文筛选篇目
 
-### **5. Profile 配置系统 ⚙️**
+### **5. Git / Obsidian 文库交付 🌿**
+
+- 在设置页上传仓库专用 SSH Deploy Key 私钥
+- 按产品中的目录树生成 Markdown 与 Obsidian `[[WikiLink]]` 索引
+- 自动携带已提取的关键帧资源
+- 只管理先闻继学生成的文件，不碰仓库中的其它目录
+- 通过内容哈希识别 Obsidian 外部修改；遇到冲突保留用户版本，不静默覆盖
+- 支持测试连接、手动同步、同步结果和 commit SHA 回执
+
+### **6. Profile 配置系统 ⚙️**
 
 - 支持创建多个独立的 LLM 配置（Profile），每个配置有名称、供应商、模型等
 - 一键切换活跃配置，无需重新输入 API Key
 - 内置 OpenAI / DeepSeek / OpenRouter / Ollama 等供应商预设，自动填入默认值
 - 同一中转站可创建多个 Profile 分别对应不同模型
 
-### **6. 音视频与文章支持 🎬**
+### **7. 音视频与文章支持 🎬**
 
 - **Bilibili直链转换**：支持B站视频一键下载
 - **本地文件上传**：支持本地音频/视频文件
@@ -147,17 +154,12 @@
 - 视频：`.mp4`、`.avi`、`.mov`、`.mkv`、`.flv`、`.wmv`、`.webm`、`.m4v`
 - 音频：`.mp3`、`.wav`、`.flac`、`.aac`、`.ogg`、`.m4a`、`.wma`、`.opus`
 
-#### **6. CPU 友好 + GPU 加速 ⚡**
+#### **8. CPU 友好 + GPU 加速 ⚡**
 默认即开即用的 `CPU` 转录体验，同时提供可切换的 `CUDA` 加速路径：
 
 - **CPU 开箱可用**：默认 `tiny + CPU`，在 i7-12700 上实测约 `10x` 识别倍率（具体耗时与音频质量、模型大小有关）
 - **CUDA 智能诊断**：自动检测 `NVIDIA / PyTorch CUDA / CTranslate2` 状态；可用时启用 GPU 转录，不可用时给出原因与处理建议
 - **字幕优先，回退语音识别**：可开启”优先使用字幕”，未获取到字幕时自动回退到本地语音识别
-
-<p align="center">
-  <img src="docs/images/subtitle.png" alt="转录设置" width="600">
-  <br>
-</p>
 
 **如何启用CUDA加速**：
 
@@ -183,7 +185,7 @@
 - 相比起 CPU ，转录速度可提升 3-10 倍（取决于显卡性能）
 - 推荐显存：4GB以上（tiny/base模型），8GB以上（medium/large模型）
 
-#### **7. PC / 手机端Web阅读支持 📱**
+#### **9. PC / 手机端Web阅读支持 📱**
 宽屏/窄屏自适应布局，良好阅读体验
 
 
@@ -334,27 +336,27 @@ run一键启动.bat
 ```bash
 # Linux/macOS（若使用 deploy 脚本安装）
 source .venv/bin/activate
-python ShengWen-app.py
+python xianwen-app.py
 ```
 
 ```bash
 # Windows
-.\.venv\Scripts\python.exe ShengWen-app.py
+.\.venv\Scripts\python.exe xianwen-app.py
 ```
 请注意使用创建的虚拟环境中的 python 来启动，否则可能缺少依赖而报错
 
 ### 成功启动提示参考
 ```bash
 ========================================
-  声文智汇 (ShengWen) - 一键启动
+  先闻继学 (XianWen) - 一键启动
 ========================================
 
-使用 Python: D:\prj\SonicScribe\.venv\Scripts\python.exe
+使用 Python: D:\prj\xian-wen-project\.venv\Scripts\python.exe
 
-INFO  2026-03-13 10:13:01.248 Using SQLite database: ShengWen.db
+INFO  2026-03-13 10:13:01.248 Using configured database
 INFO  2026-03-13 10:13:03.422 --- [Startup] 未检测到代理环境，已自动接管本地代理端口 7890 ---
 INFO  2026-03-13 10:13:03.429 ╔════════════════════════════════════════════════════════════╗
-INFO  2026-03-13 10:13:03.429 ║  声文智汇 ShengWen v0.1.3                           ║
+INFO  2026-03-13 10:13:03.429 ║  先闻继学 XianWen v0.1.3                       ║
 INFO  2026-03-13 10:13:03.429 ╚════════════════════════════════════════════════════════════╝
 INFO:     Started server process [22792]
 INFO:     Waiting for application startup.
@@ -379,9 +381,9 @@ INFO:     connection open
 
 ## ⚙️ 配置系统
 
-ShengWen 当前版本以 **前端设置面板** 作为主要配置入口，同时保留 JSON 文件供手动维护：
+XianWen 当前版本以 **前端设置面板** 作为主要配置入口，同时保留 JSON 文件供手动维护：
 
-- 推荐入口：前端设置面板（`LLM` / `转录设置`）
+- 推荐入口：前端设置面板（`LLM` / `转录设置` / `Agent 设置` / `Git 文库`）
 - 配置文件：`config/settings.json`
 - 如需手动维护，可先从 `config/settings.example.json` 复制一份
 
@@ -437,7 +439,7 @@ ShengWen 当前版本以 **前端设置面板** 作为主要配置入口，同�
 推荐流程：
 
 1. 先在本机浏览器登录目标站点。
-2. 打开 ShengWen 的「转录设置」-「采集账号」。
+2. 打开 XianWen 的「转录设置」-「采集账号」。
 3. 对应站点点击「从浏览器获取」。
 4. 小鹅通需要先粘贴视频链接或店铺域名，用来定位具体店铺 Cookie。
 
@@ -449,21 +451,32 @@ ShengWen 当前版本以 **前端设置面板** 作为主要配置入口，同�
 
 详细设计、接口、数据表、安全边界和后续阶段见：[用户级采集账号设计](docs/architecture/用户级采集账号设计.md)。
 
-### PostgreSQL 开发实例
+### PostgreSQL 产品实例
 
-默认仍可使用 SQLite。本地验证用户级采集账号持久化时，可以启动 PostgreSQL：
-
-```bash
-docker compose -f docker-compose.postgres.yml up -d postgres
-```
-
-并通过环境变量指定数据库：
+SQLite 仍可作为轻量兼容模式。持续使用、凭据保存和 Git 文库场景推荐 PostgreSQL：
 
 ```bash
-export SHENGWEN_DATABASE_URL='postgresql+psycopg://shengwen:shengwen_dev_password@127.0.0.1:54329/shengwen'
+docker compose -f docker-compose.postgres.yml up -d --wait postgres
 ```
 
-也可以写入 `config/settings.json` 的 `database.url`。
+首次切换时，把原 SQLite 数据幂等迁移到 PostgreSQL：
+
+```bash
+XIANWEN_DATABASE_URL='postgresql+psycopg://xianwen:<password>@127.0.0.1:54329/xianwen' \
+  .venv/bin/python tools/migrate_sqlite_to_postgres.py --sqlite xianwen.db
+```
+
+然后在本机 `config/settings.json` 的 `database.url` 中写入同一连接地址。配置了 PostgreSQL 后，如果数据库不可用，应用会停止启动，不会静默回退到另一份数据源。
+
+### Git 文库与 Deploy Key
+
+1. 在 GitHub / GitLab 仓库中创建或添加一个允许写入的 Deploy Key。
+2. 打开先闻继学「设置 → Git 文库」，填写 SSH 仓库地址、分支和文库目录。
+3. 上传与公钥配对的无口令 SSH 私钥；私钥会使用本机生成的独立密钥加密保存。
+4. 测试连接后点击「同步整座文库」。
+5. 在 Obsidian 中 clone 或 pull 该仓库，即可继续阅读和编辑。
+
+同步器通过 `.xianwen-manifest.json` 追踪自己生成的文件。若文件已在 Obsidian 中修改，本次同步会报告冲突并保留外部版本。
 
 
 ---
@@ -473,7 +486,7 @@ export SHENGWEN_DATABASE_URL='postgresql+psycopg://shengwen:shengwen_dev_passwor
 
 ### Q1. 怎么用转录模型？
 
-首次启动时，转录模型会自动联网下载；网络不通时任务可能无法正常开始。也可先准备好本地模型，再让 ShengWen 直接读取本地文件夹。
+首次启动时，转录模型会自动联网下载；网络不通时任务可能无法正常开始。也可先准备好本地模型，再让 XianWen 直接读取本地文件夹。
 
 | 模型档位 | 速度/资源占用 | 质量与适用场景 | 官方下载页 |
 | :--- | :--- | :--- | :--- |
@@ -523,11 +536,11 @@ export SHENGWEN_DATABASE_URL='postgresql+psycopg://shengwen:shengwen_dev_passwor
 
 #### **一些大语言 AI 模型效果测试**
 
-| 大语言 AI 模型 | 总结风格（实测） |  总结效果示例<br>（总结至 [@林亦LYi](https://space.bilibili.com/4401694/?spm_id_from=333.788.upinfo.detail.click) 的 [一个视频搞懂OpenClaw！](https://www.bilibili.com/video/BV1jEAaz3E6K)） |
-| :--- | :--- | :--- | 
-| **Gemini 2.5/3.0 Pro** | 上下文能力较好 + 带思考，原文细节较为丰富（个人最习惯用） | [点击查看示例图](docs/images/llm-gemini-25pro-summary-20260301-1214.png) |
-| **DeepSeek V3.2** | 输出迅速，性价比高，长上下文适合该项目 | [点击查看示例图](docs/images/llm-deepseek-v32-summary-20260301-1223.png) |
-| **GPT 4.1 / 5.x** | 细节丰富，有专业感 | [点击查看示例图](docs/images/llm-gpt52-summary-20260301-1213.png) |
+| 大语言 AI 模型 | 总结风格（实测） |
+| :--- | :--- |
+| **Gemini 2.5/3.0 Pro** | 上下文能力较好 + 带思考，原文细节较为丰富（个人最习惯用） |
+| **DeepSeek V3.2** | 输出迅速，性价比高，长上下文适合该项目 |
+| **GPT 4.1 / 5.x** | 细节丰富，有专业感 |
 - 不同的模型会对最终总结文章的**风味造成影响**。
 - 可尝试用同一视频分别交给不同 AI 模型总结后横向对比，选择最符合自己口味的模型。
 - **模型风味测试实操**：
@@ -565,7 +578,7 @@ export SHENGWEN_DATABASE_URL='postgresql+psycopg://shengwen:shengwen_dev_passwor
 - [ ] 增加agent模式下流水线处理（一遍转录一遍总结）
 - [ ] 批量任务处理（批量链接、批量本地文件、带分 P 视频链接处理一键批量任务、批量导出总结文本等）
 - [x] ~~更好的设置界面引导（Profile 配置系统、供应商预设自动填入）~~（2026-05-04已实现）
-- [ ] 研究如何结合 AI 视觉能力，让总结中包含视频画面信息（如果研究出来了，我是不是可以把这个项目的名字从“**声文智汇**”改成“**声文视汇**”……？🤔）
+- [ ] 增强 AI 视觉能力，让总结中包含更多视频画面信息
 
 ---
 ## 💓 其它信息
@@ -602,10 +615,10 @@ export SHENGWEN_DATABASE_URL='postgresql+psycopg://shengwen:shengwen_dev_passwor
 ---
 **最后，如果觉得这个项目有用，请点个 ⭐️Star，大家的反馈是我持续改进的动力🥰~**
 
-[⬆ 回到顶部](#️-声文智汇---ShengWen)
+[⬆ 回到顶部](#先闻继学xianwen采集整理与持续学习的个人文库)
 
-Made ❤️ by **[smileFAace](https://linux.do/u/smileface/summary)**
+**先闻继学（XianWen）开源项目**
 
-联系我: [smileFAace@outlook.com](mailto:smileFAace@outlook.com)
+问题与建议请提交到 [GitHub Issues](https://github.com/iSubin/xianwen/issues)。
 
 </div>

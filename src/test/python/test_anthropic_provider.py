@@ -6,10 +6,10 @@ import unittest
 path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 sys.path.insert(0, path)
 
-from src.main.python.sheng_wen.config.settings import _BUILTIN_PROVIDER_DEFAULTS
-from src.main.python.sheng_wen.llm.llm import LLMConfig
-from src.main.python.sheng_wen.llm.litellm_client import LiteLLMClient
-from src.main.python.sheng_wen.llm.provider_manager import LLMProviderManager
+from src.main.python.xianwen.config.settings import _BUILTIN_PROVIDER_DEFAULTS
+from src.main.python.xianwen.llm.llm import LLMConfig
+from src.main.python.xianwen.llm.litellm_client import LiteLLMClient
+from src.main.python.xianwen.llm.provider_manager import LLMProviderManager
 
 
 class TestAnthropicProvider(unittest.TestCase):

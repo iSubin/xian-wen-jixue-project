@@ -5,7 +5,7 @@
     "enable_progress_test": false,
     "enable_mdns": false,
     "frontend_dist_dir": "frontend/dist",
-    "prompt_file": "src/main/python/sheng_wen/prompt.md"
+    "prompt_file": "src/main/python/xianwen/prompt.md"
   },
   "whisper": {
     "model_source": "auto_download",
@@ -32,7 +32,7 @@
     ]
   },
   "database": {
-    "sqlite_path": "ShengWen.db",
+    "sqlite_path": "xianwen.db",
     "json_file_path": "tasks.json",
     "url": ""
   },
@@ -55,7 +55,7 @@
     "llm_call_retry_max": 3,
     "llm_call_timeout_sec": 120,
     "fallback_to_standard_on_agent_error": true,
-    "chunk_prompt_file": "src/main/python/sheng_wen/prompt_for_chunk.md",
+    "chunk_prompt_file": "src/main/python/xianwen/prompt_for_chunk.md",
     "max_agent_value_chars": 500,
     "chunk_debug_dump_enabled": false,
     "chunk_debug_dump_dir": "temp/chunk_debug",

@@ -31,8 +31,8 @@ export const MARKDOWN_THEMES: Record<string, MarkdownTheme> = {
   default: {
     id: 'default',
     name: '默认风格',
-    description: 'ShengWen 原始设计，简洁大方',
-    author: 'ShengWen',
+    description: 'XianWen 原始设计，简洁大方',
+    author: 'XianWen',
     cssVariables: {
       // 基础设置
       '--md-base-font-size': '1rem',
@@ -133,7 +133,7 @@ export const MARKDOWN_THEMES: Record<string, MarkdownTheme> = {
     id: 'typographic',
     name: '排版风格',
     description: '注重阅读体验，类似 Medium，适合长文阅读',
-    author: 'ShengWen',
+    author: 'XianWen',
     cssVariables: {
       '--md-base-font-size': '18px',
       '--md-base-line-height': '1.8',
@@ -180,7 +180,7 @@ export const MARKDOWN_THEMES: Record<string, MarkdownTheme> = {
     id: 'minimal',
     name: '极简风格',
     description: '黑白灰配色，专注内容，去除干扰',
-    author: 'ShengWen',
+    author: 'XianWen',
     cssVariables: {
       '--md-base-font-size': '1rem',
       '--md-base-line-height': '1.6',
@@ -227,7 +227,7 @@ export const MARKDOWN_THEMES: Record<string, MarkdownTheme> = {
     id: 'warm',
     name: '暖色调',
     description: '温暖舒适的配色，适合生活类、情感类内容',
-    author: 'ShengWen',
+    author: 'XianWen',
     cssVariables: {
       '--md-base-font-size': '1rem',
       '--md-base-line-height': '1.7',

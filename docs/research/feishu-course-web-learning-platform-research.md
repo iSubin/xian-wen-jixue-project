@@ -2,7 +2,7 @@
 
 日期：2026-07-18
 
-本文单独记录“采集 Claude Code 培训文档，保存到飞书，并进一步做成 Web 学习平台”的方案。该方向是一个新产品，不应与 ShengWen 主仓库混合开发。
+本文单独记录“采集 Claude Code 培训文档，保存到飞书，并进一步做成 Web 学习平台”的方案。该方向是一个新产品，不应与 XianWen 主仓库混合开发。
 
 ---
 
@@ -59,10 +59,10 @@ Generated at: 2026-07-16T00:35:10
 
 这件事值得作为新产品独立做。
 
-它不是 ShengWen 的一个功能，而是另一个产品：
+它不是 XianWen 的一个功能，而是另一个产品：
 
 ```text
-ShengWen：负责采集、转录、总结、知识文档生成。
+XianWen：负责采集、转录、总结、知识文档生成。
 学习平台：负责内容组织、课程阅读、搜索、学习进度和知识 Agent。
 ```
 
@@ -189,9 +189,9 @@ LearnHouse 这类完整 LMS 可以作为远期参考，但不适合作为第一�
 
 如果未来明确只做公开文档站，静态站足够；但当前目标已经更接近学习产品。
 
-### 4.3 不建议把学习平台放进 ShengWen
+### 4.3 不建议把学习平台放进 XianWen
 
-ShengWen 已经承担采集、下载、转录、总结、站点凭据、任务队列等复杂职责。继续放学习平台会让代码边界变混乱。
+XianWen 已经承担采集、下载、转录、总结、站点凭据、任务队列等复杂职责。继续放学习平台会让代码边界变混乱。
 
 推荐新建独立项目：
 
@@ -430,6 +430,6 @@ course-learning-platform/
 
 ```text
 请阅读 /Users/subin/Documents/Claude-Project/xian-wen-project/docs/research/feishu-course-web-learning-platform-research.md。
-我要新建一个独立的中文学习平台产品，不与 ShengWen 混合。
+我要新建一个独立的中文学习平台产品，不与 XianWen 混合。
 请先做项目初始化方案和第一版目录结构，技术底座按 Next.js + Fumadocs + TypeScript + Tailwind 处理，后续再接 PostgreSQL、Meilisearch 和飞书同步。
 ```

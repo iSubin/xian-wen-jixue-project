@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a dedicated single-article WeChat public-account capture flow that turns one `mp.weixin.qq.com` URL into a normal ShengWen learning-note task.
+**Goal:** Add a dedicated single-article WeChat public-account capture flow that turns one `mp.weixin.qq.com` URL into a normal XianWen learning-note task.
 
 **Architecture:** Internalize the reusable logic from the local `wechat-article-export` skill as a focused backend adapter. Create article tasks through a dedicated `/articles/wechat` endpoint, store captured Markdown in the existing `transcript` field, and enqueue the current LLM worker directly for summarization. Add a separate frontend entry and modal while keeping existing video submission stable.
 
@@ -15,9 +15,9 @@
 Backend:
 
 - Modify `requirements.txt`: add `requests`, `beautifulsoup4`, `lxml`, `markdownify`.
-- Modify `src/main/python/sheng_wen/db.py`: add `source_type`, `source_url`, and `source_meta` to task persistence, schema migration, and JSON fallback.
-- Create `src/main/python/sheng_wen/wechat_article.py`: WeChat article adapter, metadata extraction, Markdown conversion, image handling.
-- Modify `src/main/python/sheng_wen/api.py`: add request model, response fields, `/articles/wechat` endpoint, and LLM enqueue helper.
+- Modify `src/main/python/xianwen/db.py`: add `source_type`, `source_url`, and `source_meta` to task persistence, schema migration, and JSON fallback.
+- Create `src/main/python/xianwen/wechat_article.py`: WeChat article adapter, metadata extraction, Markdown conversion, image handling.
+- Modify `src/main/python/xianwen/api.py`: add request model, response fields, `/articles/wechat` endpoint, and LLM enqueue helper.
 - Test with `tests/test_wechat_article.py`: adapter and persistence tests.
 
 Frontend:
@@ -41,7 +41,7 @@ Docs:
 **Files:**
 
 - Modify: `requirements.txt`
-- Modify: `src/main/python/sheng_wen/db.py`
+- Modify: `src/main/python/xianwen/db.py`
 - Test: `tests/test_wechat_article.py`
 
 - [ ] **Step 1: Write failing persistence tests**
@@ -59,7 +59,7 @@ import unittest
 PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(PROJECT_ROOT, "src", "main", "python"))
 
-from sheng_wen.db import TaskDB, TaskStatus
+from xianwen.db import TaskDB, TaskStatus
 
 
 class TaskSourceFieldsPersistenceTest(unittest.TestCase):
@@ -142,7 +142,7 @@ markdownify>=0.11.6
 
 - [ ] **Step 4: Add task source columns and schema migration**
 
-In `src/main/python/sheng_wen/db.py`, update `TaskModel`:
+In `src/main/python/xianwen/db.py`, update `TaskModel`:
 
 ```python
     source_type = Column(String, nullable=False, default="video")
@@ -219,7 +219,7 @@ Expected: both tests pass.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add requirements.txt src/main/python/sheng_wen/db.py tests/test_wechat_article.py
+git add requirements.txt src/main/python/xianwen/db.py tests/test_wechat_article.py
 git commit -m "feat: add task source metadata"
 ```
 
@@ -229,7 +229,7 @@ git commit -m "feat: add task source metadata"
 
 **Files:**
 
-- Create: `src/main/python/sheng_wen/wechat_article.py`
+- Create: `src/main/python/xianwen/wechat_article.py`
 - Modify: `tests/test_wechat_article.py`
 
 - [ ] **Step 1: Add adapter tests**
@@ -237,7 +237,7 @@ git commit -m "feat: add task source metadata"
 Append these tests to `tests/test_wechat_article.py`:
 
 ```python
-from sheng_wen.wechat_article import (
+from xianwen.wechat_article import (
     WechatArticleCaptureError,
     capture_wechat_article_from_html,
     is_wechat_article_url,
@@ -302,11 +302,11 @@ Run:
 .venv/bin/python -m unittest tests.test_wechat_article -v
 ```
 
-Expected: import fails because `sheng_wen.wechat_article` does not exist.
+Expected: import fails because `xianwen.wechat_article` does not exist.
 
 - [ ] **Step 3: Implement adapter module**
 
-Create `src/main/python/sheng_wen/wechat_article.py`:
+Create `src/main/python/xianwen/wechat_article.py`:
 
 ```python
 from __future__ import annotations
@@ -502,7 +502,7 @@ Expected: all tests pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/python/sheng_wen/wechat_article.py tests/test_wechat_article.py
+git add src/main/python/xianwen/wechat_article.py tests/test_wechat_article.py
 git commit -m "feat: add wechat article adapter"
 ```
 
@@ -512,7 +512,7 @@ git commit -m "feat: add wechat article adapter"
 
 **Files:**
 
-- Modify: `src/main/python/sheng_wen/api.py`
+- Modify: `src/main/python/xianwen/api.py`
 - Modify: `tests/test_wechat_article.py`
 
 - [ ] **Step 1: Add API helper tests**
@@ -522,8 +522,8 @@ Append these tests to `tests/test_wechat_article.py`:
 ```python
 class WechatArticleTaskPayloadTest(unittest.TestCase):
     def test_article_task_payload_contains_source_metadata(self):
-        from sheng_wen.api import _build_wechat_article_task_data
-        from sheng_wen.wechat_article import CapturedArticle
+        from xianwen.api import _build_wechat_article_task_data
+        from xianwen.wechat_article import CapturedArticle
 
         article = CapturedArticle(
             source_type="wechat_article",
@@ -564,7 +564,7 @@ Expected: fails because `_build_wechat_article_task_data` is missing.
 
 - [ ] **Step 3: Add API models**
 
-In `src/main/python/sheng_wen/api.py`, add these Pydantic models near existing task models:
+In `src/main/python/xianwen/api.py`, add these Pydantic models near existing task models:
 
 ```python
 class WechatArticleCreate(BaseModel):
@@ -583,7 +583,7 @@ Extend the `Task` response model:
 
 - [ ] **Step 4: Add task builder and endpoint**
 
-In `src/main/python/sheng_wen/api.py`, add this helper before route definitions:
+In `src/main/python/xianwen/api.py`, add this helper before route definitions:
 
 ```python
 def _build_wechat_article_task_data(task_id: str, article, folder_id: str | None, summary_mode: str) -> dict:
@@ -671,7 +671,7 @@ Expected: all tests pass.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/main/python/sheng_wen/api.py tests/test_wechat_article.py
+git add src/main/python/xianwen/api.py tests/test_wechat_article.py
 git commit -m "feat: add wechat article capture API"
 ```
 
@@ -1095,7 +1095,7 @@ Expected: all tests pass; Vite chunk-size warnings are acceptable.
 Start the app:
 
 ```bash
-.venv/bin/python ShengWen-app.py
+.venv/bin/python xianwen-app.py
 ```
 
 Open:

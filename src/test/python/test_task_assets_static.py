@@ -6,7 +6,7 @@ import unittest
 path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 sys.path.insert(0, path)
 
-from src.main.python.sheng_wen.api import app
+from src.main.python.xianwen.api import app
 
 
 class TestTaskAssetsStaticMount(unittest.TestCase):

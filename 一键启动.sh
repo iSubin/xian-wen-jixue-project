@@ -72,7 +72,7 @@ ensure_proxy_env() {
 }
 
 echo "=========================================="
-echo "  声文智汇 (ShengWen) - 一键启动"
+echo "  先闻继学 (XianWen) - 一键启动"
 echo "=========================================="
 echo
 
@@ -98,4 +98,4 @@ if [[ ! -d "frontend/dist" ]]; then
   exit 1
 fi
 
-exec "$PYTHON_CMD" ShengWen-app.py
+exec "$PYTHON_CMD" xianwen-app.py

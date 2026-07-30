@@ -334,3 +334,41 @@ export interface FolderTreeNode extends Folder {
 }
 
 export type FolderNode = FolderTreeNode
+
+export interface GitSettings {
+  configured: boolean;
+  repository_url: string;
+  branch: string;
+  root_path: string;
+  author_name: string;
+  author_email: string;
+  include_transcript: boolean;
+  has_private_key: boolean;
+  public_key: string;
+  status: 'not_configured' | 'connected' | 'error' | string;
+  last_verified_at?: string | null;
+  last_used_at?: string | null;
+  last_error?: string | null;
+}
+
+export interface GitSettingsUpdate {
+  repository_url: string;
+  branch: string;
+  root_path: string;
+  author_name: string;
+  author_email: string;
+  include_transcript: boolean;
+  private_key?: string;
+}
+
+export interface GitSyncResult {
+  success: boolean;
+  document_count: number;
+  committed: boolean;
+  commit_sha: string;
+  created: number;
+  updated: number;
+  adopted: number;
+  removed: number;
+  conflicts: string[];
+}

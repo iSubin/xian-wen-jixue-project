@@ -25,8 +25,12 @@ import type {
   LLMSettings,
   SummarizationSettings,
   TranscriptionSettings,
+  GitSettings,
+  GitSettingsUpdate,
+  GitSyncResult,
 } from '../types'
 import ConnectedAccountsSettings from './ConnectedAccountsSettings.vue'
+import GitSyncSettings from './GitSyncSettings.vue'
 
 const props = defineProps<{
   isOpen: boolean
@@ -48,6 +52,13 @@ const props = defineProps<{
   summarizationSettings: SummarizationSettings | null
   isUpdatingSummarizationSettings: boolean
   isReadingBilibiliCookieFromBrowser: boolean
+  gitSettings: GitSettings | null
+  gitSyncResult: GitSyncResult | null
+  gitError: string
+  isLoadingGitSettings: boolean
+  isSavingGitSettings: boolean
+  isTestingGit: boolean
+  isSyncingGit: boolean
 }>()
 
 const emit = defineEmits<{
@@ -97,9 +108,13 @@ const emit = defineEmits<{
     max_agent_value_chars?: number
     fallback_to_standard_on_agent_error?: boolean
   }]
+  saveGitSettings: [payload: GitSettingsUpdate]
+  testGit: []
+  syncGit: []
+  deleteGitSettings: []
 }>()
 
-const settingsTab = ref<'llm' | 'transcription' | 'summarization'>('llm')
+const settingsTab = ref<'llm' | 'transcription' | 'summarization' | 'git'>('llm')
 
 // LLM Profile form — bound to profileFormState prop
 const llmProfileName = computed({
@@ -375,6 +390,19 @@ const handleSaveSummarizationSettings = () => {
               <PhGitBranch :size="18" :weight="settingsTab === 'summarization' ? 'fill' : 'regular'" />
               <span>Agent 设置</span>
             </button>
+
+            <button
+              @click="settingsTab = 'git'"
+              :class="[
+                'flex items-center gap-2 md:gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap',
+                settingsTab === 'git'
+                  ? 'bg-[#f5eee2] text-[#9f4938] shadow-sm'
+                  : 'text-slate-600 hover:bg-white/50 hover:text-slate-800'
+              ]"
+            >
+              <PhGitBranch :size="18" :weight="settingsTab === 'git' ? 'fill' : 'regular'" />
+              <span>Git 文库</span>
+            </button>
           </nav>
         </div>
 
@@ -383,7 +411,15 @@ const handleSaveSummarizationSettings = () => {
           <!-- 头部栏 (仅桌面端) -->
           <div class="hidden md:flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white">
             <h2 class="text-lg font-semibold text-slate-800">
-              {{ settingsTab === 'llm' ? 'LLM 配置' : settingsTab === 'transcription' ? '转录设置' : 'Agent 设置' }}
+              {{
+                settingsTab === 'llm'
+                  ? 'LLM 配置'
+                  : settingsTab === 'transcription'
+                    ? '转录设置'
+                    : settingsTab === 'summarization'
+                      ? 'Agent 设置'
+                      : 'Git 文库'
+              }}
             </h2>
             <button
               @click="emit('close')"
@@ -983,6 +1019,21 @@ const handleSaveSummarizationSettings = () => {
               <span>{{ isUpdatingSummarizationSettings ? '保存中...' : '保存设置' }}</span>
             </button>
           </div>
+
+          <GitSyncSettings
+            v-if="settingsTab === 'git'"
+            :settings="gitSettings"
+            :result="gitSyncResult"
+            :error="gitError"
+            :isLoading="isLoadingGitSettings"
+            :isSaving="isSavingGitSettings"
+            :isTesting="isTestingGit"
+            :isSyncing="isSyncingGit"
+            @save="emit('saveGitSettings', $event)"
+            @test="emit('testGit')"
+            @sync="emit('syncGit')"
+            @remove="emit('deleteGitSettings')"
+          />
           </div>
         </div>
       </div>

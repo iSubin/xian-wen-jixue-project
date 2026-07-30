@@ -323,7 +323,7 @@ install_frontend_deps() {
 }
 
 echo "=========================================="
-echo "  ShengWen 一键部署脚本 (Linux/macOS)"
+echo "  XianWen 一键部署脚本 (Linux/macOS)"
 echo "=========================================="
 echo
 
@@ -403,7 +403,7 @@ echo "✅ 部署完成！"
 echo "=========================================="
 echo
 echo "下一步操作："
-echo "1. 启动服务: chmod +x ./run一键启动.sh && ./run一键启动.sh  或者  source ${VENV_DIR}/bin/activate && python ShengWen-app.py"
+echo "1. 启动服务: chmod +x ./run一键启动.sh && ./run一键启动.sh  或者  source ${VENV_DIR}/bin/activate && python xianwen-app.py"
 echo "2. 打开浏览器访问: http://localhost:8000/"
 echo "3. 在前端设置面板中填写 LLM 与转录参数"
 echo

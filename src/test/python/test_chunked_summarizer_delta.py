@@ -10,8 +10,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 sys.path.insert(0, path)
 
-from src.main.python.sheng_wen.llm.llm import LLMError
-from src.main.python.sheng_wen.summarization.chunked_summarizer import ChunkedSummarizer
+from src.main.python.xianwen.llm.llm import LLMError
+from src.main.python.xianwen.summarization.chunked_summarizer import ChunkedSummarizer
 
 
 def _make_summarizer():

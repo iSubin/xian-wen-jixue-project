@@ -9,9 +9,9 @@ from unittest.mock import patch
 path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 sys.path.insert(0, path)
 
-from src.main.python.sheng_wen.downloader.homeway_resolver import HomewayResolvedVideo
-from src.main.python.sheng_wen.downloader.xiaoet_resolver import XiaoetResolvedVideo
-from src.main.python.sheng_wen.downloader.video_downloader_worker import VideoDownloaderWorker
+from src.main.python.xianwen.downloader.homeway_resolver import HomewayResolvedVideo
+from src.main.python.xianwen.downloader.xiaoet_resolver import XiaoetResolvedVideo
+from src.main.python.xianwen.downloader.video_downloader_worker import VideoDownloaderWorker
 
 
 class TestVideoDownloaderFrameQuality(unittest.TestCase):
@@ -31,7 +31,7 @@ class TestVideoDownloaderFrameQuality(unittest.TestCase):
     def test_ydl_opts_include_bilibili_cookiefile_when_available(self):
         worker = VideoDownloaderWorker(name="test-downloader")
 
-        fd, cookie_path = tempfile.mkstemp(prefix="shengwen-test-", suffix=".cookies.txt")
+        fd, cookie_path = tempfile.mkstemp(prefix="xianwen-test-", suffix=".cookies.txt")
         os.close(fd)
         try:
             opts = worker._build_ydl_opts(
@@ -116,7 +116,7 @@ class TestVideoDownloaderFrameQuality(unittest.TestCase):
                 return "/tmp/video.mp4"
 
         with patch(
-            "src.main.python.sheng_wen.downloader.video_downloader_worker.yt_dlp.YoutubeDL",
+            "src.main.python.xianwen.downloader.video_downloader_worker.yt_dlp.YoutubeDL",
             FakeYDL,
         ):
             worker.process_task(
@@ -156,7 +156,7 @@ class TestVideoDownloaderFrameQuality(unittest.TestCase):
                 return "/tmp/homeway.mp4"
 
         with patch(
-            "src.main.python.sheng_wen.downloader.video_downloader_worker.resolve_homeway_graphic_video",
+            "src.main.python.xianwen.downloader.video_downloader_worker.resolve_homeway_graphic_video",
             return_value=HomewayResolvedVideo(
                 media_url="https://cdn.example.com/video.m3u8?token=media-token",
                 title="投研大师视频",
@@ -164,7 +164,7 @@ class TestVideoDownloaderFrameQuality(unittest.TestCase):
                 vhall_id="260368304",
             ),
         ), patch(
-            "src.main.python.sheng_wen.downloader.video_downloader_worker.yt_dlp.YoutubeDL",
+            "src.main.python.xianwen.downloader.video_downloader_worker.yt_dlp.YoutubeDL",
             FakeYDL,
         ):
             worker.process_task(
@@ -212,10 +212,10 @@ class TestVideoDownloaderFrameQuality(unittest.TestCase):
             )
 
         with patch(
-            "src.main.python.sheng_wen.downloader.video_downloader_worker.resolve_homeway_graphic_video",
+            "src.main.python.xianwen.downloader.video_downloader_worker.resolve_homeway_graphic_video",
             fake_resolve,
         ), patch(
-            "src.main.python.sheng_wen.downloader.video_downloader_worker.yt_dlp.YoutubeDL",
+            "src.main.python.xianwen.downloader.video_downloader_worker.yt_dlp.YoutubeDL",
             FakeYDL,
         ):
             worker.process_task(
@@ -253,7 +253,7 @@ class TestVideoDownloaderFrameQuality(unittest.TestCase):
                 return "/tmp/xiaoet.mp4"
 
         with patch(
-            "src.main.python.sheng_wen.downloader.video_downloader_worker.resolve_xiaoet_video",
+            "src.main.python.xianwen.downloader.video_downloader_worker.resolve_xiaoet_video",
             return_value=XiaoetResolvedVideo(
                 media_url="https://vod.example.com/video.m3u8?sign=s&t=t&us=u",
                 title="小鹅通视频",
@@ -263,7 +263,7 @@ class TestVideoDownloaderFrameQuality(unittest.TestCase):
                 quality="1080p_hls",
             ),
         ), patch(
-            "src.main.python.sheng_wen.downloader.video_downloader_worker.yt_dlp.YoutubeDL",
+            "src.main.python.xianwen.downloader.video_downloader_worker.yt_dlp.YoutubeDL",
             FakeYDL,
         ):
             worker.process_task(
@@ -313,10 +313,10 @@ class TestVideoDownloaderFrameQuality(unittest.TestCase):
             )
 
         with patch(
-            "src.main.python.sheng_wen.downloader.video_downloader_worker.resolve_xiaoet_video",
+            "src.main.python.xianwen.downloader.video_downloader_worker.resolve_xiaoet_video",
             fake_resolve,
         ), patch(
-            "src.main.python.sheng_wen.downloader.video_downloader_worker.yt_dlp.YoutubeDL",
+            "src.main.python.xianwen.downloader.video_downloader_worker.yt_dlp.YoutubeDL",
             FakeYDL,
         ):
             worker.process_task(
@@ -363,7 +363,7 @@ class TestVideoDownloaderFrameQuality(unittest.TestCase):
                 return "/tmp/xiaoet.mp4"
 
         with patch(
-            "src.main.python.sheng_wen.downloader.video_downloader_worker.resolve_xiaoet_video",
+            "src.main.python.xianwen.downloader.video_downloader_worker.resolve_xiaoet_video",
             return_value=XiaoetResolvedVideo(
                 media_url="https://vod.example.com/video.m3u8?sign=s&t=t&us=u",
                 title="第15课.mp4",
@@ -373,10 +373,10 @@ class TestVideoDownloaderFrameQuality(unittest.TestCase):
                 quality="720p_hls",
             ),
         ), patch(
-            "src.main.python.sheng_wen.downloader.video_downloader_worker.yt_dlp.YoutubeDL",
+            "src.main.python.xianwen.downloader.video_downloader_worker.yt_dlp.YoutubeDL",
             FakeYDL,
         ), patch(
-            "src.main.python.sheng_wen.task_updater.update_and_notify",
+            "src.main.python.xianwen.task_updater.update_and_notify",
             fake_update_and_notify,
         ):
             worker.process_task(

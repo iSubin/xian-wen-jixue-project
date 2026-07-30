@@ -28,6 +28,7 @@ venv
 .env
 .env.local
 config/settings.json
+config/.credential_secret
 scripts/fetch_subtitle/.bilibili_cookie.env
 .claude/settings.local
 

@@ -7,7 +7,7 @@ import unittest
 path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 sys.path.insert(0, path)
 
-from src.main.python.sheng_wen.frame_enricher import (
+from src.main.python.xianwen.frame_enricher import (
     enrich_summary_with_video_frames,
     select_frame_candidates,
     select_transcript_frame_candidates,

@@ -1,16 +1,16 @@
-# 先闻文档中心
+# 先闻继学文档中心
 
-本目录保存先闻的正式产品、架构、使用、研究和交接文档。临时产物、运行缓存和用户内容不应放入此目录。
+本目录保存先闻继学的正式产品、架构、使用、研究和交接文档。临时产物、运行缓存和用户内容不应放入此目录。
 
 ## 文档导航
 
 ### 品牌
 
-- [先闻品牌与命名规范](brand/先闻品牌与命名规范.md)
+- [先闻继学品牌与命名规范](brand/先闻继学品牌与命名规范.md)
 
 ### 架构
 
-- [统一知识采集与内容分发架构](architecture/shengwen-content-ingestion-architecture.md)
+- [统一知识采集与内容分发架构](architecture/xianwen-content-ingestion-architecture.md)
 - [用户级采集账号设计](architecture/用户级采集账号设计.md)
 
 ### 使用指南
@@ -28,7 +28,7 @@
 
 ### 交接
 
-- [开发主线交接文档](handoff/shengwen-session-handoff.md)
+- [开发主线交接文档](handoff/xianwen-session-handoff.md)
 
 ### 历史设计记录
 

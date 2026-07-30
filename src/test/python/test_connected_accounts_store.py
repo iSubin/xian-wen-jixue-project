@@ -7,7 +7,7 @@ import unittest
 path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 sys.path.insert(0, path)
 
-from src.main.python.sheng_wen.db import CredentialSecretModel, TaskDB
+from src.main.python.xianwen.db import CredentialSecretModel, TaskDB
 
 
 class TestConnectedAccountsStore(unittest.TestCase):

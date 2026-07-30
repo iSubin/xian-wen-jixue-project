@@ -8,7 +8,7 @@ path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..')
 sys.path.insert(0, path)
 print(f"已将 {path} 添加到 sys.path")
 
-from src.main.python.sheng_wen.transcriber.transcriber import get_transcriber, TranscriptionResult, ModelLoadError, TranscriptionError
+from src.main.python.xianwen.transcriber.transcriber import get_transcriber, TranscriptionResult, ModelLoadError, TranscriptionError
 
 def format_duration(seconds):
     """格式化时间戳为HHMMSS"""

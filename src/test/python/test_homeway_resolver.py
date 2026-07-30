@@ -7,7 +7,7 @@ from urllib.parse import parse_qs, urlparse
 path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 sys.path.insert(0, path)
 
-from src.main.python.sheng_wen.downloader.homeway_resolver import (
+from src.main.python.xianwen.downloader.homeway_resolver import (
     HomewayResolveError,
     HomewayResolvedVideo,
     HomewayVideoResolver,

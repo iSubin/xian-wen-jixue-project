@@ -7,7 +7,7 @@ from unittest.mock import patch
 path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 sys.path.insert(0, path)
 
-from src.main.python.sheng_wen.utils.ffmpeg_helper import FFmpegHelper
+from src.main.python.xianwen.utils.ffmpeg_helper import FFmpegHelper
 
 
 class TestFFmpegHelper(unittest.TestCase):
@@ -21,8 +21,8 @@ class TestFFmpegHelper(unittest.TestCase):
         FFmpegHelper._ffmpeg_path = self._old_ffmpeg_path
         FFmpegHelper._ffmpeg_dir = self._old_ffmpeg_dir
 
-    @patch("src.main.python.sheng_wen.utils.ffmpeg_helper.shutil.which")
-    @patch("src.main.python.sheng_wen.utils.ffmpeg_helper.os.path.isfile")
+    @patch("src.main.python.xianwen.utils.ffmpeg_helper.shutil.which")
+    @patch("src.main.python.xianwen.utils.ffmpeg_helper.os.path.isfile")
     def test_falls_back_to_system_ffmpeg_when_imageio_returns_nonexistent_command(self, mocked_isfile, mocked_which):
         mocked_isfile.return_value = False
         mocked_which.return_value = "/usr/local/bin/ffmpeg"

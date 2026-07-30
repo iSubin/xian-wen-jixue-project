@@ -7,7 +7,7 @@ from unittest.mock import patch
 path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 sys.path.insert(0, path)
 
-from src.main.python.sheng_wen.transcriber.fast_whisper_transcriber import FastWhisperTranscriber
+from src.main.python.xianwen.transcriber.fast_whisper_transcriber import FastWhisperTranscriber
 
 
 class TestFastWhisperTranscriberHelpers(unittest.TestCase):

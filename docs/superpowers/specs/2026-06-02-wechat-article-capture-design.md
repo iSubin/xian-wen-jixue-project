@@ -2,7 +2,7 @@
 
 ## Purpose
 
-ShengWen is evolving toward a video learning note library first, then a broader personal knowledge system. The first non-video source will be single WeChat public-account article capture.
+XianWen is evolving toward a video learning note library first, then a broader personal knowledge system. The first non-video source will be single WeChat public-account article capture.
 
 The goal is to let a user paste one `mp.weixin.qq.com` article URL, capture the article as text, generate a learning note through the existing LLM summary pipeline, and store the result in the same task/folder reading experience as video notes.
 
@@ -29,7 +29,7 @@ The local skill `/Users/subin/.codex/skills/wechat-article-export` is the refere
 - Markdown conversion through `markdownify`.
 - YAML front matter output.
 
-ShengWen should not depend on the external skill path at runtime. The implementation should internalize the reusable logic as a backend adapter so the app can run independently after deployment.
+XianWen should not depend on the external skill path at runtime. The implementation should internalize the reusable logic as a backend adapter so the app can run independently after deployment.
 
 ## User Flow
 
@@ -118,7 +118,7 @@ The adapter should:
 - Fall back to `var createTime = 'yyyy-mm-dd hh:mm'` for publish time.
 - Extract article body from `#js_content`.
 - Convert the body HTML to Markdown.
-- Download article images into ShengWen-managed task assets when possible.
+- Download article images into XianWen-managed task assets when possible.
 - Replace Markdown image references with local asset paths when images are downloaded.
 - Keep the original source URL in metadata.
 

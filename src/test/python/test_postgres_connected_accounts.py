@@ -7,18 +7,18 @@ import uuid
 path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 sys.path.insert(0, path)
 
-from src.main.python.sheng_wen.db import TaskDB
+from src.main.python.xianwen.db import TaskDB
 
 
 @unittest.skipUnless(
-    os.getenv("SHENGWEN_TEST_DATABASE_URL"),
-    "Set SHENGWEN_TEST_DATABASE_URL to run PostgreSQL integration tests",
+    os.getenv("XIANWEN_TEST_DATABASE_URL"),
+    "Set XIANWEN_TEST_DATABASE_URL to run PostgreSQL integration tests",
 )
 class TestPostgresConnectedAccounts(unittest.TestCase):
     def test_connected_accounts_persist_to_postgres(self):
         store = TaskDB(
             file_path=os.path.join(path, "temp", "postgres-test-tasks.json"),
-            database_url=os.environ["SHENGWEN_TEST_DATABASE_URL"],
+            database_url=os.environ["XIANWEN_TEST_DATABASE_URL"],
         )
         user_id = f"user-{uuid.uuid4().hex}"
 

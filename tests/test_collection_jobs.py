@@ -7,13 +7,13 @@ import unittest
 PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(PROJECT_ROOT, "src", "main", "python"))
 
-from sheng_wen.collection_jobs import (
+from xianwen.collection_jobs import (
     build_aggregate_markdown,
     build_bilibili_parts_collection,
     derive_collection_status,
     extract_urls_from_text,
 )
-from sheng_wen.db import TaskDB, TaskStatus
+from xianwen.db import TaskDB, TaskStatus
 
 
 class CollectionJobHelpersTest(unittest.TestCase):

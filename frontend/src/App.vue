@@ -4,6 +4,7 @@ import { PhMonitorPlay, PhList } from '@phosphor-icons/vue'
 import { marked } from 'marked'
 import { useTaskViewModel } from './composables/useTaskViewModel'
 import { useFolderViewModel } from './composables/useFolderViewModel'
+import { useGitSync } from './composables/useGitSync'
 import { useMermaidViewer } from './composables/useMermaidViewer'
 import {
   useSummaryImageExporter,
@@ -26,6 +27,7 @@ import type {
   LocalFolderScanResult,
   MarkdownHeadingItem,
   Task,
+  GitSettingsUpdate,
 } from './types'
 import Sidebar from './components/Sidebar.vue'
 import FloatingToolbar from './components/FloatingToolbar.vue'
@@ -131,6 +133,20 @@ const {
   assignTaskToFolder,
 } = useFolderViewModel()
 
+const {
+  gitSettings,
+  gitSyncResult,
+  gitError,
+  isLoadingGitSettings,
+  isSavingGitSettings,
+  isTestingGit,
+  isSyncingGit,
+  saveGitSettings,
+  testGit,
+  syncGit,
+  deleteGitSettings,
+} = useGitSync()
+
 // 状态变量
 const showInfoModal = ref(false)
 const isSettingsModalOpen = ref(false)
@@ -170,6 +186,32 @@ const mermaidViewerModalRef = ref<{
 // Toast 通知
 const { toasts, removeToast, success, info, error: toastError } = useToast()
 
+const handleSaveGitSettings = async (payload: GitSettingsUpdate) => {
+  if (await saveGitSettings(payload)) {
+    success('Git 文库设置已安全保存')
+  }
+}
+
+const handleTestGit = async () => {
+  if (await testGit()) {
+    success('Git 仓库与 Deploy Key 连接正常')
+  }
+}
+
+const handleSyncGit = async () => {
+  info('正在整理目录并推送文库')
+  if (await syncGit()) {
+    success(gitSyncResult.value?.committed ? '文库已推送到 Git' : 'Git 文库已经是最新')
+  }
+}
+
+const handleDeleteGitSettings = async () => {
+  if (!window.confirm('确定删除 Git 仓库设置和本机保存的 Deploy Key 私钥吗？')) return
+  if (await deleteGitSettings()) {
+    success('Git 文库设置已删除')
+  }
+}
+
 const {
   showMermaidViewer,
   currentMermaidSvg,
@@ -184,7 +226,7 @@ const {
 
 const { exportSummaryAsImage, generateSummaryImagePreview } = useSummaryImageExporter()
 
-const SUMMARY_IMAGE_SETTINGS_STORAGE_KEY = 'ShengWen:summary-image-export-settings'
+const SUMMARY_IMAGE_SETTINGS_STORAGE_KEY = 'xianwen:summary-image-export-settings'
 
 const summaryLayoutOptions: Array<{ label: string; value: SummaryImageLayoutPreset }> = [
   { label: '9:16 手机竖版', value: 'mobile-9-16' },
@@ -917,6 +959,13 @@ watch(
       :summarizationSettings="summarizationSettings"
       :isUpdatingSummarizationSettings="isUpdatingSummarizationSettings"
       :isReadingBilibiliCookieFromBrowser="isReadingBilibiliCookieFromBrowser"
+      :gitSettings="gitSettings"
+      :gitSyncResult="gitSyncResult"
+      :gitError="gitError"
+      :isLoadingGitSettings="isLoadingGitSettings"
+      :isSavingGitSettings="isSavingGitSettings"
+      :isTestingGit="isTestingGit"
+      :isSyncingGit="isSyncingGit"
       @close="isSettingsModalOpen = false"
       @switchActiveProfile="handleSwitchActiveProfile"
       @editProfile="handleEditProfile"
@@ -931,6 +980,10 @@ watch(
       @importConnectedAccountFromBrowser="handleImportConnectedAccountFromBrowser"
       @deleteConnectedAccount="handleDeleteConnectedAccount"
       @updateSummarizationSettings="handleUpdateSummarizationSettings"
+      @saveGitSettings="handleSaveGitSettings"
+      @testGit="handleTestGit"
+      @syncGit="handleSyncGit"
+      @deleteGitSettings="handleDeleteGitSettings"
     />
 
     <!-- 遮罩层 (Mobile Only) -->
@@ -1065,7 +1118,7 @@ watch(
 
         <div class="flex-1 flex flex-col items-center justify-center text-slate-400">
           <PhMonitorPlay :size="64" weight="thin" class="mb-4 opacity-20" />
-          <p>请从左侧选择一个任务查看详情</p>
+          <p class="font-serif tracking-wider">请从左侧文库选择一篇文档，或进入采集台带回新知</p>
         </div>
       </div>
     </main>

@@ -7,7 +7,7 @@ import unittest
 path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 sys.path.insert(0, path)
 
-from src.main.python.sheng_wen.lazy_worker_manager import LazyWorkerManager
+from src.main.python.xianwen.lazy_worker_manager import LazyWorkerManager
 
 
 class _StubLazyWorkerManager(LazyWorkerManager):

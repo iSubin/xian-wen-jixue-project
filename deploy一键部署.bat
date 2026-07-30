@@ -9,7 +9,7 @@ set "PYTHON_EXE="
 set "PYTHON_ARGS="
 
 echo ==========================================
-echo   ShengWen 一键部署脚本 (Windows)
+echo   XianWen 一键部署脚本 (Windows)
 echo ==========================================
 echo.
 
@@ -96,19 +96,19 @@ exit /b 1
 
 :python_ok
 set "PYTHON_VERSION="
-"%PYTHON_EXE%" %PYTHON_ARGS% -c "import sys; print(str(sys.version_info[0]) + '.' + str(sys.version_info[1]))" > "%TEMP%\shengwen_python_version.txt" 2>nul
+"%PYTHON_EXE%" %PYTHON_ARGS% -c "import sys; print(str(sys.version_info[0]) + '.' + str(sys.version_info[1]))" > "%TEMP%\xianwen_python_version.txt" 2>nul
 if errorlevel 1 (
     echo ❌ 错误: 无法识别 Python 版本
     echo 请确认已安装 Python 3.x，并可通过 py 启动器或 python 命令访问
     echo 可手动执行以下命令排查：
     echo   py -3 -c "import sys; print(sys.version)"
     echo   python -c "import sys; print(sys.version)"
-    if exist "%TEMP%\shengwen_python_version.txt" del /f /q "%TEMP%\shengwen_python_version.txt" >nul 2>nul
+    if exist "%TEMP%\xianwen_python_version.txt" del /f /q "%TEMP%\xianwen_python_version.txt" >nul 2>nul
     pause
     exit /b 1
 )
-set /p PYTHON_VERSION=<"%TEMP%\shengwen_python_version.txt"
-if exist "%TEMP%\shengwen_python_version.txt" del /f /q "%TEMP%\shengwen_python_version.txt" >nul 2>nul
+set /p PYTHON_VERSION=<"%TEMP%\xianwen_python_version.txt"
+if exist "%TEMP%\xianwen_python_version.txt" del /f /q "%TEMP%\xianwen_python_version.txt" >nul 2>nul
 if not defined PYTHON_VERSION (
     echo ❌ 错误: 无法识别 Python 版本
     echo 请确认已安装 Python 3.x，并可通过 py 启动器或 python 命令访问
@@ -262,7 +262,7 @@ echo ✅ 部署完成！
 echo ==========================================
 echo.
 echo 下一步操作：
-echo 1. 启动服务: ./run一键启动.bat 或者 .\%VENV_DIR%\Scripts\python.exe ShengWen-app.py
+echo 1. 启动服务: ./run一键启动.bat 或者 .\%VENV_DIR%\Scripts\python.exe xianwen-app.py
 echo 2. 打开浏览器: http://localhost:8000/
 echo 3. 在前端设置面板中填写 LLM 与转录参数
 echo.

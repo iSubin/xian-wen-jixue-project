@@ -8,7 +8,7 @@ set "PYTHON_ARGS="
 set "VENV_PYTHON=%CD%\.venv\Scripts\python.exe"
 
 echo ========================================
-echo   声文智汇 (ShengWen) - 一键启动
+echo   先闻继学 (XianWen) - 一键启动
 echo ========================================
 echo.
 
@@ -42,7 +42,7 @@ if not exist frontend\dist (
 
 echo 使用 Python: %PYTHON_EXE% %PYTHON_ARGS%
 echo.
-call "%PYTHON_EXE%" %PYTHON_ARGS% ShengWen-app.py
+call "%PYTHON_EXE%" %PYTHON_ARGS% xianwen-app.py
 if errorlevel 1 (
     echo.
     echo ❌ 服务退出，返回码: %errorlevel%

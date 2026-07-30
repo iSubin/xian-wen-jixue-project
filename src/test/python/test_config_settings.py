@@ -7,7 +7,7 @@ import unittest
 path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 sys.path.insert(0, path)
 
-from src.main.python.sheng_wen.config.settings import DEFAULT_SETTINGS, JSONConfigManager
+from src.main.python.xianwen.config.settings import DEFAULT_SETTINGS, JSONConfigManager
 
 
 class TestJSONConfigManager(unittest.TestCase):

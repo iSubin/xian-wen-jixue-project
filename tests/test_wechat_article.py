@@ -9,8 +9,8 @@ from unittest.mock import patch
 PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(PROJECT_ROOT, "src", "main", "python"))
 
-from sheng_wen.db import TaskDB, TaskStatus
-from sheng_wen.wechat_article import (
+from xianwen.db import TaskDB, TaskStatus
+from xianwen.wechat_article import (
     WechatArticleCaptureError,
     capture_wechat_article_from_html,
     is_wechat_article_url,
@@ -129,7 +129,7 @@ class WechatArticleAdapterTest(unittest.TestCase):
                 return FakeResponse()
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("sheng_wen.wechat_article.requests.Session", FakeSession):
+            with patch("xianwen.wechat_article.requests.Session", FakeSession):
                 result = capture_wechat_article_from_html(
                     "https://mp.weixin.qq.com/s/example",
                     SAMPLE_WECHAT_HTML,
@@ -152,8 +152,8 @@ class WechatArticleAdapterTest(unittest.TestCase):
 
 class WechatArticleTaskPayloadTest(unittest.TestCase):
     def test_article_task_payload_contains_source_metadata(self):
-        from sheng_wen.api import _build_wechat_article_task_data
-        from sheng_wen.wechat_article import CapturedArticle
+        from xianwen.api import _build_wechat_article_task_data
+        from xianwen.wechat_article import CapturedArticle
 
         article = CapturedArticle(
             source_type="wechat_article",

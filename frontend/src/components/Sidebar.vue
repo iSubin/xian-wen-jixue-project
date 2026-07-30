@@ -43,6 +43,7 @@ import {
 import ThemeSelector from './ThemeSelector.vue'
 import FolderBrowser from './FolderBrowser/FolderBrowser.vue'
 import ConnectedAccountsSettings from './ConnectedAccountsSettings.vue'
+import KnowledgeLibraryTree from './KnowledgeLibrary/KnowledgeLibraryTree.vue'
 
 const videoUrl = defineModel<string>('videoUrl', { required: true })
 const selectedFile = defineModel<File | null>('selectedFile', { default: null })
@@ -149,7 +150,7 @@ const emit = defineEmits<{
 const fileInput = ref<HTMLInputElement | null>(null)
 const isSettingsPanelOpen = ref(false)
 const settingsTab = ref<'llm' | 'transcription' | 'summarization'>('llm')
-const sidebarTab = ref<'quick' | 'manage' | 'theme'>('quick')
+const sidebarTab = ref<'quick' | 'library' | 'manage' | 'theme'>('library')
 const showLocalPathHelp = ref(false)
 
 const llmApiKey = ref('')
@@ -655,9 +656,25 @@ watch(() => props.summarizationSettings, (settings) => {
               ? 'bg-blue-50 text-primary'
               : 'text-slate-400 hover:bg-gray-100 hover:text-slate-600'
           ]"
-          title="任务管理"
+          title="采集台"
         >
           <PhFolder :size="20" />
+        </button>
+
+        <button
+          @click="sidebarTab = 'library'"
+          :class="[
+            'w-10 h-10 rounded-xl flex items-center justify-center transition-colors relative',
+            sidebarTab === 'library'
+              ? 'bg-[#f3e7dc] text-[#a84735]'
+              : 'text-slate-400 hover:bg-[#f7efe6] hover:text-[#8f493b]'
+          ]"
+          title="继学文库"
+        >
+          <PhBooks :size="20" weight="duotone" />
+          <span class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#e8dac9] text-[#775f4e] text-[10px] leading-4 text-center">
+            {{ tasks.filter(task => task.summary || task.transcript).length }}
+          </span>
         </button>
 
         <button
@@ -686,9 +703,17 @@ watch(() => props.summarizationSettings, (settings) => {
                 <PhWaveSine :size="20" weight="bold" />
               </div>
               <div class="min-w-0">
-                <h1 class="text-lg font-bold text-slate-900 tracking-tight truncate">声文智汇</h1>
+                <h1 class="text-lg font-bold text-slate-900 tracking-[0.12em] truncate font-serif">先闻继学</h1>
                 <p class="text-[11px] text-slate-500">
-                  {{ sidebarTab === 'quick' ? '快速提交与任务浏览' : sidebarTab === 'manage' ? '全部任务搜索视图' : 'Markdown 样式主题' }} · v{{ appVersion }}
+                  {{
+                    sidebarTab === 'quick'
+                      ? '采万象'
+                      : sidebarTab === 'library'
+                        ? '继学不息'
+                        : sidebarTab === 'manage'
+                          ? '检索全库'
+                          : 'Markdown 样式主题'
+                  }} · v{{ appVersion }}
                 </p>
               </div>
             </div>
@@ -1354,6 +1379,15 @@ watch(() => props.summarizationSettings, (settings) => {
               @toggleFolderSelection="(ids: any, selected: any) => emit('toggleFolderSelection', ids, selected)"
             />
           </div>
+        </template>
+
+        <template v-else-if="sidebarTab === 'library'">
+          <KnowledgeLibraryTree
+            :tasks="tasks"
+            :folderTree="folderTree"
+            :selectedTask="selectedTask"
+            @selectTask="(task) => { emit('selectTask', task); isSidebarOpen = false; }"
+          />
         </template>
 
         <template v-else>

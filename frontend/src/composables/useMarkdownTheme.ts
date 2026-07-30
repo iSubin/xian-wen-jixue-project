@@ -19,7 +19,7 @@ import {
 // 导出类型供其他模块使用
 export type { MarkdownTheme, MarkdownThemeId }
 
-const STORAGE_KEY = 'ShengWen:markdown-theme'
+const STORAGE_KEY = 'xianwen:markdown-theme'
 
 // 全局主题状态（单例模式，确保整个应用共享同一状态）
 const currentThemeId = ref<MarkdownThemeId>(DEFAULT_THEME)
@@ -238,4 +238,3 @@ export function getCurrentTheme(): MarkdownTheme {
 export function getThemeById(themeId: MarkdownThemeId): MarkdownTheme | undefined {
   return MARKDOWN_THEMES[themeId]
 }
-
