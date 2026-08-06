@@ -6,6 +6,7 @@ import {
   PhCaretRight,
   PhFolderNotch,
   PhFolderNotchOpen,
+  PhPencilSimple,
 } from '@phosphor-icons/vue'
 import type { FolderTreeNode, Task } from '../../types'
 
@@ -18,6 +19,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   select: [task: Task]
+  edit: [task: Task]
 }>()
 
 const expanded = ref(true)
@@ -53,20 +55,23 @@ const documentCount = computed(() => {
     </button>
 
     <div v-if="expanded" class="folder-children">
-      <button
+      <div
         v-for="document in directDocuments"
         :key="document.id"
-        type="button"
         :class="['document-row', selectedTask?.id === document.id ? 'selected' : '']"
         :style="{ paddingLeft: `${36 + depth * 15}px` }"
-        @click="emit('select', document)"
       >
-        <PhArticle :size="14" weight="duotone" />
-        <span>
-          <strong>{{ document.title || document.topic || '未命名文档' }}</strong>
-          <small>{{ document.topic || (document.source_type === 'wechat_article' ? '公众号文章' : '知识文稿') }}</small>
-        </span>
-      </button>
+        <button type="button" class="document-main" @click="emit('select', document)">
+          <PhArticle :size="14" weight="duotone" />
+          <span>
+            <strong>{{ document.title || document.topic || '未命名文档' }}</strong>
+            <small>{{ document.source_type === 'manual' ? '手写文档' : document.source_type === 'wechat_article' ? '公众号文章' : '整理文稿' }}</small>
+          </span>
+        </button>
+        <button type="button" class="edit-button" title="编辑文档" @click="emit('edit', document)">
+          <PhPencilSimple :size="13" />
+        </button>
+      </div>
 
       <KnowledgeTreeNode
         v-for="child in node.children"
@@ -76,23 +81,27 @@ const documentCount = computed(() => {
         :selectedTask="selectedTask"
         :depth="depth + 1"
         @select="emit('select', $event)"
+        @edit="emit('edit', $event)"
       />
     </div>
   </div>
 </template>
 
 <style scoped>
-.folder-row, .document-row { width: 100%; display: flex; align-items: center; border: 0; text-align: left; }
-.folder-row { min-height: 34px; gap: 6px; color: #514a40; transition: background .16s ease; }
-.folder-row:hover { background: rgba(155, 75, 57, .06); }
-.caret { color: #94897a; }
-.folder-icon { color: #9c6b35; }
-.folder-name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 12px/1.4 "Noto Serif SC", "Songti SC", serif; letter-spacing: .04em; }
-.folder-count { margin-right: 8px; color: #9a9185; font: 10px/1 ui-monospace, monospace; }
-.document-row { min-height: 42px; gap: 8px; padding-right: 8px; color: #746b5f; transition: background .16s ease, color .16s ease; }
-.document-row:hover { color: #363029; background: #f5eee3; }
-.document-row.selected { color: #8f3f30; background: #f3e5dc; box-shadow: inset 3px 0 0 #a84735; }
-.document-row > span { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
-.document-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 12px/1.35 "Noto Serif SC", "Songti SC", serif; }
-.document-row small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #9a9185; font: 9px/1.25 ui-sans-serif, system-ui, sans-serif; }
+.folder-row { width: 100%; min-height: 34px; display: flex; align-items: center; gap: 6px; border: 0; color: #475569; text-align: left; transition: background .16s ease, color .16s ease; }
+.folder-row:hover { color: #1e3a8a; background: #f8fafc; }
+.caret { color: #94a3b8; }
+.folder-icon { color: #3b82f6; }
+.folder-name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 12px/1.4 ui-sans-serif, system-ui, sans-serif; }
+.folder-count { margin-right: 8px; color: #94a3b8; font: 10px/1 ui-monospace, monospace; }
+.document-row { width: 100%; min-height: 42px; display: flex; align-items: center; padding-right: 6px; color: #64748b; transition: background .16s ease, color .16s ease; }
+.document-row:hover { color: #1e293b; background: #f8fafc; }
+.document-row.selected { color: #1d4ed8; background: #eff6ff; box-shadow: inset 3px 0 0 #3b82f6; }
+.document-main { min-width: 0; flex: 1; min-height: 42px; display: flex; align-items: center; gap: 8px; text-align: left; }
+.document-main > span { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.document-main strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 12px/1.35 ui-sans-serif, system-ui, sans-serif; }
+.document-main small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #94a3b8; font: 9px/1.25 ui-sans-serif, system-ui, sans-serif; }
+.edit-button { width: 27px; height: 27px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 7px; color: #94a3b8; opacity: 0; transition: opacity .16s ease, color .16s ease, background .16s ease; }
+.document-row:hover .edit-button, .document-row.selected .edit-button { opacity: 1; }
+.edit-button:hover { color: #2563eb; background: #dbeafe; }
 </style>

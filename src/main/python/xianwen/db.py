@@ -8,7 +8,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from sqlalchemy import create_engine, Column, String, Float, Integer, Text, DateTime, Enum as SQLEnum, inspect, text
+from sqlalchemy import create_engine, Column, String, Float, Integer, Text, DateTime, Boolean, Enum as SQLEnum, inspect, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from Cryptodome.Cipher import AES
@@ -53,6 +53,7 @@ class TaskModel(Base):
     source_type = Column(String, nullable=False, default="video")
     source_url = Column(Text, nullable=True)
     source_meta = Column(Text, nullable=True)
+    library_visible = Column(Boolean, nullable=False, default=True)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -79,6 +80,7 @@ class TaskModel(Base):
             "source_type": self.source_type or "video",
             "source_url": self.source_url or self.video_url,
             "source_meta": self.source_meta,
+            "library_visible": self.library_visible is not False,
         }
 
 
@@ -341,6 +343,7 @@ class TaskDB:
             has_source_type = "source_type" in columns
             has_source_url = "source_url" in columns
             has_source_meta = "source_meta" in columns
+            has_library_visible = "library_visible" in columns
             if (
                 has_latest_modified_at
                 and has_author_name
@@ -353,6 +356,7 @@ class TaskDB:
                 and has_source_type
                 and has_source_url
                 and has_source_meta
+                and has_library_visible
             ):
                 return
 
@@ -393,6 +397,10 @@ class TaskDB:
                 if not has_source_meta:
                     conn.execute(text("ALTER TABLE tasks ADD COLUMN source_meta TEXT"))
                     logger.info("Database schema updated: added tasks.source_meta")
+                if not has_library_visible:
+                    conn.execute(text("ALTER TABLE tasks ADD COLUMN library_visible BOOLEAN"))
+                    conn.execute(text("UPDATE tasks SET library_visible = TRUE WHERE library_visible IS NULL"))
+                    logger.info("Database schema updated: added tasks.library_visible")
         except Exception as e:
             logger.error(f"Failed to ensure database schema: {e}")
 
@@ -451,6 +459,7 @@ class TaskDB:
                     source_type=task_data.get("source_type") or "video",
                     source_url=task_data.get("source_url") or task_data.get("video_url"),
                     source_meta=task_data.get("source_meta"),
+                    library_visible=task_data.get("library_visible", True) is not False,
                 )
                 session.add(task)
             
@@ -481,6 +490,7 @@ class TaskDB:
         data.setdefault("source_type", "video")
         data.setdefault("source_url", data.get("video_url"))
         data.setdefault("source_meta", None)
+        data.setdefault("library_visible", True)
         return data
 
     def save_task(self, task_id: str, task_data: Dict[str, Any]):
@@ -510,6 +520,7 @@ class TaskDB:
                     task_data_copy.setdefault("source_type", "video")
                     task_data_copy.setdefault("source_url", task_data_copy.get("video_url"))
                     task_data_copy.setdefault("source_meta", None)
+                    task_data_copy.setdefault("library_visible", True)
                     
                     # 确保 'id' 不在 task_data_copy 中，因为它已经作为关键字参数传递
                     task_data_copy.pop('id', None)
@@ -552,6 +563,19 @@ class TaskDB:
         else:
             all_tasks = self._memory_db.values()
             return [self._deserialize_task(t) for t in all_tasks]
+
+    def list_library_documents(self) -> List[Dict[str, Any]]:
+        """Return the editorial document view used by the library and Git publisher."""
+        return [
+            task
+            for task in self.list_tasks()
+            if task.get("library_visible", True) is not False
+            and (
+                str(task.get("source_type") or "") == "manual"
+                or bool(str(task.get("summary") or "").strip())
+                or bool(str(task.get("transcript") or "").strip())
+            )
+        ]
 
     def delete_task(self, task_id: str):
         if self.use_db:

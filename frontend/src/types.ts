@@ -35,6 +35,7 @@ export interface Task {
   source_type?: 'video' | 'wechat_article' | string;
   source_url?: string | null;
   source_meta?: string | null;
+  library_visible?: boolean;
 }
 
 export interface CreateTaskRequest {
@@ -371,4 +372,10 @@ export interface GitSyncResult {
   adopted: number;
   removed: number;
   conflicts: string[];
+}
+
+export interface LibraryDocumentPayload {
+  title: string;
+  content: string;
+  folder_id: string | null;
 }

@@ -102,6 +102,33 @@ class GitSyncExportTest(unittest.TestCase):
         self.assertEqual(document.read_text(encoding="utf-8"), "user edit\n")
         self.assertEqual(result["conflicts"], ["课程/第一课.md"])
 
+    def test_hidden_documents_are_removed_from_next_snapshot(self):
+        now = datetime.utcnow()
+        self.store.save_task(
+            "manual-001",
+            {
+                "video_url": "manual://manual-001",
+                "source_url": "",
+                "source_type": "manual",
+                "status": "COMPLETED",
+                "created_at": now,
+                "latest_modified_at": now,
+                "progress": 1.0,
+                "title": "手写文档",
+                "summary": "",
+                "transcript": "",
+                "library_visible": True,
+            },
+        )
+        generated, document_count = build_library_files(self.store, project_root=self.root)
+        self.assertEqual(document_count, 1)
+        self.assertIn("未归档/手写文档.md", generated)
+
+        self.store.update_task("manual-001", {"library_visible": False})
+        generated, document_count = build_library_files(self.store, project_root=self.root)
+        self.assertEqual(document_count, 0)
+        self.assertNotIn("未归档/手写文档.md", generated)
+
     def test_rejects_unsafe_git_inputs(self):
         self.assertEqual(
             validate_repository_url("git@github.com:owner/repo.git"),

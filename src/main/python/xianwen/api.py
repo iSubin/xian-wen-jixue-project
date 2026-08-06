@@ -303,6 +303,18 @@ class LibraryDocumentView(BaseModel):
     latest_modified_at: Optional[datetime] = None
 
 
+class LibraryDocumentCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=300)
+    content: str = ""
+    folder_id: Optional[str] = None
+
+
+class LibraryDocumentUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=1, max_length=300)
+    content: Optional[str] = None
+    folder_id: Optional[str] = None
+
+
 class LibraryTreeView(BaseModel):
     folders: List[Dict[str, Any]]
     documents: List[LibraryDocumentView]
@@ -334,6 +346,7 @@ class Task(BaseModel):
     source_type: Optional[str] = "video"
     source_url: Optional[str] = None
     source_meta: Optional[str] = None
+    library_visible: bool = True
 
 
 class FolderCreate(BaseModel):
@@ -520,6 +533,18 @@ def _git_account_bundle(user_id: str) -> tuple[Dict[str, Any] | None, Dict[str, 
         return None, None
     secret = db.get_connected_account_secret(user_id, str(account.get("id") or ""))
     return account, secret
+
+
+def _mark_git_library_pending(user_id: str) -> None:
+    account = db.get_connected_account_by_provider(user_id, "git")
+    if not account:
+        return
+    db.update_connected_account_runtime(
+        user_id,
+        str(account["id"]),
+        status="pending_sync",
+        last_error=None,
+    )
 
 
 def _git_settings_view(user_id: str) -> Dict[str, Any]:
@@ -1824,15 +1849,13 @@ async def get_task(task_id: str):
 
 @app.get("/library/tree", response_model=LibraryTreeView)
 async def get_library_tree():
-    """把已有任务投影为可阅读文档，并沿用 folders 形成知识目录树。"""
+    """返回数据库中的当前文库快照；Git 发布器消费同一份快照。"""
     folders = db.list_folders()
     documents = []
     unfiled_count = 0
-    for task in db.list_tasks():
+    for task in db.list_library_documents():
         has_summary = bool(str(task.get("summary") or "").strip())
         has_transcript = bool(str(task.get("transcript") or "").strip())
-        if not has_summary and not has_transcript:
-            continue
         folder_id = task.get("folder_id")
         if not folder_id:
             unfiled_count += 1
@@ -1859,6 +1882,91 @@ async def get_library_tree():
         "unfiled_count": unfiled_count,
     }
 
+
+@app.post("/library/documents", response_model=Task, status_code=201)
+async def create_library_document(payload: LibraryDocumentCreate, request: Request):
+    """Create a manual Markdown document without starting a capture task."""
+    if payload.folder_id and not db.get_folder(payload.folder_id):
+        raise HTTPException(status_code=404, detail="目标目录不存在")
+    title = payload.title.strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="请填写文档题名")
+
+    document_id = str(uuid.uuid4())
+    now = datetime.utcnow()
+    db.save_task(
+        document_id,
+        {
+            "video_url": f"manual://{document_id}",
+            "status": TaskStatus.COMPLETED,
+            "created_at": now,
+            "latest_modified_at": now,
+            "progress": 1.0,
+            "title": title,
+            "topic": title,
+            "summary": payload.content,
+            "transcript": "",
+            "folder_id": payload.folder_id,
+            "source_type": "manual",
+            "source_url": "",
+            "source_meta": json.dumps({"origin": "library_editor"}, ensure_ascii=False),
+            "library_visible": True,
+        },
+    )
+    document = db.get_task(document_id)
+    if not document:
+        raise HTTPException(status_code=500, detail="文档创建失败")
+    _mark_git_library_pending(_current_user_id(request))
+    await notify_task_update(document_id, document)
+    return document
+
+
+@app.patch("/library/documents/{document_id}", response_model=Task)
+async def update_library_document(
+    document_id: str,
+    payload: LibraryDocumentUpdate,
+    request: Request,
+):
+    """Edit title, Markdown content, or folder while preserving the source task."""
+    document = db.get_task(document_id)
+    if not document or document.get("library_visible", True) is False:
+        raise HTTPException(status_code=404, detail="文档不存在")
+
+    updates = payload.model_dump(exclude_unset=True)
+    if "folder_id" in updates and updates["folder_id"] and not db.get_folder(updates["folder_id"]):
+        raise HTTPException(status_code=404, detail="目标目录不存在")
+    if "title" in updates:
+        title = str(updates.pop("title") or "").strip()
+        if not title:
+            raise HTTPException(status_code=400, detail="请填写文档题名")
+        updates["title"] = title
+        updates["topic"] = title
+    if "content" in updates:
+        updates["summary"] = updates.pop("content")
+
+    if updates:
+        document = db.update_task(document_id, updates)
+        if not document:
+            raise HTTPException(status_code=500, detail="文档更新失败")
+        _mark_git_library_pending(_current_user_id(request))
+        await notify_task_update(document_id, document)
+    return document
+
+
+@app.delete("/library/documents/{document_id}", status_code=204)
+async def remove_library_document(document_id: str, request: Request):
+    """Remove a document from the library without deleting capture history or assets."""
+    document = db.get_task(document_id)
+    if not document or document.get("library_visible", True) is False:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    updated = db.update_task(document_id, {"library_visible": False})
+    if not updated:
+        raise HTTPException(status_code=500, detail="文档移除失败")
+    _mark_git_library_pending(_current_user_id(request))
+    await notify_task_update(document_id, updated)
+    return Response(status_code=204)
+
+
 @app.patch("/tasks/{task_id}", response_model=Task)
 async def update_task(task_id: str, task_update: TaskUpdate):
     """
@@ -1868,7 +1976,7 @@ async def update_task(task_id: str, task_update: TaskUpdate):
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    updates = task_update.dict(exclude_unset=True)
+    updates = task_update.model_dump(exclude_unset=True)
     if updates:
         from .task_updater import update_and_notify
         updated_task = await update_and_notify(task_id, updates)

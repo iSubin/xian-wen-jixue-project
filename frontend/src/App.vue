@@ -82,6 +82,7 @@ const {
   clearResumeSnapshot,
   resetStreamingState,
   submitTask,
+  fetchTasks,
   cancelSubmitting,
   selectTask,
   downloadContent,
@@ -141,6 +142,7 @@ const {
   isSavingGitSettings,
   isTestingGit,
   isSyncingGit,
+  fetchGitSettings,
   saveGitSettings,
   testGit,
   syncGit,
@@ -209,6 +211,16 @@ const handleDeleteGitSettings = async () => {
   if (!window.confirm('确定删除 Git 仓库设置和本机保存的 Deploy Key 私钥吗？')) return
   if (await deleteGitSettings()) {
     success('Git 文库设置已删除')
+  }
+}
+
+const handleLibraryChanged = async () => {
+  await Promise.all([fetchTasks(), fetchGitSettings()])
+}
+
+const handleLibraryDocumentRemoved = (documentId: string) => {
+  if (selectedTask.value?.id === documentId) {
+    selectedTask.value = null
   }
 }
 
@@ -1024,6 +1036,9 @@ watch(
       :folderTree="folderTree"
       :isMultiSelectMode="isMultiSelectMode"
       :selectedTaskIds="selectedTaskIds"
+      :gitConfigured="Boolean(gitSettings?.configured)"
+      :gitStatus="gitSettings?.status || 'not_configured'"
+      :isSyncingGit="isSyncingGit"
       @submit="handleSubmit"
       @cancelSubmit="cancelSubmitting"
       @selectTask="handleSelectTask"
@@ -1058,6 +1073,9 @@ watch(
       @toggleFolderSelection="toggleFolderSelection"
       @openCollectionCapture="isCollectionCaptureOpen = true"
       @openWechatArticleCapture="isWechatArticleCaptureOpen = true"
+      @libraryChanged="handleLibraryChanged"
+      @libraryDocumentRemoved="handleLibraryDocumentRemoved"
+      @syncGit="handleSyncGit"
     />
 
     <!-- 右侧内容区 -->

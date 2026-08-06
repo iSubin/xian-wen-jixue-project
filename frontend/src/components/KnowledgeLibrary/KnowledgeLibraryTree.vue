@@ -1,23 +1,59 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { PhArticle, PhBooks, PhMagnifyingGlass, PhSealCheck } from '@phosphor-icons/vue'
-import type { FolderTreeNode, Task } from '../../types'
+import {
+  PhArticle,
+  PhBooks,
+  PhCloudArrowUp,
+  PhMagnifyingGlass,
+  PhPencilSimple,
+  PhPlus,
+  PhSpinner,
+} from '@phosphor-icons/vue'
+import type { Folder, FolderTreeNode, LibraryDocumentPayload, Task } from '../../types'
+import { useLibraryDocuments } from '../../composables/useLibraryDocuments'
 import KnowledgeTreeNode from './KnowledgeTreeNode.vue'
+import LibraryDocumentEditor from './LibraryDocumentEditor.vue'
 
 const props = defineProps<{
   tasks: Task[]
+  folders: Folder[]
   folderTree: FolderTreeNode[]
   selectedTask: Task | null
+  gitConfigured: boolean
+  gitStatus: string
+  isSyncingGit: boolean
 }>()
 
 const emit = defineEmits<{
   selectTask: [task: Task]
+  changed: []
+  removed: [documentId: string]
+  syncGit: []
 }>()
 
+const {
+  isSavingDocument,
+  isRemovingDocument,
+  libraryDocumentError,
+  createDocument,
+  updateDocument,
+  removeDocument,
+} = useLibraryDocuments()
+
 const keyword = ref('')
+const editorOpen = ref(false)
+const editingDocument = ref<Task | null>(null)
+
 const documents = computed(() =>
-  props.tasks.filter(task => Boolean((task.summary || '').trim() || (task.transcript || '').trim())),
+  props.tasks.filter(task =>
+    task.library_visible !== false
+    && (
+      task.source_type === 'manual'
+      || Boolean((task.summary || '').trim() || (task.transcript || '').trim())
+    ),
+  ),
 )
+
 const filteredDocuments = computed(() => {
   const query = keyword.value.trim().toLocaleLowerCase('zh-CN')
   if (!query) return documents.value
@@ -26,38 +62,91 @@ const filteredDocuments = computed(() => {
       .some(value => String(value || '').toLocaleLowerCase('zh-CN').includes(query)),
   )
 })
+
 const rootDocuments = computed(() =>
   filteredDocuments.value
     .filter(document => !document.folder_id)
     .sort((a, b) => (a.title || '').localeCompare(b.title || '', 'zh-CN')),
 )
-const completedCount = computed(() =>
-  documents.value.filter(document => document.status === 'COMPLETED').length,
-)
+
+const rootFolderCount = computed(() => props.folderTree.length)
+const pendingSync = computed(() => props.gitStatus === 'pending_sync')
+
+const openCreate = () => {
+  editingDocument.value = null
+  editorOpen.value = true
+}
+
+const openEdit = (document: Task) => {
+  editingDocument.value = document
+  editorOpen.value = true
+}
+
+const closeEditor = () => {
+  if (isSavingDocument.value || isRemovingDocument.value) return
+  editorOpen.value = false
+}
+
+const saveDocument = async (payload: LibraryDocumentPayload) => {
+  const saved = editingDocument.value
+    ? await updateDocument(editingDocument.value.id, payload)
+    : await createDocument(payload)
+  if (!saved) return
+  editorOpen.value = false
+  emit('changed')
+  emit('selectTask', saved)
+}
+
+const removeCurrentDocument = async () => {
+  if (!editingDocument.value) return
+  const documentId = editingDocument.value.id
+  if (!await removeDocument(documentId)) return
+  editorOpen.value = false
+  emit('removed', documentId)
+  emit('changed')
+}
 </script>
 
 <template>
   <div class="knowledge-library">
     <header class="library-header">
-      <p>藏 书 阁</p>
-      <div class="library-counts">
-        <span><b>{{ documents.length }}</b> 卷</span>
-        <i />
-        <span><b>{{ folderTree.length }}</b> 部</span>
-        <i />
-        <span><b>{{ completedCount }}</b> 已成篇</span>
+      <div class="title-row">
+        <div>
+          <h2><PhBooks :size="17" weight="duotone" />藏经阁</h2>
+          <p>按目录整理和阅读你的知识文档</p>
+        </div>
+        <button class="new-button" type="button" @click="openCreate">
+          <PhPlus :size="14" weight="bold" />
+          新建
+        </button>
       </div>
+
+      <div class="library-counts">
+        <span><b>{{ documents.length }}</b> 篇文档</span>
+        <span><b>{{ rootFolderCount }}</b> 个根目录</span>
+        <button
+          type="button"
+          :class="['sync-button', pendingSync ? 'pending' : '']"
+          :disabled="!gitConfigured || isSyncingGit"
+          :title="gitConfigured ? '把当前文库快照同步到 Git' : '请先在设置中配置 Git 文库'"
+          @click="emit('syncGit')"
+        >
+          <PhSpinner v-if="isSyncingGit" :size="13" class="spin" />
+          <PhCloudArrowUp v-else :size="13" />
+          {{ isSyncingGit ? '同步中' : pendingSync ? '待同步' : '同步 Git' }}
+        </button>
+      </div>
+
       <div class="search-box">
         <PhMagnifyingGlass :size="15" />
-        <input v-model="keyword" placeholder="检索题名、主题或正文">
+        <input v-model="keyword" placeholder="搜索题名、主题或正文">
       </div>
     </header>
 
     <div v-if="documents.length" class="library-scroll">
       <div class="tree-caption">
-        <PhBooks :size="15" weight="duotone" />
         <span>文库目录</span>
-        <small>点击篇目进入阅读</small>
+        <small>悬停文档可编辑</small>
       </div>
 
       <KnowledgeTreeNode
@@ -68,72 +157,95 @@ const completedCount = computed(() =>
         :selectedTask="selectedTask"
         :depth="0"
         @select="emit('selectTask', $event)"
+        @edit="openEdit"
       />
 
       <section v-if="rootDocuments.length" class="unfiled">
         <div class="unfiled-title">
           <PhArticle :size="14" />
-          未归档
-          <span>{{ rootDocuments.length }}</span>
+          <span>未归档</span>
+          <b>{{ rootDocuments.length }}</b>
         </div>
-        <button
+        <div
           v-for="document in rootDocuments"
           :key="document.id"
-          type="button"
           :class="['root-document', selectedTask?.id === document.id ? 'selected' : '']"
-          @click="emit('selectTask', document)"
         >
-          <PhArticle :size="14" weight="duotone" />
-          <span>{{ document.title || document.topic || '未命名文档' }}</span>
-        </button>
+          <button type="button" class="document-main" @click="emit('selectTask', document)">
+            <PhArticle :size="14" weight="duotone" />
+            <span>{{ document.title || document.topic || '未命名文档' }}</span>
+          </button>
+          <button type="button" class="edit-button" title="编辑文档" @click="openEdit(document)">
+            <PhPencilSimple :size="13" />
+          </button>
+        </div>
       </section>
 
-      <p v-if="keyword && filteredDocuments.length === 0" class="empty-search">没有找到相合的篇目</p>
-      <footer>
-        <PhSealCheck :size="14" weight="duotone" />
-        在采集台拖拽篇目，即可调整目录归属
-      </footer>
+      <p v-if="keyword && filteredDocuments.length === 0" class="empty-search">没有找到匹配的文档</p>
+      <footer>目录和正文修改后，点击“同步 Git”发布最新快照</footer>
     </div>
 
     <div v-else class="empty-library">
-      <div class="empty-mark">學</div>
-      <h3>文库尚空</h3>
-      <p>从采集台带回第一份材料，转写与提炼完成后便会在此成篇。</p>
+      <div class="empty-mark"><PhBooks :size="27" weight="duotone" /></div>
+      <h3>藏经阁还是空的</h3>
+      <p>新建一篇手写文档，或从采集台带回第一份材料。</p>
+      <button type="button" @click="openCreate"><PhPlus :size="14" />新建文档</button>
     </div>
+
+    <LibraryDocumentEditor
+      :show="editorOpen"
+      :document="editingDocument"
+      :folders="folders"
+      :isSaving="isSavingDocument"
+      :isRemoving="isRemovingDocument"
+      :error="libraryDocumentError"
+      @close="closeEditor"
+      @save="saveDocument"
+      @remove="removeCurrentDocument"
+    />
   </div>
 </template>
 
 <style scoped>
-.knowledge-library {
-  height: 100%;
-  color: #342f28;
-  background:
-    linear-gradient(rgba(122, 101, 72, .025) 1px, transparent 1px),
-    #fbf8f0;
-  background-size: 100% 28px;
-  font-family: "Noto Serif SC", "Songti SC", STSong, serif;
-}
-.library-header { padding: 18px 16px 14px; border-bottom: 1px solid #e5dac8; background: rgba(251, 248, 240, .94); }
-.library-header > p { margin: 0 0 8px; color: #a84735; font-size: 11px; font-weight: 700; letter-spacing: .36em; }
-.library-counts { display: flex; align-items: baseline; gap: 8px; color: #7c7366; font-size: 10px; }
-.library-counts b { color: #39332b; font: 600 18px/1 ui-monospace, monospace; }
-.library-counts i { width: 1px; height: 10px; background: #d7cab8; }
-.search-box { display: flex; align-items: center; gap: 7px; margin-top: 13px; padding: 8px 10px; border: 1px solid #ded3c2; background: rgba(255,255,255,.68); color: #9c9182; }
-.search-box input { min-width: 0; flex: 1; border: 0; background: transparent; color: #3d372f; font: 12px/1.2 ui-sans-serif, system-ui, sans-serif; outline: none; }
-.library-scroll { height: calc(100% - 126px); overflow-y: auto; padding: 11px 8px 20px; }
-.tree-caption { display: flex; align-items: center; gap: 6px; padding: 7px 8px 10px; color: #6d6255; font-size: 11px; letter-spacing: .08em; }
-.tree-caption small { margin-left: auto; color: #a0988c; font: 9px/1 ui-sans-serif, system-ui, sans-serif; letter-spacing: 0; }
-.unfiled { margin-top: 9px; padding-top: 8px; border-top: 1px solid #e7ddcd; }
-.unfiled-title { display: flex; align-items: center; gap: 6px; padding: 6px 8px; color: #73695c; font-size: 11px; }
-.unfiled-title span { margin-left: auto; font: 10px/1 ui-monospace, monospace; }
-.root-document { width: 100%; display: flex; align-items: center; gap: 8px; padding: 9px 10px 9px 21px; color: #746b5f; text-align: left; font-size: 12px; }
-.root-document:hover { background: #f5eee3; color: #39332b; }
-.root-document.selected { color: #8f3f30; background: #f3e5dc; box-shadow: inset 3px 0 0 #a84735; }
-.root-document span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.empty-search, footer { margin: 14px 8px; color: #9a9185; text-align: center; font: 10px/1.6 ui-sans-serif, system-ui, sans-serif; }
-footer { display: flex; align-items: center; justify-content: center; gap: 5px; padding-top: 10px; border-top: 1px solid #e7ddcd; }
-.empty-library { display: grid; place-items: center; padding: 64px 24px; text-align: center; }
-.empty-mark { display: grid; place-items: center; width: 58px; height: 58px; border: 1px solid #b45b49; color: #a84735; font-size: 28px; transform: rotate(-2deg); }
-.empty-library h3 { margin: 18px 0 7px; font-size: 17px; letter-spacing: .18em; }
-.empty-library p { margin: 0; color: #8b8174; font: 11px/1.8 ui-sans-serif, system-ui, sans-serif; }
+.knowledge-library { height: 100%; display: flex; flex-direction: column; color: #334155; background: #fff; font-family: ui-sans-serif, system-ui, sans-serif; }
+.library-header { padding: 15px 14px 13px; border-bottom: 1px solid #eef2f7; background: #fff; }
+.title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.title-row h2 { display: flex; align-items: center; gap: 7px; margin: 0; color: #0f172a; font-size: 14px; font-weight: 650; }
+.title-row h2 svg { color: #2563eb; }
+.title-row p { margin: 3px 0 0; color: #94a3b8; font-size: 10px; }
+.new-button { height: 30px; display: flex; align-items: center; gap: 5px; padding: 0 9px; border-radius: 8px; color: #fff; background: #2563eb; font-size: 11px; font-weight: 600; transition: background .16s ease, transform .16s ease; }
+.new-button:hover { background: #1d4ed8; }
+.new-button:active { transform: translateY(1px); }
+.library-counts { min-height: 27px; display: flex; align-items: center; gap: 10px; margin-top: 10px; color: #64748b; font-size: 10px; }
+.library-counts b { color: #334155; font-variant-numeric: tabular-nums; }
+.sync-button { margin-left: auto; min-height: 26px; display: flex; align-items: center; gap: 5px; padding: 0 8px; border: 1px solid #dbe3ee; border-radius: 8px; color: #64748b; background: #fff; font-size: 10px; transition: border-color .16s ease, color .16s ease, background .16s ease; }
+.sync-button:hover:not(:disabled) { color: #2563eb; border-color: #bfdbfe; background: #eff6ff; }
+.sync-button.pending { color: #1d4ed8; border-color: #bfdbfe; background: #eff6ff; }
+.sync-button:disabled { opacity: .45; cursor: not-allowed; }
+.search-box { display: flex; align-items: center; gap: 7px; margin-top: 10px; padding: 7px 9px; border: 1px solid #e2e8f0; border-radius: 9px; background: #f8fafc; color: #94a3b8; transition: border-color .16s ease, box-shadow .16s ease; }
+.search-box:focus-within { border-color: #93c5fd; box-shadow: 0 0 0 3px rgba(59, 130, 246, .09); background: #fff; }
+.search-box input { min-width: 0; flex: 1; border: 0; background: transparent; color: #334155; font-size: 11px; outline: none; }
+.library-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 9px 7px 18px; }
+.tree-caption { display: flex; align-items: center; padding: 6px 8px 9px; color: #64748b; font-size: 10px; font-weight: 600; }
+.tree-caption small { margin-left: auto; color: #a8b2c1; font-size: 9px; font-weight: 400; }
+.unfiled { margin-top: 8px; padding-top: 7px; border-top: 1px solid #eef2f7; }
+.unfiled-title { display: flex; align-items: center; gap: 6px; padding: 6px 8px; color: #64748b; font-size: 11px; }
+.unfiled-title b { margin-left: auto; color: #94a3b8; font: 500 10px/1 ui-monospace, monospace; }
+.root-document { min-height: 38px; display: flex; align-items: center; padding: 0 6px 0 18px; color: #64748b; transition: color .16s ease, background .16s ease; }
+.root-document:hover { color: #1e293b; background: #f8fafc; }
+.root-document.selected { color: #1d4ed8; background: #eff6ff; box-shadow: inset 3px 0 0 #3b82f6; }
+.document-main { min-width: 0; flex: 1; min-height: 38px; display: flex; align-items: center; gap: 8px; text-align: left; font-size: 11px; }
+.document-main span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.edit-button { width: 27px; height: 27px; display: grid; place-items: center; border-radius: 7px; color: #94a3b8; opacity: 0; transition: opacity .16s ease, color .16s ease, background .16s ease; }
+.root-document:hover .edit-button, .root-document.selected .edit-button { opacity: 1; }
+.edit-button:hover { color: #2563eb; background: #dbeafe; }
+.empty-search, footer { margin: 13px 8px; color: #94a3b8; text-align: center; font-size: 9px; line-height: 1.6; }
+footer { padding-top: 10px; border-top: 1px solid #eef2f7; }
+.empty-library { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 24px; text-align: center; }
+.empty-mark { width: 54px; height: 54px; display: grid; place-items: center; border-radius: 16px; color: #2563eb; background: #eff6ff; }
+.empty-library h3 { margin: 15px 0 6px; color: #334155; font-size: 14px; font-weight: 650; }
+.empty-library p { margin: 0; color: #94a3b8; font-size: 11px; line-height: 1.6; }
+.empty-library button { display: flex; align-items: center; gap: 5px; margin-top: 14px; padding: 7px 10px; border-radius: 8px; color: #2563eb; background: #eff6ff; font-size: 11px; font-weight: 600; }
+.spin { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>

@@ -76,6 +76,46 @@ class LibraryApiTest(unittest.TestCase):
         self.assertNotIn("private_key", payload)
         self.assertNotIn("secret", response.text)
 
+    def test_document_crud_preserves_source_task(self):
+        invalid = self.client.post(
+            "/library/documents",
+            json={"title": "   ", "content": ""},
+        )
+        self.assertEqual(invalid.status_code, 400)
+
+        folder = self.client.post("/folders/", json={"name": "产品"}).json()
+        created = self.client.post(
+            "/library/documents",
+            json={
+                "title": "手写笔记",
+                "content": "# 初稿",
+                "folder_id": folder["id"],
+            },
+        )
+        self.assertEqual(created.status_code, 201)
+        document_id = created.json()["id"]
+        self.assertEqual(created.json()["source_type"], "manual")
+
+        updated = self.client.patch(
+            f"/library/documents/{document_id}",
+            json={
+                "title": "手写笔记（二稿）",
+                "content": "# 二稿",
+                "folder_id": None,
+            },
+        )
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(updated.json()["summary"], "# 二稿")
+        self.assertIsNone(updated.json()["folder_id"])
+
+        removed = self.client.delete(f"/library/documents/{document_id}")
+        self.assertEqual(removed.status_code, 204)
+        self.assertEqual(self.client.get("/library/tree").json()["document_count"], 0)
+
+        source_record = self.client.get(f"/tasks/{document_id}")
+        self.assertEqual(source_record.status_code, 200)
+        self.assertFalse(source_record.json()["library_visible"])
+
 
 if __name__ == "__main__":
     unittest.main()

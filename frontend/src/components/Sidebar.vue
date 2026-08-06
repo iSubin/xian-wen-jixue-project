@@ -78,6 +78,9 @@ const props = defineProps<{
   folderTree: FolderTreeNode[]
   isMultiSelectMode: boolean
   selectedTaskIds: Set<string>
+  gitConfigured: boolean
+  gitStatus: string
+  isSyncingGit: boolean
 }>()
 
 const emit = defineEmits<{
@@ -145,6 +148,9 @@ const emit = defineEmits<{
     fallback_to_standard_on_agent_error?: boolean
   }]
   startTestLlm: []
+  libraryChanged: []
+  libraryDocumentRemoved: [documentId: string]
+  syncGit: []
 }>()
 
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -167,6 +173,16 @@ const llmTemperature = computed({
   set: (v: number) => { props.profileFormState.temperature = v },
 })
 const appVersion = __APP_VERSION__
+const captureTasks = computed(() => props.tasks.filter(task => task.source_type !== 'manual'))
+const libraryDocumentCount = computed(() =>
+  props.tasks.filter(task =>
+    task.library_visible !== false
+    && (
+      task.source_type === 'manual'
+      || Boolean((task.summary || '').trim() || (task.transcript || '').trim())
+    ),
+  ).length,
+)
 
 const transcriptionDevice = ref<'cpu' | 'cuda'>('cpu')
 const transcriptionModelSource = ref<'auto_download' | 'manual_path'>('auto_download')
@@ -567,7 +583,7 @@ const statusOptions: Array<{ value: 'all' | TaskStatus, label: string }> = [
 const managedResults = computed<ManagedTaskResult[]>(() => {
   const keyword = manageKeyword.value.trim()
   const status = manageStatus.value
-  let list = props.tasks.map((task) => {
+  let list = captureTasks.value.map((task) => {
     const topicPreview = buildMatchPreview(resolveTaskTopic(task), keyword, 14)
     const summaryPreview = buildMatchPreview(task.summary || '', keyword, 22)
     const modifiedInfo = buildModifiedInfo(task)
@@ -666,14 +682,14 @@ watch(() => props.summarizationSettings, (settings) => {
           :class="[
             'w-10 h-10 rounded-xl flex items-center justify-center transition-colors relative',
             sidebarTab === 'library'
-              ? 'bg-[#f3e7dc] text-[#a84735]'
-              : 'text-slate-400 hover:bg-[#f7efe6] hover:text-[#8f493b]'
+              ? 'bg-blue-50 text-primary'
+              : 'text-slate-400 hover:bg-gray-100 hover:text-slate-600'
           ]"
-          title="继学文库"
+          title="藏经阁"
         >
           <PhBooks :size="20" weight="duotone" />
-          <span class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#e8dac9] text-[#775f4e] text-[10px] leading-4 text-center">
-            {{ tasks.filter(task => task.summary || task.transcript).length }}
+          <span class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-blue-100 text-blue-700 text-[10px] leading-4 text-center">
+            {{ libraryDocumentCount }}
           </span>
         </button>
 
@@ -689,7 +705,7 @@ watch(() => props.summarizationSettings, (settings) => {
         >
           <PhMagnifyingGlass :size="20" />
           <span class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-gray-200 text-slate-500 text-[10px] leading-4 text-center">
-            {{ tasks.length }}
+            {{ captureTasks.length }}
           </span>
         </button>
       </div>
@@ -1354,7 +1370,7 @@ watch(() => props.summarizationSettings, (settings) => {
 
           <div class="flex-1 overflow-y-auto p-4 custom-scrollbar">
             <FolderBrowser
-              :tasks="tasks"
+              :tasks="captureTasks"
               :folders="folders"
               :folderTree="folderTree"
               :selectedTask="selectedTask"
@@ -1384,9 +1400,16 @@ watch(() => props.summarizationSettings, (settings) => {
         <template v-else-if="sidebarTab === 'library'">
           <KnowledgeLibraryTree
             :tasks="tasks"
+            :folders="folders"
             :folderTree="folderTree"
             :selectedTask="selectedTask"
+            :gitConfigured="gitConfigured"
+            :gitStatus="gitStatus"
+            :isSyncingGit="isSyncingGit"
             @selectTask="(task) => { emit('selectTask', task); isSidebarOpen = false; }"
+            @changed="emit('libraryChanged')"
+            @removed="emit('libraryDocumentRemoved', $event)"
+            @syncGit="emit('syncGit')"
           />
         </template>
 

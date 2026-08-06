@@ -269,11 +269,7 @@ def build_library_files(
 ) -> tuple[Dict[str, GeneratedFile], int]:
     folders = task_db.list_folders()
     folder_paths = _build_folder_paths(folders)
-    tasks = [
-        task
-        for task in task_db.list_tasks()
-        if str(task.get("summary") or "").strip() or str(task.get("transcript") or "").strip()
-    ]
+    tasks = task_db.list_library_documents()
     tasks.sort(key=lambda item: (str(item.get("created_at") or ""), str(item.get("id") or "")))
 
     generated: Dict[str, GeneratedFile] = {}
