@@ -21,9 +21,9 @@ XianWen 后续应作为一个独立产品继续维护，定位是：
 当前仓库：
 
 ```text
-路径：/Users/subin/Documents/Claude-Project/xian-wen-project
+路径：/Users/subin/Documents/Claude-Project/xian-wen-jixue-project
 当前分支：master
-主远程：git@github.com:iSubin/xianwen.git
+主远程：git@github.com:iSubin/xian-wen-jixue-project.git
 品牌与文档基线提交：9db838c docs: establish xianwen brand and docs layout
 ```
 
@@ -224,7 +224,7 @@ http://127.0.0.1:8000/
 可以直接把下面这段给新的 XianWen 开发主线 session：
 
 ```text
-请先阅读 /Users/subin/Documents/Claude-Project/xian-wen-project/docs/handoff/xianwen-session-handoff.md，
+请先阅读 /Users/subin/Documents/Claude-Project/xian-wen-jixue-project/docs/handoff/xianwen-session-handoff.md，
 再检查当前仓库状态。这个项目后续作为 XianWen 独立产品维护，不要把新的学习平台能力混进来。
 
 如果涉及部署，请先阅读 README.md 并优先使用 deploy一键部署.sh 和 run一键启动.sh。

@@ -351,7 +351,7 @@ python xianwen-app.py
   先闻继学 (XianWen) - 一键启动
 ========================================
 
-使用 Python: D:\prj\xian-wen-project\.venv\Scripts\python.exe
+使用 Python: D:\prj\xian-wen-jixue-project\.venv\Scripts\python.exe
 
 INFO  2026-03-13 10:13:01.248 Using configured database
 INFO  2026-03-13 10:13:03.422 --- [Startup] 未检测到代理环境，已自动接管本地代理端口 7890 ---
@@ -619,6 +619,6 @@ XIANWEN_DATABASE_URL='postgresql+psycopg://xianwen:<password>@127.0.0.1:54329/xi
 
 **先闻继学（XianWen）开源项目**
 
-问题与建议请提交到 [GitHub Issues](https://github.com/iSubin/xianwen/issues)。
+问题与建议请提交到 [GitHub Issues](https://github.com/iSubin/xian-wen-jixue-project/issues)。
 
 </div>

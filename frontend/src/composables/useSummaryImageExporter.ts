@@ -83,7 +83,7 @@ interface RenderPageContext {
 }
 
 const BASE_EXPORT_WIDTH = 1080
-const DEFAULT_SHARE_URL = 'https://github.com/iSubin/xianwen'
+const DEFAULT_SHARE_URL = 'https://github.com/iSubin/xian-wen-jixue-project'
 const EXPORT_FONT_FAMILY = "'Microsoft YaHei', 'Segoe UI', 'Consolas', sans-serif"
 const HEADER_HORIZONTAL_PADDING = 44
 const CONTENT_HORIZONTAL_PADDING = 76

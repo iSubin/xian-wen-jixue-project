@@ -429,7 +429,7 @@ course-learning-platform/
 新 session 的建议开场提示词：
 
 ```text
-请阅读 /Users/subin/Documents/Claude-Project/xian-wen-project/docs/research/feishu-course-web-learning-platform-research.md。
+请阅读 /Users/subin/Documents/Claude-Project/xian-wen-jixue-project/docs/research/feishu-course-web-learning-platform-research.md。
 我要新建一个独立的中文学习平台产品，不与 XianWen 混合。
 请先做项目初始化方案和第一版目录结构，技术底座按 Next.js + Fumadocs + TypeScript + Tailwind 处理，后续再接 PostgreSQL、Meilisearch 和飞书同步。
 ```
