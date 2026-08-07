@@ -2,6 +2,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
@@ -34,6 +35,24 @@ class TestJSONConfigManager(unittest.TestCase):
             self.assertEqual(whisper.model_source, "auto_download")
             self.assertIsNone(whisper.model_path)
             self.assertIsNone(whisper.faster_whisper_model_path)
+
+    def test_database_url_environment_overrides_json_config(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = os.path.join(temp_dir, "settings.json")
+            manager = JSONConfigManager(config_path=config_path)
+            manager.update_section("database", {"url": "sqlite:///from-settings.db"})
+
+            with mock.patch.dict(
+                os.environ,
+                {"XIANWEN_DATABASE_URL": "postgresql+psycopg://env-user:placeholder@postgres:5432/envdb"},
+                clear=False,
+            ):
+                database = manager.get_database_config()
+
+            self.assertEqual(
+                database.url,
+                "postgresql+psycopg://env-user:placeholder@postgres:5432/envdb",
+            )
 
 
 if __name__ == "__main__":

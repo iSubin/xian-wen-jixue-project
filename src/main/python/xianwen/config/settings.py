@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import uuid
 from dataclasses import MISSING, dataclass, field, fields as dataclass_fields
 from pathlib import Path
@@ -643,10 +644,11 @@ class JSONConfigManager:
     def get_database_config(self) -> DatabaseConfig:
         raw = self.get_raw_config().get("database", {})
         defaults = DEFAULT_SETTINGS["database"]
+        environment_url = os.getenv("XIANWEN_DATABASE_URL", "").strip()
         return DatabaseConfig(
             sqlite_path=str(raw.get("sqlite_path", defaults["sqlite_path"])),
             json_file_path=str(raw.get("json_file_path", defaults["json_file_path"])),
-            url=str(raw.get("url", defaults["url"])),
+            url=environment_url or str(raw.get("url", defaults["url"])),
         )
 
     def get_cors_config(self) -> CORSConfig:

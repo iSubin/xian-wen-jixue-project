@@ -456,6 +456,7 @@ XianWen 当前版本以 **前端设置面板** 作为主要配置入口，同时
 SQLite 仍可作为轻量兼容模式。持续使用、凭据保存和 Git 文库场景推荐 PostgreSQL：
 
 ```bash
+export XIANWEN_POSTGRES_PASSWORD="$(openssl rand -hex 24)"
 docker compose -f docker-compose.postgres.yml up -d --wait postgres
 ```
 
@@ -467,6 +468,37 @@ XIANWEN_DATABASE_URL='postgresql+psycopg://xianwen:<password>@127.0.0.1:54329/xi
 ```
 
 然后在本机 `config/settings.json` 的 `database.url` 中写入同一连接地址。配置了 PostgreSQL 后，如果数据库不可用，应用会停止启动，不会静默回退到另一份数据源。
+
+### Docker 全栈部署（FastAPI + 已构建前端 + PostgreSQL）
+
+`docker-compose.postgres.yml` 现在同时提供 `postgres` 和 `app` 服务；只启动 `postgres` 仍保留原来的本地数据库路径，启动整个 Compose 项目即可运行完整应用：
+
+```bash
+# 凭据只存在于当前 shell，不写入仓库或示例文件
+export XIANWEN_POSTGRES_PASSWORD="$(openssl rand -hex 24)"
+unset XIANWEN_DATABASE_URL
+
+docker compose -f docker-compose.postgres.yml up -d --build --wait
+```
+
+启动后访问 <http://127.0.0.1:8000/>。应用和 PostgreSQL 默认都只绑定本机地址；PostgreSQL 的 `54329` 端口保留给现有迁移/本地脚本使用，不会监听局域网。
+
+Compose 镜像会在构建阶段执行前端 `npm run build`，运行阶段只提供 `frontend/dist` 静态产物和 FastAPI 服务，不启动前端开发服务器。应用配置、任务资源和模型缓存分别保存在 Docker named volumes 中；本地 `config/settings.json`、`config/.credential_secret`、数据库文件和 `.env` 不会进入镜像构建上下文。
+
+已有环境变量仍然有效：
+
+- `XIANWEN_DATABASE_URL`：如果设置，将覆盖 `config/settings.json` 中的 `database.url`；Compose 场景下应使用容器可解析的主机名（内置数据库使用 `postgres`）。使用内置 PostgreSQL 时请先 `unset` 它，避免把本机 `127.0.0.1` 地址带入容器。
+- `XIANWEN_POSTGRES_PASSWORD`：必填，不再提供仓库内置的默认密码。
+- `XIANWEN_CREDENTIAL_SECRET` / `XIANWEN_CREDENTIAL_SECRET_FILE`：按现有本地模式传入；未设置时应用会在持久化的配置卷中生成本地加密密钥。
+
+检查 Compose 配置而不启动服务：
+
+```bash
+XIANWEN_POSTGRES_PASSWORD=compose-check-only \
+  docker compose -f docker-compose.postgres.yml config --quiet
+```
+
+这是本地单用户部署边界：默认不向局域网开放，也不包含反向代理或用户认证；如需公网/多人访问，还应在外层增加认证、TLS 和更严格的网络策略。
 
 ### Git 文库与 Deploy Key
 
@@ -572,7 +604,7 @@ XIANWEN_DATABASE_URL='postgresql+psycopg://xianwen:<password>@127.0.0.1:54329/xi
 - [x] ~~Agent 增强模式集成（长内容分段理解、跨段关联总结）~~（2026-03-07已实现）
 - [x] ~~文章大纲导航（自动提取标题、快速跳转章节）~~（2026-03-07已实现）
 - [x] ~~时间戳跳转（点击时间戳跳转视频对应时间点）~~（2026-03-08已实现）
-- [ ] Docker部署支持
+- [x] Docker部署支持（FastAPI + 已构建前端 + PostgreSQL）
 - [ ] 支持处理字幕文件（`.srt` / `.ass` / `.vtt`）
 - [ ] 英文语言支持（界面与提示）
 - [ ] 增加agent模式下流水线处理（一遍转录一遍总结）

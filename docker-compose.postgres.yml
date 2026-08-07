@@ -1,12 +1,11 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: xianwen-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: xianwen
       POSTGRES_USER: xianwen
-      POSTGRES_PASSWORD: ${XIANWEN_POSTGRES_PASSWORD:-xianwen_dev_password}
+      POSTGRES_PASSWORD: ${XIANWEN_POSTGRES_PASSWORD:?Set XIANWEN_POSTGRES_PASSWORD before starting PostgreSQL}
     ports:
       - "127.0.0.1:54329:5432"
     volumes:
@@ -16,6 +15,50 @@ services:
       interval: 3s
       timeout: 3s
       retries: 20
+    security_opt:
+      - no-new-privileges:true
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      XIANWEN_DATABASE_URL: "${XIANWEN_DATABASE_URL:-postgresql+psycopg://xianwen:${XIANWEN_POSTGRES_PASSWORD}@postgres:5432/xianwen}"
+      XIANWEN_CREDENTIAL_SECRET: "${XIANWEN_CREDENTIAL_SECRET-}"
+      XIANWEN_CREDENTIAL_SECRET_FILE: "${XIANWEN_CREDENTIAL_SECRET_FILE-}"
+    ports:
+      - "${XIANWEN_APP_BIND:-127.0.0.1}:${XIANWEN_APP_PORT:-8000}:8000"
+    volumes:
+      - xianwen-config:/app/config
+      - xianwen-temp:/app/temp
+      - xianwen-model-cache:/home/xianwen/.cache
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8000/version', timeout=3)
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 10
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
 volumes:
   xianwen-postgres-data:
+  xianwen-config:
+  xianwen-temp:
+  xianwen-model-cache:
