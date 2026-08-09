@@ -12,8 +12,12 @@ sys.path.insert(0, os.path.join(PROJECT_ROOT, "src", "main", "python"))
 from xianwen.db import TaskDB, TaskStatus
 from xianwen.wechat_article import (
     WechatArticleCaptureError,
+    build_wechat_account_history_from_payload,
     capture_wechat_article_from_html,
+    extract_wechat_account_identity_from_html,
     is_wechat_article_url,
+    parse_wechat_history_payload,
+    read_wechat_cookie_header_from_browser,
 )
 
 
@@ -23,7 +27,12 @@ SAMPLE_WECHAT_HTML = """
     <meta property="og:title" content="测试文章">
     <meta property="og:article:author" content="测试公众号">
     <meta property="og:description" content="这是一段描述">
-    <script>var createTime = '2026-04-09 16:58';</script>
+    <script>
+      var biz = "MzTestBiz";
+      var nickname = "测试公众号";
+      var appmsg_token = "history-token";
+      var createTime = '2026-04-09 16:58';
+    </script>
   </head>
   <body>
     <div id="js_content">
@@ -34,6 +43,34 @@ SAMPLE_WECHAT_HTML = """
   </body>
 </html>
 """
+
+SAMPLE_HISTORY_PAYLOAD = {
+    "ret": 0,
+    "general_msg_list": json.dumps(
+        {
+            "list": [
+                {
+                    "comm_msg_info": {"datetime": 1775725080},
+                    "app_msg_ext_info": {
+                        "title": "主文章",
+                        "content_url": "https:\\/\\/mp.weixin.qq.com\\/s\\/main?__biz=MzTestBiz",
+                        "digest": "主文章摘要",
+                        "cover": "https://mmbiz.qpic.cn/cover-main.jpg",
+                        "multi_app_msg_item_list": [
+                            {
+                                "title": "副文章",
+                                "content_url": "https://mp.weixin.qq.com/s/sub",
+                                "digest": "副文章摘要",
+                                "cover": "https://mmbiz.qpic.cn/cover-sub.jpg",
+                            }
+                        ],
+                    },
+                }
+            ]
+        },
+        ensure_ascii=False,
+    ),
+}
 
 
 class TaskSourceFieldsPersistenceTest(unittest.TestCase):
@@ -148,6 +185,114 @@ class WechatArticleAdapterTest(unittest.TestCase):
                 "<html><body></body></html>",
                 download_images=False,
             )
+
+    def test_extract_account_identity_from_article_html(self):
+        identity = extract_wechat_account_identity_from_html(
+            "https://mp.weixin.qq.com/s/example",
+            SAMPLE_WECHAT_HTML,
+        )
+
+        self.assertEqual(identity.biz, "MzTestBiz")
+        self.assertEqual(identity.account_name, "测试公众号")
+        self.assertEqual(identity.appmsg_token, "history-token")
+
+    def test_extract_account_identity_accepts_object_property_token(self):
+        html = """
+        <html>
+          <head>
+            <meta property="og:article:author" content="对象公众号">
+            <script>
+              window.cgiData = {
+                biz: "MzObjectBiz",
+                appmsg_token: "object-token"
+              };
+            </script>
+          </head>
+          <body><div id="js_content">正文</div></body>
+        </html>
+        """
+
+        identity = extract_wechat_account_identity_from_html(
+            "https://mp.weixin.qq.com/s/example",
+            html,
+        )
+
+        self.assertEqual(identity.biz, "MzObjectBiz")
+        self.assertEqual(identity.account_name, "对象公众号")
+        self.assertEqual(identity.appmsg_token, "object-token")
+
+    def test_extract_account_identity_does_not_match_html_attribute_nickname(self):
+        html = """
+        <html>
+          <head>
+            <meta property="og:article:author" content="正确公众号">
+            <script>
+              var biz = "MzAttrBiz";
+              window.appmsg_token = "attr-token";
+            </script>
+          </head>
+          <body>
+            <div id="js_content">
+              <a data-miniprogram-nickname="错误昵称">小程序</a>
+            </div>
+          </body>
+        </html>
+        """
+
+        identity = extract_wechat_account_identity_from_html(
+            "https://mp.weixin.qq.com/s/example",
+            html,
+        )
+
+        self.assertEqual(identity.account_name, "正确公众号")
+
+    def test_read_wechat_cookie_header_from_browser_uses_browser_cookie3_when_available(self):
+        class FakeCookie:
+            def __init__(self, name, value):
+                self.name = name
+                self.value = value
+
+        class FakeBrowserCookie3:
+            @staticmethod
+            def chrome(domain_name):
+                self.assertEqual(domain_name, "mp.weixin.qq.com")
+                return [
+                    FakeCookie("ua_id", "ua-value"),
+                    FakeCookie("mm_lang", "zh_CN"),
+                    FakeCookie("ua_id", "duplicate"),
+                    FakeCookie("empty", ""),
+                ]
+
+        with patch.dict(sys.modules, {"browser_cookie3": FakeBrowserCookie3}):
+            header, source = read_wechat_cookie_header_from_browser()
+
+        self.assertEqual(header, "ua_id=ua-value; mm_lang=zh_CN")
+        self.assertEqual(source, "Google Chrome")
+
+    def test_parse_wechat_history_payload_expands_multi_article_messages(self):
+        items = parse_wechat_history_payload(SAMPLE_HISTORY_PAYLOAD)
+
+        self.assertEqual(len(items), 2)
+        self.assertEqual(items[0].title, "主文章")
+        self.assertEqual(items[0].source_url, "https://mp.weixin.qq.com/s/main?__biz=MzTestBiz")
+        self.assertEqual(items[0].digest, "主文章摘要")
+        self.assertEqual(items[0].publish_time, "2026-04-09 16:58:00")
+        self.assertEqual(items[1].title, "副文章")
+        self.assertEqual(items[1].source_url, "https://mp.weixin.qq.com/s/sub")
+
+    def test_build_account_history_from_payload_uses_article_identity(self):
+        history = build_wechat_account_history_from_payload(
+            "https://mp.weixin.qq.com/s/example",
+            SAMPLE_WECHAT_HTML,
+            SAMPLE_HISTORY_PAYLOAD,
+            limit=1,
+        )
+
+        self.assertEqual(history.account_name, "测试公众号")
+        self.assertEqual(history.biz, "MzTestBiz")
+        self.assertEqual(history.source_url, "https://mp.weixin.qq.com/s/example")
+        self.assertEqual(len(history.items), 1)
+        self.assertEqual(history.items[0].title, "主文章")
 
 
 class WechatArticleTaskPayloadTest(unittest.TestCase):

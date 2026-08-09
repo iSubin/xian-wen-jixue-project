@@ -2,6 +2,7 @@ import re
 from typing import Any, Dict, Iterable, List
 
 from .db import TaskStatus
+from .wechat_article import WechatAccountHistory
 
 
 TERMINAL_STATUSES = {TaskStatus.COMPLETED.value, TaskStatus.FAILED.value}
@@ -67,6 +68,31 @@ def build_bilibili_parts_collection(source_url: str, video_info: Dict[str, Any])
         "source_type": "bilibili_multi_part" if len(items) > 1 else "single_url",
         "source_url": source_url,
         "title": title,
+        "total_items": len(items),
+        "items": items,
+    }
+
+
+def build_wechat_history_collection(history: WechatAccountHistory) -> Dict[str, Any]:
+    """Convert a WeChat public account history preview into collection preview data."""
+    account_name = _clean_title(history.account_name, "微信公众号")
+    items = []
+    for order, article in enumerate(history.items):
+        items.append(
+            {
+                "provider": "wechat",
+                "source_url": article.source_url,
+                "title": _clean_title(article.title, f"第 {order + 1} 篇"),
+                "part_index": order,
+                "duration": None,
+            }
+        )
+
+    return {
+        "provider": "wechat",
+        "source_type": "wechat_account_history",
+        "source_url": history.source_url,
+        "title": f"{account_name} - 公众号历史文章",
         "total_items": len(items),
         "items": items,
     }
