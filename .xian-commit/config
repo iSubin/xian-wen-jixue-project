@@ -1,0 +1,36 @@
+# xian-commit policy example
+# Copy to .xian-commit/config in a target repo when defaults need adjustment.
+# Format: key=value. Values are whitespace-separated where multiple entries are allowed.
+#
+# This file stores rules only. Do not store runtime state, change state, push
+# authorization, or agent plans here.
+
+# push.mode:
+#   explicit-only - agent may push only after the current user request says push.
+#   auto-safe     - default; post-commit may push HEAD to the upstream branch after safe commits.
+#   never         - pre-push rejects every push.
+# Legacy value "disabled" is accepted as an alias of "never".
+push.mode=auto-safe
+
+# branch.protected: glob patterns rejected by pre-push.
+# auto-safe also skips these branches instead of pushing them.
+branch.protected=
+
+# path.allow: staged path globs allowed before denylist checks.
+# Use this for project-owned audit/evidence artifacts that intentionally match a
+# broad project-specific deny pattern.
+path.allow=
+
+# path.deny: extra staged path globs rejected by pre-commit.
+path.deny=
+
+# message.types: allowed commit types.
+message.types=feat fix refactor docs test chore
+
+# message.title_language:
+#   zh  - title must contain CJK text.
+#   any - skip title language check.
+message.title_language=zh
+
+# message.body_required: true or false.
+message.body_required=true
