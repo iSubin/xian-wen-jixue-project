@@ -657,14 +657,15 @@ watch(() => props.summarizationSettings, (settings) => {
 <template>
   <aside
     :class="[
-      'fixed md:static inset-y-0 left-0 z-40 w-[85%] max-w-[340px] md:w-[400px] bg-white border-r border-gray-100 h-full shadow-2xl md:shadow-none transition-transform duration-300 transform',
+      'xw-sidebar fixed md:static inset-y-0 left-0 z-40 w-[85%] max-w-[340px] md:w-[400px] bg-white border-r border-gray-100 h-full shadow-2xl md:shadow-none transition-transform duration-300 transform',
       isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
     ]"
   >
     <div class="flex h-full">
       <!-- 左侧 tab rail -->
-      <div class="w-14 shrink-0 border-r border-gray-100 bg-gray-50 flex flex-col items-center py-4 gap-2">
+      <div class="xw-tab-rail w-14 shrink-0 border-r border-gray-100 bg-gray-50 flex flex-col items-center py-4 gap-2">
         <button
+          aria-label="打开采集台"
           @click="sidebarTab = 'quick'"
           :class="[
             'w-10 h-10 rounded-xl flex items-center justify-center transition-colors',
@@ -678,6 +679,7 @@ watch(() => props.summarizationSettings, (settings) => {
         </button>
 
         <button
+          aria-label="打开藏经阁"
           @click="sidebarTab = 'library'"
           :class="[
             'w-10 h-10 rounded-xl flex items-center justify-center transition-colors relative',
@@ -694,6 +696,7 @@ watch(() => props.summarizationSettings, (settings) => {
         </button>
 
         <button
+          aria-label="打开任务搜索"
           @click="sidebarTab = 'manage'"
           :class="[
             'w-10 h-10 rounded-xl flex items-center justify-center transition-colors relative',
@@ -713,9 +716,9 @@ watch(() => props.summarizationSettings, (settings) => {
       <div class="flex-1 min-w-0 flex flex-col">
         <div class="relative">
           <!-- Logo -->
-          <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+          <div class="xw-brand-header p-4 border-b border-gray-100 flex items-center justify-between">
             <div class="flex items-center gap-2.5 min-w-0">
-              <div class="w-9 h-9 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center text-white shadow-sm shadow-blue-200 shrink-0">
+              <div class="xw-brand-mark w-9 h-9 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center text-white shadow-sm shadow-blue-200 shrink-0">
                 <PhWaveSine :size="20" weight="bold" />
               </div>
               <div class="min-w-0">
@@ -736,13 +739,14 @@ watch(() => props.summarizationSettings, (settings) => {
 
             <div class="flex items-center gap-1">
               <button
+                aria-label="打开设置"
                 @click="emit('openSettings')"
                 class="w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-colors flex items-center justify-center"
                 title="设置"
               >
                 <PhGearSix :size="16" />
               </button>
-              <button @click="isSidebarOpen = false" class="md:hidden text-slate-400 hover:text-slate-600 p-1">
+              <button aria-label="关闭侧边栏" @click="isSidebarOpen = false" class="md:hidden text-slate-400 hover:text-slate-600 p-1">
                 <PhX :size="20" />
               </button>
             </div>

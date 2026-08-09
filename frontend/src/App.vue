@@ -935,7 +935,8 @@ watch(
 </script>
 
 <template>
-  <div class="flex h-[100dvh] w-full overflow-hidden bg-bg text-slate-800 font-sans relative">
+  <div class="xw-app-shell flex h-[100dvh] w-full overflow-hidden bg-bg text-slate-800 font-sans relative">
+    <a class="skip-link" href="#main-content">跳转到正文</a>
     <!-- Toast 通知容器 -->
     <ToastContainer
       :toasts="toasts"
@@ -1000,7 +1001,7 @@ watch(
 
     <!-- 遮罩层 (Mobile Only) -->
     <transition name="fade">
-      <div v-if="isSidebarOpen" @click="isSidebarOpen = false" class="fixed inset-0 bg-slate-900/50 z-30 backdrop-blur-sm md:hidden"></div>
+      <div v-if="isSidebarOpen" @click="isSidebarOpen = false" class="xw-mobile-scrim fixed inset-0 bg-slate-900/50 z-30 backdrop-blur-sm md:hidden"></div>
     </transition>
 
     <!-- 左侧边栏 -->
@@ -1079,7 +1080,7 @@ watch(
     />
 
     <!-- 右侧内容区 -->
-    <main class="flex-1 flex flex-col h-full bg-gray-50 relative w-full overflow-hidden">
+    <main id="main-content" class="xw-main flex-1 flex flex-col h-full bg-gray-50 relative w-full overflow-hidden" tabindex="-1">
       <template v-if="selectedTask">
         <!-- 悬浮气泡工具栏 -->
         <FloatingToolbar
@@ -1128,13 +1129,13 @@ watch(
       <!-- 未选中状态 -->
       <div v-else class="flex-1 flex flex-col h-full">
         <!-- 移动端顶部栏（未选中任务时显示） -->
-        <header class="h-14 bg-white border-b border-gray-100 px-4 flex items-center md:hidden shrink-0 sticky top-0 z-20">
-          <button @click="isSidebarOpen = true" class="p-1.5 -ml-1.5 text-slate-600 hover:bg-gray-100 rounded-lg active:scale-90 transition-transform">
+        <header class="xw-mobile-empty-header h-14 bg-white border-b border-gray-100 px-4 flex items-center md:hidden shrink-0 sticky top-0 z-20">
+          <button aria-label="打开侧边栏" @click="isSidebarOpen = true" class="p-1.5 -ml-1.5 text-slate-600 hover:bg-gray-100 rounded-lg active:scale-90 transition-transform">
             <PhList :size="24" />
           </button>
         </header>
 
-        <div class="flex-1 flex flex-col items-center justify-center text-slate-400">
+        <div class="xw-empty-state flex-1 flex flex-col items-center justify-center text-slate-400">
           <PhMonitorPlay :size="64" weight="thin" class="mb-4 opacity-20" />
           <p class="font-serif tracking-wider">请从左侧文库选择一篇文档，或进入采集台带回新知</p>
         </div>

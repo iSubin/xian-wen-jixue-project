@@ -532,8 +532,8 @@ watch(() => props.streamingBlocks, () => {
 </script>
 
 <template>
-  <div ref="contentScrollRef" class="flex-1 overflow-y-auto overflow-x-auto p-4 md:p-8 pt-16 md:pt-20 custom-scrollbar">
-    <div class="max-w-4xl mx-auto">
+  <div ref="contentScrollRef" class="reading-content-scroll flex-1 overflow-y-auto overflow-x-auto p-4 md:p-8 pt-16 md:pt-20 custom-scrollbar">
+    <div class="reading-content max-w-4xl mx-auto">
       <!-- 错误状态 -->
       <div v-if="isFailed" class="bg-red-50 border border-red-100 p-6 rounded-2xl mb-6">
         <div class="flex items-center gap-3 text-red-700 font-bold mb-2">
@@ -551,7 +551,7 @@ watch(() => props.streamingBlocks, () => {
       </div>
 
       <!-- 成功内容区 -->
-      <div v-else class="bg-white rounded-2xl shadow-sm border border-slate-200 min-h-[500px] relative">
+      <div v-else class="reading-sheet bg-white rounded-2xl shadow-sm border border-slate-200 min-h-[500px] relative">
         <!-- AI 总结 Tab -->
         <div v-show="activeTab === 'summary'">
           <!-- 顶部元信息卡片 -->
@@ -572,7 +572,7 @@ watch(() => props.streamingBlocks, () => {
           <!-- 总结内容 - 添加主题容器类 -->
           <article
             ref="summaryArticleRef"
-            class="prose prose-sm md:prose-base prose-slate prose-headings:font-bold prose-a:text-blue-600 hover:prose-a:underline prose-img:rounded-xl max-w-none px-8 py-8 ss-shared-prose markdown-theme-container"
+            class="reading-article prose prose-sm md:prose-base prose-slate prose-headings:font-bold prose-a:text-blue-600 hover:prose-a:underline prose-img:rounded-xl max-w-none px-8 py-8 ss-shared-prose markdown-theme-container"
             :data-theme="currentThemeId"
           >
             <!-- 快照模式：切回来时有已有内容 + 新 delta 增量 -->
@@ -594,7 +594,7 @@ watch(() => props.streamingBlocks, () => {
         </div>
 
         <!-- 转录文本 Tab -->
-        <div v-show="activeTab === 'transcript'" class="px-8 py-8">
+        <div v-show="activeTab === 'transcript'" class="transcript-view px-8 py-8">
           <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
             <h3 class="text-lg font-bold text-slate-800">{{ isArticleTask ? '文章原文' : '全文转录' }}</h3>
             <div class="flex flex-wrap items-center justify-end gap-2">

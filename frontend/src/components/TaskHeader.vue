@@ -31,10 +31,10 @@ const startEditingTopic = () => {
 </script>
 
 <template>
-  <header class="h-16 bg-white/60 backdrop-blur-sm border-b border-gray-200 px-4 md:px-8 flex items-center justify-between shadow-sm shrink-0 sticky top-0 z-20">
+  <header class="xw-task-header h-16 bg-white/60 backdrop-blur-sm border-b border-gray-200 px-4 md:px-8 flex items-center justify-between shadow-sm shrink-0 sticky top-0 z-20">
     <div class="flex items-center gap-3 md:gap-4 overflow-hidden">
       <!-- 移动端侧边栏切换按钮 -->
-      <button @click="$emit('toggle-sidebar')" class="md:hidden p-1.5 -ml-1.5 text-slate-600 hover:bg-gray-100 rounded-lg active:scale-90 transition-transform">
+      <button aria-label="打开侧边栏" @click="$emit('toggle-sidebar')" class="md:hidden p-1.5 -ml-1.5 text-slate-600 hover:bg-gray-100 rounded-lg active:scale-90 transition-transform">
         <PhList :size="24" />
       </button>
 
@@ -46,7 +46,7 @@ const startEditingTopic = () => {
           <h2 class="text-sm md:text-base font-bold text-slate-800 truncate max-w-[200px] md:max-w-md" :title="topic || task.title || '任务详情'">
             {{ topic || task.title || '任务详情' }}
           </h2>
-          <button @click="startEditingTopic" class="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-primary p-1 rounded hover:bg-slate-100" title="编辑主题">
+          <button aria-label="编辑主题" @click="startEditingTopic" class="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-primary p-1 rounded hover:bg-slate-100" title="编辑主题">
             <PhPencilSimple :size="16" />
           </button>
         </div>

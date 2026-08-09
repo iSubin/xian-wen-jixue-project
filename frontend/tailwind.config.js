@@ -12,7 +12,10 @@ export default {
         bg: '#f9fafb', // Gray 50
       },
       fontFamily: {
-        sans: ['Microsoft YaHei', 'Segoe UI', 'Consolas', 'sans-serif'],
+        sans: ['Noto Sans SC', 'Noto Sans TC', 'PingFang SC', 'Microsoft YaHei', 'system-ui', 'sans-serif'],
+        serif: ['Noto Serif SC', 'Noto Serif TC', 'Songti SC', 'STSong', 'serif'],
+        reading: ['Noto Serif SC', 'Noto Serif TC', 'Songti SC', 'STSong', 'serif'],
+        mono: ['JetBrains Mono', 'SFMono-Regular', 'Consolas', 'monospace'],
       }
     },
   },

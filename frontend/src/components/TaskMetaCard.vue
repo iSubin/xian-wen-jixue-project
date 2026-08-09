@@ -30,7 +30,7 @@ const startEditingTopic = () => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-4">
+  <div class="task-meta-card flex flex-col gap-4">
     <!-- 视频标题 -->
     <h1 class="text-2xl md:text-3xl font-bold text-slate-800">
       {{ task.title || '未命名视频' }}
