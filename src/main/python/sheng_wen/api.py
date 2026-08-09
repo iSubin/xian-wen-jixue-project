@@ -29,7 +29,14 @@ from .utils.media import (
 from .collection_jobs import (
     build_aggregate_markdown,
     build_bilibili_parts_collection,
+    build_wechat_history_collection,
     extract_urls_from_text,
+)
+from .wechat_article import (
+    WechatArticleCaptureError,
+    capture_wechat_article,
+    is_wechat_article_url,
+    preview_wechat_account_history,
 )
 from .downloader.bilibili_author_resolver import (
     resolve_bilibili_author,
@@ -488,6 +495,7 @@ class CollectionPreviewItem(BaseModel):
 class CollectionPreviewRequest(BaseModel):
     source: str = Field(..., min_length=1, description="合集链接、视频链接列表或粘贴文本")
     title: Optional[str] = Field(default=None, description="用户指定的合集标题")
+    limit: Optional[int] = Field(default=30, ge=1, le=100, description="历史列表最多预览条数")
 
 
 class CollectionPreview(BaseModel):
@@ -952,6 +960,22 @@ def _build_wechat_article_task_data(task_id: str, article: Any, folder_id: str |
     }
 
 
+async def _enqueue_wechat_article_summary(task_id: str, raw_markdown: str, summary_mode: str) -> None:
+    temp_dir = "temp"
+    os.makedirs(temp_dir, exist_ok=True)
+    intermediate_file = os.path.join(temp_dir, f"{task_id}_wechat_article.md")
+    with open(intermediate_file, "w", encoding="utf-8") as file:
+        file.write(raw_markdown)
+
+    worker = await get_llm_worker()
+    await worker.add_task({
+        "task_id": task_id,
+        "intermediate_file_path": intermediate_file,
+        "output_file": os.path.join(temp_dir, f"{task_id}_wechat_summary.md"),
+        "summary_mode": summary_mode,
+    })
+
+
 async def _try_resolve_and_persist_author(task_id: str, video_url: str) -> bool:
     try:
         from .task_updater import update_and_notify
@@ -1300,8 +1324,6 @@ async def _get_bilibili_video_title_and_parts(video_url: str) -> tuple[str, list
 
 @app.post("/articles/wechat", response_model=Task, status_code=201)
 async def create_wechat_article_task(payload: WechatArticleCreate):
-    from .wechat_article import WechatArticleCaptureError, capture_wechat_article
-
     source_url = str(payload.url)
     task_id = str(uuid.uuid4())
     article_assets_dir = os.path.join(task_assets_dir, task_id)
@@ -1324,20 +1346,8 @@ async def create_wechat_article_task(payload: WechatArticleCreate):
     )
     db.save_task(task_id, task_data)
 
-    temp_dir = "temp"
-    os.makedirs(temp_dir, exist_ok=True)
-    intermediate_file = os.path.join(temp_dir, f"{task_id}_wechat_article.md")
-    with open(intermediate_file, "w", encoding="utf-8") as file:
-        file.write(article.raw_markdown)
-
     try:
-        worker = await get_llm_worker()
-        await worker.add_task({
-            "task_id": task_id,
-            "intermediate_file_path": intermediate_file,
-            "output_file": os.path.join(temp_dir, f"{task_id}_wechat_summary.md"),
-            "summary_mode": resolved_summary_mode,
-        })
+        await _enqueue_wechat_article_summary(task_id, article.raw_markdown, resolved_summary_mode)
     except Exception as exc:
         from .task_updater import update_and_notify
         await update_and_notify(
@@ -1487,6 +1497,8 @@ def _guess_collection_provider(urls: List[str]) -> str:
     for url in urls:
         if _is_bilibili_video_url(url):
             providers.add("bilibili")
+        elif is_wechat_article_url(url):
+            providers.add("wechat")
         elif is_xiaoet_video_url(url):
             providers.add("xiaoetong")
         elif is_homeway_graphic_video_url(url):
@@ -1509,7 +1521,7 @@ def _title_from_collection_url(url: str, index: int) -> str:
 def _build_url_list_collection_preview(source: str, title: str | None = None) -> Dict[str, Any]:
     urls = extract_urls_from_text(source)
     if not urls:
-        raise HTTPException(status_code=400, detail="未找到可用的视频链接")
+        raise HTTPException(status_code=400, detail="未找到可用的链接")
 
     provider = _guess_collection_provider(urls)
     items = []
@@ -1524,14 +1536,88 @@ def _build_url_list_collection_preview(source: str, title: str | None = None) ->
             }
         )
 
+    default_title = f"合集任务（{len(items)} 个视频）"
+    if provider == "wechat":
+        default_title = f"公众号文章合集（{len(items)} 篇）"
+
     return {
         "provider": provider,
         "source_type": "url_list",
         "source_url": urls[0] if len(urls) == 1 else None,
-        "title": (title or f"合集任务（{len(items)} 个视频）").strip(),
+        "title": (title or default_title).strip(),
         "total_items": len(items),
         "items": items,
     }
+
+
+async def _create_wechat_article_collection_task(
+    item: Dict[str, Any],
+    folder_id: str,
+    summary_mode: str,
+) -> str:
+    task_id = str(uuid.uuid4())
+    source_url = str(item.get("source_url") or "").strip()
+    fallback_title = str(item.get("title") or source_url or "公众号文章")
+    article_assets_dir = os.path.join(task_assets_dir, task_id)
+
+    try:
+        article = capture_wechat_article(
+            source_url,
+            output_dir=article_assets_dir,
+            markdown_image_base=f"/task-assets/{task_id}",
+        )
+    except WechatArticleCaptureError as exc:
+        source_meta = json.dumps({"error": str(exc), "source_type": "wechat_article"}, ensure_ascii=False)
+        db.save_task(
+            task_id,
+            {
+                "id": task_id,
+                "video_url": source_url,
+                "source_type": "wechat_article",
+                "source_url": source_url,
+                "source_meta": source_meta,
+                "status": TaskStatus.FAILED,
+                "created_at": datetime.utcnow(),
+                "latest_modified_at": datetime.utcnow(),
+                "progress": 0.0,
+                "title": fallback_title,
+                "transcript": "",
+                "summary": "",
+                "error_message": str(exc),
+                "author_name": None,
+                "author_url": source_url,
+                "summary_mode": summary_mode,
+                "summary_chunk_total": None,
+                "summary_chunk_done": None,
+                "summary_meta": source_meta,
+                "folder_id": folder_id,
+            },
+        )
+        await notify_task_update(task_id)
+        return task_id
+
+    task_data = _build_wechat_article_task_data(
+        task_id,
+        article,
+        folder_id=folder_id,
+        summary_mode=summary_mode,
+    )
+    db.save_task(task_id, task_data)
+
+    try:
+        await _enqueue_wechat_article_summary(task_id, article.raw_markdown, summary_mode)
+    except Exception:
+        from .task_updater import update_and_notify
+        await update_and_notify(
+            task_id,
+            {
+                "status": TaskStatus.FAILED,
+                "error_message": "文章已采集，但生成笔记任务启动失败，请稍后重试",
+            },
+        )
+
+    await notify_task_update(task_id)
+    return task_id
 
 
 async def _create_task_for_collection_item(
@@ -1541,6 +1627,13 @@ async def _create_task_for_collection_item(
     quality: str,
     summary_mode: str,
 ) -> str:
+    if str(item.get("provider") or "").strip().lower() == "wechat":
+        return await _create_wechat_article_collection_task(
+            item=item,
+            folder_id=folder_id,
+            summary_mode=summary_mode,
+        )
+
     task_id = str(uuid.uuid4())
     source_url = str(item.get("source_url") or "").strip()
     title = str(item.get("title") or source_url or "合集条目")
@@ -1591,11 +1684,11 @@ async def _create_task_for_collection_item(
 
 @app.post("/collections/preview", response_model=CollectionPreview)
 async def preview_collection(payload: CollectionPreviewRequest):
-    """预览合集任务：优先识别 B 站多P，否则按粘贴链接列表处理。"""
+    """预览合集任务：优先识别 B 站多P和公众号历史，否则按粘贴链接列表处理。"""
     source = str(payload.source or "").strip()
     urls = extract_urls_from_text(source)
     if not urls:
-        raise HTTPException(status_code=400, detail="未找到可用的视频链接")
+        raise HTTPException(status_code=400, detail="未找到可用的链接")
 
     if len(urls) == 1 and _is_bilibili_video_url(urls[0]):
         video_info = await get_bilibili_video_info(BilibiliVideoInfoRequest(url=urls[0]))
@@ -1606,6 +1699,16 @@ async def preview_collection(payload: CollectionPreviewRequest):
                 preview["title"] = payload.title.strip()
             return preview
 
+    if len(urls) == 1 and is_wechat_article_url(urls[0]):
+        try:
+            history = preview_wechat_account_history(urls[0], limit=int(payload.limit or 30))
+        except WechatArticleCaptureError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        preview = build_wechat_history_collection(history)
+        if payload.title:
+            preview["title"] = payload.title.strip()
+        return preview
+
     return _build_url_list_collection_preview(source, payload.title)
 
 
@@ -1613,7 +1716,7 @@ async def preview_collection(payload: CollectionPreviewRequest):
 async def create_collection_job(payload: CollectionCreateRequest, request: Request):
     """创建合集任务，并为每个条目创建普通处理任务。"""
     if not payload.items:
-        raise HTTPException(status_code=400, detail="合集至少需要一个视频条目")
+        raise HTTPException(status_code=400, detail="合集至少需要一个采集条目")
 
     resolved_summary_mode = _normalize_summary_mode(payload.summary_mode)
     quality = str(payload.quality or "audio_only")

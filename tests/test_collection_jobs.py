@@ -10,10 +10,12 @@ sys.path.insert(0, os.path.join(PROJECT_ROOT, "src", "main", "python"))
 from sheng_wen.collection_jobs import (
     build_aggregate_markdown,
     build_bilibili_parts_collection,
+    build_wechat_history_collection,
     derive_collection_status,
     extract_urls_from_text,
 )
 from sheng_wen.db import TaskDB, TaskStatus
+from sheng_wen.wechat_article import WechatAccountHistory, WechatHistoryArticle
 
 
 class CollectionJobHelpersTest(unittest.TestCase):
@@ -53,6 +55,43 @@ class CollectionJobHelpersTest(unittest.TestCase):
         self.assertEqual(preview["items"][0]["title"], "P1 开场")
         self.assertEqual(preview["items"][0]["part_index"], 0)
         self.assertEqual(preview["items"][1]["duration"], 240)
+
+    def test_build_wechat_history_collection_converts_articles_to_items(self):
+        history = WechatAccountHistory(
+            account_name="测试公众号",
+            source_url="https://mp.weixin.qq.com/s/source",
+            biz="MzTestBiz",
+            items=[
+                WechatHistoryArticle(
+                    source_url="https://mp.weixin.qq.com/s/a",
+                    title="第一篇",
+                    digest="摘要",
+                    publish_time="2026-04-09 16:58:00",
+                    cover_url=None,
+                    item_index=0,
+                ),
+                WechatHistoryArticle(
+                    source_url="https://mp.weixin.qq.com/s/b",
+                    title="第二篇",
+                    digest=None,
+                    publish_time=None,
+                    cover_url=None,
+                    item_index=1,
+                ),
+            ],
+            metadata={"ret": 0},
+        )
+
+        preview = build_wechat_history_collection(history)
+
+        self.assertEqual(preview["provider"], "wechat")
+        self.assertEqual(preview["source_type"], "wechat_account_history")
+        self.assertEqual(preview["source_url"], "https://mp.weixin.qq.com/s/source")
+        self.assertEqual(preview["title"], "测试公众号 - 公众号历史文章")
+        self.assertEqual(preview["total_items"], 2)
+        self.assertEqual(preview["items"][0]["provider"], "wechat")
+        self.assertEqual(preview["items"][0]["source_url"], "https://mp.weixin.qq.com/s/a")
+        self.assertEqual(preview["items"][0]["title"], "第一篇")
 
     def test_derive_collection_status_counts_task_states(self):
         items = [

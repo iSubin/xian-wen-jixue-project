@@ -56,6 +56,23 @@ const selectedDurationLabel = computed(() => {
   return `${minutes} 分钟`
 })
 
+const providerLabel = (provider: string) => {
+  const normalized = provider.toLowerCase()
+  if (normalized === 'wechat') return '公众号'
+  if (normalized === 'bilibili') return 'B 站'
+  if (normalized === 'xiaoetong') return '小鹅通'
+  if (normalized === 'homeway') return '投研大师'
+  return provider || '未知来源'
+}
+
+const sourceTypeLabel = (sourceType: string) => {
+  if (sourceType === 'wechat_account_history') return '历史文章'
+  if (sourceType === 'bilibili_multi_part') return '多 P 视频'
+  if (sourceType === 'url_list') return '链接列表'
+  if (sourceType === 'single_url') return '单链接'
+  return sourceType || '批量采集'
+}
+
 const canCreate = computed(() => Boolean(preview.value && selectedItems.value.length > 0 && !props.isCreatingCollection))
 
 const resetState = () => {
@@ -90,7 +107,7 @@ const toggleItem = (item: CollectionPreviewItem, index: number) => {
 const handlePreview = async () => {
   const source = sourceInput.value.trim()
   if (!source) {
-    errorMessage.value = '请先粘贴合集链接或视频链接列表'
+    errorMessage.value = '请先粘贴合集链接、公众号文章或链接列表'
     return
   }
 
@@ -155,7 +172,7 @@ watch(() => props.isOpen, (isOpen) => {
               </div>
               <div>
                 <h2 class="text-base font-semibold text-slate-900">合集采集</h2>
-                <p class="text-xs text-slate-500">批量提交视频，完成后聚合成知识文档</p>
+                <p class="text-xs text-slate-500">批量提交视频或文章，完成后聚合成知识文档</p>
               </div>
             </div>
             <button
@@ -170,12 +187,12 @@ watch(() => props.isOpen, (isOpen) => {
             <div class="grid gap-4 md:grid-cols-[1fr_260px]">
               <div class="space-y-3">
                 <label class="block">
-                  <span class="mb-1.5 block text-xs font-medium text-slate-500">粘贴 B 站合集 / 多 P / 视频链接列表</span>
+                  <span class="mb-1.5 block text-xs font-medium text-slate-500">粘贴合集链接 / 公众号文章 / 链接列表</span>
                   <textarea
                     v-model="sourceInput"
                     rows="7"
                     class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm leading-6 text-slate-700 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-100"
-                    placeholder="可以粘贴一个 B 站多 P 链接，也可以一行一个视频链接。后续这里会扩展小鹅通、投研大师等合集入口。"
+                    placeholder="可以粘贴 B 站多 P 链接、公众号文章链接，或一行一个可采集链接。"
                   ></textarea>
                 </label>
 
@@ -215,7 +232,7 @@ watch(() => props.isOpen, (isOpen) => {
                 >
                   <PhSpinner v-if="isPreviewing" :size="16" class="animate-spin" />
                   <PhLink v-else :size="16" />
-                  {{ isPreviewing ? '解析中...' : '解析合集' }}
+                  {{ isPreviewing ? '解析中...' : '解析来源' }}
                 </button>
               </aside>
             </div>
@@ -228,7 +245,9 @@ watch(() => props.isOpen, (isOpen) => {
               <div class="mb-3 flex items-center justify-between gap-3">
                 <div>
                   <h3 class="text-sm font-semibold text-slate-800">{{ preview.title }}</h3>
-                  <p class="text-xs text-slate-500">{{ preview.provider }} · {{ preview.source_type }} · 共 {{ preview.total_items }} 条</p>
+                  <p class="text-xs text-slate-500">
+                    {{ providerLabel(preview.provider) }} · {{ sourceTypeLabel(preview.source_type) }} · 共 {{ preview.total_items }} 条
+                  </p>
                 </div>
                 <div class="flex items-center gap-2">
                   <button class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50" @click="selectAll">全选</button>
@@ -268,7 +287,7 @@ watch(() => props.isOpen, (isOpen) => {
           </div>
 
           <footer class="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
-            <p class="text-xs text-slate-500">第一版会为每个条目创建独立任务，并自动归入同一个文件夹。</p>
+            <p class="text-xs text-slate-500">每个条目会创建独立任务，并自动归入同一个文件夹。</p>
             <div class="flex items-center gap-2">
               <button
                 class="rounded-xl px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-white hover:text-slate-900"
@@ -282,7 +301,7 @@ watch(() => props.isOpen, (isOpen) => {
                 @click="handleCreate"
               >
                 <PhSpinner v-if="isCreatingCollection" :size="16" class="animate-spin" />
-                创建合集任务
+                创建批量任务
               </button>
             </div>
           </footer>
