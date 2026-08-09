@@ -16,11 +16,6 @@
 ### 使用指南
 
 - [使用说明](guides/使用说明.md)
-- [飞书课程体系构建与阅读体验规范](guides/飞书课程体系构建与阅读体验规范.md)
-
-### 产品研究
-
-- [飞书课程内容 Web 学习平台方案调研](research/feishu-course-web-learning-platform-research.md)
 
 ### 示例
 
@@ -47,3 +42,4 @@
 - 面向使用者的说明放入 `guides/`，交接快照放入 `handoff/`。
 - 新的重要架构决策应在文档中说明背景、结论、边界和迁移方式。
 - 不提交 API Key、Cookie、SESSDATA、访问令牌或用户私有内容。
+- Claude Code 课程、飞书发布和课程专用抓取资产已迁至独立工程 `xian-courses-ai/xian-claude-code-course`。

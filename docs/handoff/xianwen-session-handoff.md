@@ -132,13 +132,13 @@ tests/test_wechat_article.py
 
 注意：公众号历史文章批量拉取不应当在新 session 中默认认为已经完成。后续如果继续做，建议作为独立需求设计和验证。
 
-### 3.5 飞书课程文档导出
+### 3.5 飞书课程文档导出（已迁出）
 
-已经新增工具：
+以下课程专用工具和测试已迁至独立工程：
 
 ```text
-tools/export_web_docs_to_lark.py
-tests/test_lark_export_style.py
+/Users/subin/Documents/Claude-Project/xian-courses-ai/xian-claude-code-course/tools/export_web_docs_to_lark.py
+/Users/subin/Documents/Claude-Project/xian-courses-ai/xian-claude-code-course/tests/test_lark_export_style.py
 ```
 
 用途：
@@ -153,8 +153,8 @@ tests/test_lark_export_style.py
 本轮输出的映射文件：
 
 ```text
-temp/web-doc-exports/20260715-220654/source-url-map.md
-temp/web-doc-exports/20260715-220654/source-url-map.json
+/Users/subin/Documents/Claude-Project/xian-courses-ai/xian-claude-code-course/snapshots/legacy-web-doc-export/20260715-220654/source-url-map.md
+/Users/subin/Documents/Claude-Project/xian-courses-ai/xian-claude-code-course/snapshots/legacy-web-doc-export/20260715-220654/source-url-map.json
 ```
 
 已验证：
@@ -162,7 +162,7 @@ temp/web-doc-exports/20260715-220654/source-url-map.json
 - 飞书侧 236 个节点已覆盖更新，包括根节点、目录页和正文页。
 - 公开飞书文档中已去掉“原文链接 / 原文页面 / 查看原文 / 本文由原网页采集生成”等来源信息。
 - 本地映射文件继续保留源站 URL 和飞书 URL 对照。
-- `tests/test_lark_export_style.py` 已覆盖来源移除、内部链接映射、目录页、正文页和“任务完成后”精细排版。
+- 新工程中的 `tests/test_lark_export_style.py` 已覆盖来源移除、内部链接映射、目录页、正文页和“任务完成后”精细排版。
 
 ---
 
