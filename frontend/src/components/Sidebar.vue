@@ -721,9 +721,10 @@ watch(() => props.summarizationSettings, (settings) => {
               <div class="xw-brand-mark w-9 h-9 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center text-white shadow-sm shadow-blue-200 shrink-0">
                 <PhWaveSine :size="20" weight="bold" />
               </div>
-              <div class="min-w-0">
-                <h1 class="text-lg font-bold text-slate-900 tracking-[0.12em] truncate font-serif">先闻继学</h1>
-                <p class="text-[11px] text-slate-500">
+              <div class="xw-brand-lockup min-w-0">
+                <span class="xw-brand-kicker">PERSONAL KNOWLEDGE / 01</span>
+                <h1 class="xw-brand-title text-lg font-bold text-slate-900 tracking-[0.12em] truncate font-serif">先闻继学</h1>
+                <p class="xw-brand-subtitle text-[11px] text-slate-500">
                   {{
                     sidebarTab === 'quick'
                       ? '采万象'

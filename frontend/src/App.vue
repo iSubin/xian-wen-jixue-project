@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, watch, ref } from 'vue'
-import { PhMonitorPlay, PhList } from '@phosphor-icons/vue'
+import { PhArrowUpRight, PhList, PhMonitorPlay } from '@phosphor-icons/vue'
 import { marked } from 'marked'
 import { useTaskViewModel } from './composables/useTaskViewModel'
 import { useFolderViewModel } from './composables/useFolderViewModel'
@@ -1135,9 +1135,26 @@ watch(
           </button>
         </header>
 
-        <div class="xw-empty-state flex-1 flex flex-col items-center justify-center text-slate-400">
-          <PhMonitorPlay :size="64" weight="thin" class="mb-4 opacity-20" />
-          <p class="font-serif tracking-wider">请从左侧文库选择一篇文档，或进入采集台带回新知</p>
+        <div class="xw-empty-state flex-1 flex flex-col justify-center text-slate-400">
+          <div class="xw-empty-stage">
+            <div class="xw-empty-color-block xw-empty-color-block--orange" aria-hidden="true"></div>
+            <div class="xw-empty-color-block xw-empty-color-block--blue" aria-hidden="true"></div>
+            <div class="xw-empty-stamp" aria-hidden="true">XW / 01</div>
+            <div class="xw-empty-copy">
+              <p class="xw-empty-kicker">PERSONAL KNOWLEDGE / 先闻继学</p>
+              <h2>把看到的，<br><em>变成自己的知识。</em></h2>
+              <p class="xw-empty-description">从一篇文章、一段视频或一个念头开始，建立属于你的长期知识现场。</p>
+              <div class="xw-empty-guide">
+                <span class="xw-empty-guide-line" aria-hidden="true"></span>
+                <span>从左侧文库选择一篇文档，开始阅读</span>
+                <PhArrowUpRight :size="16" aria-hidden="true" />
+              </div>
+            </div>
+            <div class="xw-empty-index" aria-hidden="true">
+              <PhMonitorPlay :size="28" weight="thin" />
+              <span>READ / CAPTURE / KEEP</span>
+            </div>
+          </div>
         </div>
       </div>
     </main>

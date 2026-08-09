@@ -20,7 +20,7 @@ const variantClass = computed(() => {
 <template>
   <div
     :class="[
-      'group flex items-center rounded-full p-1.5 gap-1 transition-all duration-200',
+      'xw-floating-shell group flex items-center rounded-full p-1.5 gap-1 transition-all duration-200',
       variantClass,
       noWrap ? 'whitespace-nowrap' : '',
     ]"
