@@ -127,6 +127,7 @@ const {
 const {
   folders,
   folderTree,
+  fetchFolders,
   createFolder,
   renameFolder,
   deleteFolder,
@@ -215,7 +216,7 @@ const handleDeleteGitSettings = async () => {
 }
 
 const handleLibraryChanged = async () => {
-  await Promise.all([fetchTasks(), fetchGitSettings()])
+  await Promise.all([fetchTasks(), fetchFolders(), fetchGitSettings()])
 }
 
 const handleLibraryDocumentRemoved = (documentId: string) => {

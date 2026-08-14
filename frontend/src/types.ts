@@ -376,6 +376,82 @@ export interface GitSyncResult {
   conflicts: string[];
 }
 
+export type ContentSubscriptionStatus = 'ACTIVE' | 'PAUSED' | 'AUTH_REQUIRED' | 'DEGRADED' | 'ERROR';
+export type ContentSubscriptionInitialSyncMode = 'from_now' | 'today' | 'last_7_days';
+
+export interface ContentSubscriptionPreview {
+  provider: 'homeway';
+  source_type: 'homeway_lecturer';
+  external_source_id: string;
+  display_name: string;
+  source_url: string;
+  avatar_url?: string;
+  intro?: string;
+  text_menu_name: string;
+  menu: Array<Record<string, unknown>>;
+  account_required: boolean;
+  connected_account?: ConnectedAccount | null;
+}
+
+export interface ContentSubscription {
+  id: string;
+  user_id: string;
+  provider: 'homeway' | string;
+  source_type: 'homeway_lecturer' | string;
+  source_url: string;
+  external_source_id: string;
+  display_name: string;
+  connected_account_id: string;
+  folder_id?: string | null;
+  status: ContentSubscriptionStatus;
+  poll_interval_minutes: number;
+  active_window_start: string;
+  active_window_end: string;
+  digest_time: string;
+  timezone: string;
+  initial_sync_mode: ContentSubscriptionInitialSyncMode;
+  last_cursor?: string | null;
+  last_polled_at?: string | null;
+  last_success_at?: string | null;
+  next_poll_at?: string | null;
+  last_digest_date?: string | null;
+  last_digest_at?: string | null;
+  last_error?: string | null;
+  consecutive_failures: number;
+  today_item_count: number;
+  locked_item_count: number;
+  captured_item_count: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface ContentSubscriptionCreateRequest {
+  source_url: string;
+  connected_account_id: string;
+  initial_sync_mode: ContentSubscriptionInitialSyncMode;
+  poll_interval_minutes?: number;
+  active_window_start?: string;
+  active_window_end?: string;
+  digest_time?: string;
+  timezone?: string;
+}
+
+export interface SubscriptionRun {
+  id: string;
+  subscription_id: string;
+  trigger: 'scheduled' | 'manual' | 'reconciliation' | string;
+  status: 'RUNNING' | 'SUCCESS' | 'PARTIAL' | 'FAILED' | string;
+  started_at: string;
+  finished_at?: string | null;
+  discovered_count: number;
+  captured_count: number;
+  updated_count: number;
+  locked_count: number;
+  failed_count: number;
+  error_code?: string | null;
+  error_detail?: string | null;
+}
+
 export interface LibraryDocumentPayload {
   title: string;
   content: string;

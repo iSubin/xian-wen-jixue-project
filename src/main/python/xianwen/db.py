@@ -5,10 +5,24 @@ import hashlib
 import secrets
 import uuid
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from sqlalchemy import create_engine, Column, String, Float, Integer, Text, DateTime, Boolean, Enum as SQLEnum, inspect, text
+from sqlalchemy import (
+    create_engine,
+    Column,
+    String,
+    Float,
+    Integer,
+    Text,
+    DateTime,
+    Boolean,
+    Enum as SQLEnum,
+    UniqueConstraint,
+    inspect,
+    or_,
+    text,
+)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from Cryptodome.Cipher import AES
@@ -218,6 +232,193 @@ class CollectionItemModel(Base):
             "task_id": self.task_id,
             "created_at": self.created_at.isoformat() + "Z" if self.created_at else None,
             "updated_at": self.updated_at.isoformat() + "Z" if self.updated_at else None,
+        }
+
+
+class ContentSubscriptionModel(Base):
+    __tablename__ = "content_subscriptions"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "provider",
+            "source_type",
+            "external_source_id",
+            name="uq_content_subscription_source",
+        ),
+    )
+
+    id = Column(String, primary_key=True)
+    user_id = Column(String, nullable=False, index=True)
+    provider = Column(String, nullable=False, index=True)
+    source_type = Column(String, nullable=False)
+    source_url = Column(Text, nullable=False)
+    external_source_id = Column(String, nullable=False, index=True)
+    display_name = Column(String, nullable=False)
+    connected_account_id = Column(String, nullable=False)
+    folder_id = Column(String, nullable=True)
+    status = Column(String, nullable=False, default="ACTIVE", index=True)
+    poll_interval_minutes = Column(Integer, nullable=False, default=15)
+    active_window_start = Column(String, nullable=False, default="08:30")
+    active_window_end = Column(String, nullable=False, default="18:30")
+    digest_time = Column(String, nullable=False, default="20:30")
+    timezone = Column(String, nullable=False, default="Asia/Shanghai")
+    initial_sync_mode = Column(String, nullable=False, default="from_now")
+    last_cursor = Column(Text, nullable=True)
+    last_polled_at = Column(DateTime, nullable=True)
+    last_success_at = Column(DateTime, nullable=True)
+    next_poll_at = Column(DateTime, nullable=True, index=True)
+    last_digest_date = Column(String, nullable=True)
+    last_digest_at = Column(DateTime, nullable=True)
+    last_error = Column(Text, nullable=True)
+    consecutive_failures = Column(Integer, nullable=False, default=0)
+    lease_owner = Column(String, nullable=True)
+    lease_expires_at = Column(DateTime, nullable=True, index=True)
+    deleted_at = Column(DateTime, nullable=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "provider": self.provider,
+            "source_type": self.source_type,
+            "source_url": self.source_url,
+            "external_source_id": self.external_source_id,
+            "display_name": self.display_name,
+            "connected_account_id": self.connected_account_id,
+            "folder_id": self.folder_id,
+            "status": self.status,
+            "poll_interval_minutes": self.poll_interval_minutes,
+            "active_window_start": self.active_window_start,
+            "active_window_end": self.active_window_end,
+            "digest_time": self.digest_time,
+            "timezone": self.timezone,
+            "initial_sync_mode": self.initial_sync_mode,
+            "last_cursor": self.last_cursor,
+            "last_polled_at": self.last_polled_at.isoformat() + "Z" if self.last_polled_at else None,
+            "last_success_at": self.last_success_at.isoformat() + "Z" if self.last_success_at else None,
+            "next_poll_at": self.next_poll_at.isoformat() + "Z" if self.next_poll_at else None,
+            "last_digest_date": self.last_digest_date,
+            "last_digest_at": self.last_digest_at.isoformat() + "Z" if self.last_digest_at else None,
+            "last_error": self.last_error,
+            "consecutive_failures": self.consecutive_failures or 0,
+            "created_at": self.created_at.isoformat() + "Z" if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() + "Z" if self.updated_at else None,
+        }
+
+
+class SubscriptionItemModel(Base):
+    __tablename__ = "subscription_items"
+    __table_args__ = (
+        UniqueConstraint(
+            "subscription_id",
+            "external_item_id",
+            name="uq_subscription_item_external_id",
+        ),
+    )
+
+    id = Column(String, primary_key=True)
+    subscription_id = Column(String, nullable=False, index=True)
+    provider = Column(String, nullable=False, index=True)
+    external_item_id = Column(String, nullable=False, index=True)
+    source_url = Column(Text, nullable=False)
+    published_at = Column(DateTime, nullable=False, index=True)
+    source_updated_at = Column(DateTime, nullable=True)
+    first_seen_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    last_seen_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    captured_at = Column(DateTime, nullable=True)
+    content_hash = Column(String, nullable=True)
+    preview_text = Column(Text, nullable=True)
+    raw_html = Column(Text, nullable=True)
+    raw_markdown = Column(Text, nullable=True)
+    image_manifest = Column(Text, nullable=True)
+    source_meta = Column(Text, nullable=True)
+    access_scope = Column(String, nullable=False, default="unknown")
+    capture_status = Column(String, nullable=False, default="DISCOVERED", index=True)
+    failure_code = Column(String, nullable=True)
+    failure_detail = Column(Text, nullable=True)
+    digest_date = Column(String, nullable=False, index=True)
+    digest_task_id = Column(String, nullable=True, index=True)
+    source_missing_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    @staticmethod
+    def _json_value(raw: str | None, fallback: Any) -> Any:
+        if not raw:
+            return fallback
+        try:
+            return json.loads(raw)
+        except (TypeError, json.JSONDecodeError):
+            return fallback
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "subscription_id": self.subscription_id,
+            "provider": self.provider,
+            "external_item_id": self.external_item_id,
+            "source_url": self.source_url,
+            "published_at": self.published_at.isoformat() + "Z" if self.published_at else None,
+            "source_updated_at": self.source_updated_at.isoformat() + "Z" if self.source_updated_at else None,
+            "first_seen_at": self.first_seen_at.isoformat() + "Z" if self.first_seen_at else None,
+            "last_seen_at": self.last_seen_at.isoformat() + "Z" if self.last_seen_at else None,
+            "captured_at": self.captured_at.isoformat() + "Z" if self.captured_at else None,
+            "content_hash": self.content_hash,
+            "preview_text": self.preview_text or "",
+            "raw_html": self.raw_html,
+            "raw_markdown": self.raw_markdown,
+            "image_manifest": self._json_value(self.image_manifest, []),
+            "source_meta": self._json_value(self.source_meta, {}),
+            "access_scope": self.access_scope,
+            "capture_status": self.capture_status,
+            "failure_code": self.failure_code,
+            "failure_detail": self.failure_detail,
+            "digest_date": self.digest_date,
+            "digest_task_id": self.digest_task_id,
+            "source_missing_at": self.source_missing_at.isoformat() + "Z" if self.source_missing_at else None,
+            "created_at": self.created_at.isoformat() + "Z" if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() + "Z" if self.updated_at else None,
+        }
+
+
+class SubscriptionRunModel(Base):
+    __tablename__ = "subscription_runs"
+
+    id = Column(String, primary_key=True)
+    subscription_id = Column(String, nullable=False, index=True)
+    trigger = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="RUNNING", index=True)
+    started_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    finished_at = Column(DateTime, nullable=True)
+    discovered_count = Column(Integer, nullable=False, default=0)
+    captured_count = Column(Integer, nullable=False, default=0)
+    updated_count = Column(Integer, nullable=False, default=0)
+    locked_count = Column(Integer, nullable=False, default=0)
+    failed_count = Column(Integer, nullable=False, default=0)
+    cursor_before = Column(Text, nullable=True)
+    cursor_after = Column(Text, nullable=True)
+    error_code = Column(String, nullable=True)
+    error_detail = Column(Text, nullable=True)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "subscription_id": self.subscription_id,
+            "trigger": self.trigger,
+            "status": self.status,
+            "started_at": self.started_at.isoformat() + "Z" if self.started_at else None,
+            "finished_at": self.finished_at.isoformat() + "Z" if self.finished_at else None,
+            "discovered_count": self.discovered_count or 0,
+            "captured_count": self.captured_count or 0,
+            "updated_count": self.updated_count or 0,
+            "locked_count": self.locked_count or 0,
+            "failed_count": self.failed_count or 0,
+            "cursor_before": self.cursor_before,
+            "cursor_after": self.cursor_after,
+            "error_code": self.error_code,
+            "error_detail": self.error_detail,
         }
 
 
@@ -667,6 +868,49 @@ class TaskDB:
         finally:
             session.close()
 
+    def ensure_folder_path(
+        self,
+        names: List[str],
+        *,
+        folder_type: str = "auto",
+        source_url: str | None = None,
+    ) -> Optional[str]:
+        """Return the leaf folder id, creating only missing path components."""
+        clean_names = [str(name or "").strip() for name in names if str(name or "").strip()]
+        if not clean_names:
+            return None
+
+        session: Session = self.SessionLocal()
+        try:
+            parent_id: str | None = None
+            for index, name in enumerate(clean_names):
+                query = session.query(FolderModel).filter(FolderModel.name == name)
+                if parent_id is None:
+                    query = query.filter(FolderModel.parent_id.is_(None))
+                else:
+                    query = query.filter(FolderModel.parent_id == parent_id)
+                folder = query.order_by(FolderModel.created_at.asc()).first()
+                if not folder:
+                    folder = FolderModel(
+                        id=uuid.uuid4().hex,
+                        name=name,
+                        parent_id=parent_id,
+                        folder_type=folder_type,
+                        source_video_url=source_url if index == len(clean_names) - 1 else None,
+                        sort_order=0,
+                    )
+                    session.add(folder)
+                    session.flush()
+                parent_id = folder.id
+            session.commit()
+            return parent_id
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Failed to ensure folder path: {e}")
+            raise
+        finally:
+            session.close()
+
     def update_folder(self, folder_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         session: Session = self.SessionLocal()
         try:
@@ -912,6 +1156,421 @@ class TaskDB:
         except Exception as e:
             session.rollback()
             logger.error(f"Failed to update collection job: {e}")
+            raise
+        finally:
+            session.close()
+
+    # ── Content subscriptions ──
+
+    def create_content_subscription(self, subscription_data: Dict[str, Any]) -> Dict[str, Any]:
+        if not self.use_db:
+            raise RuntimeError("Content subscriptions require database storage")
+
+        session: Session = self.SessionLocal()
+        try:
+            existing = (
+                session.query(ContentSubscriptionModel)
+                .filter(
+                    ContentSubscriptionModel.user_id == subscription_data["user_id"],
+                    ContentSubscriptionModel.provider == subscription_data["provider"],
+                    ContentSubscriptionModel.source_type == subscription_data["source_type"],
+                    ContentSubscriptionModel.external_source_id == subscription_data["external_source_id"],
+                )
+                .first()
+            )
+            if existing and existing.deleted_at is None:
+                raise ValueError("该内容来源已经订阅")
+
+            now = datetime.utcnow()
+            if existing:
+                for key, value in subscription_data.items():
+                    if key != "id" and hasattr(existing, key):
+                        setattr(existing, key, value)
+                existing.deleted_at = None
+                existing.status = "ACTIVE"
+                existing.last_error = None
+                existing.consecutive_failures = 0
+                existing.next_poll_at = subscription_data.get("next_poll_at") or now
+                existing.updated_at = now
+                subscription = existing
+            else:
+                payload = dict(subscription_data)
+                payload.setdefault("id", uuid.uuid4().hex)
+                payload.setdefault("status", "ACTIVE")
+                payload.setdefault("next_poll_at", now)
+                payload.setdefault("created_at", now)
+                payload.setdefault("updated_at", now)
+                subscription = ContentSubscriptionModel(**payload)
+                session.add(subscription)
+
+            session.commit()
+            session.refresh(subscription)
+            return subscription.to_dict()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def get_content_subscription(
+        self,
+        subscription_id: str,
+        *,
+        user_id: str | None = None,
+        include_deleted: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        session: Session = self.SessionLocal()
+        try:
+            query = session.query(ContentSubscriptionModel).filter(ContentSubscriptionModel.id == subscription_id)
+            if user_id is not None:
+                query = query.filter(ContentSubscriptionModel.user_id == user_id)
+            if not include_deleted:
+                query = query.filter(ContentSubscriptionModel.deleted_at.is_(None))
+            subscription = query.first()
+            return subscription.to_dict() if subscription else None
+        finally:
+            session.close()
+
+    def list_content_subscriptions(self, user_id: str) -> List[Dict[str, Any]]:
+        session: Session = self.SessionLocal()
+        try:
+            subscriptions = (
+                session.query(ContentSubscriptionModel)
+                .filter(
+                    ContentSubscriptionModel.user_id == user_id,
+                    ContentSubscriptionModel.deleted_at.is_(None),
+                )
+                .order_by(ContentSubscriptionModel.created_at.asc())
+                .all()
+            )
+            return [subscription.to_dict() for subscription in subscriptions]
+        finally:
+            session.close()
+
+    def update_content_subscription(
+        self,
+        subscription_id: str,
+        updates: Dict[str, Any],
+        *,
+        user_id: str | None = None,
+    ) -> Optional[Dict[str, Any]]:
+        session: Session = self.SessionLocal()
+        try:
+            query = session.query(ContentSubscriptionModel).filter(
+                ContentSubscriptionModel.id == subscription_id,
+                ContentSubscriptionModel.deleted_at.is_(None),
+            )
+            if user_id is not None:
+                query = query.filter(ContentSubscriptionModel.user_id == user_id)
+            subscription = query.first()
+            if not subscription:
+                return None
+            protected = {"id", "user_id", "provider", "source_type", "external_source_id", "created_at"}
+            for key, value in updates.items():
+                if key not in protected and hasattr(subscription, key):
+                    setattr(subscription, key, value)
+            subscription.updated_at = datetime.utcnow()
+            session.commit()
+            session.refresh(subscription)
+            return subscription.to_dict()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def cancel_content_subscription(self, subscription_id: str, user_id: str) -> bool:
+        session: Session = self.SessionLocal()
+        try:
+            subscription = (
+                session.query(ContentSubscriptionModel)
+                .filter(
+                    ContentSubscriptionModel.id == subscription_id,
+                    ContentSubscriptionModel.user_id == user_id,
+                    ContentSubscriptionModel.deleted_at.is_(None),
+                )
+                .first()
+            )
+            if not subscription:
+                return False
+            now = datetime.utcnow()
+            subscription.status = "PAUSED"
+            subscription.deleted_at = now
+            subscription.next_poll_at = None
+            subscription.lease_owner = None
+            subscription.lease_expires_at = None
+            subscription.updated_at = now
+            session.commit()
+            return True
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def get_subscription_item(
+        self,
+        subscription_id: str,
+        external_item_id: str,
+    ) -> Optional[Dict[str, Any]]:
+        session: Session = self.SessionLocal()
+        try:
+            item = (
+                session.query(SubscriptionItemModel)
+                .filter(
+                    SubscriptionItemModel.subscription_id == subscription_id,
+                    SubscriptionItemModel.external_item_id == external_item_id,
+                )
+                .first()
+            )
+            return item.to_dict() if item else None
+        finally:
+            session.close()
+
+    def upsert_subscription_item(
+        self,
+        subscription_id: str,
+        item_data: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        session: Session = self.SessionLocal()
+        try:
+            item = (
+                session.query(SubscriptionItemModel)
+                .filter(
+                    SubscriptionItemModel.subscription_id == subscription_id,
+                    SubscriptionItemModel.external_item_id == item_data["external_item_id"],
+                )
+                .first()
+            )
+            now = datetime.utcnow()
+            created = item is None
+            previous_hash = item.content_hash if item else None
+            previous_status = item.capture_status if item else None
+            payload = dict(item_data)
+            if isinstance(payload.get("image_manifest"), (list, dict)):
+                payload["image_manifest"] = json.dumps(payload["image_manifest"], ensure_ascii=False)
+            if isinstance(payload.get("source_meta"), (list, dict)):
+                payload["source_meta"] = json.dumps(payload["source_meta"], ensure_ascii=False)
+
+            if item:
+                for key, value in payload.items():
+                    if key not in {"id", "subscription_id", "first_seen_at", "created_at"} and hasattr(item, key):
+                        setattr(item, key, value)
+                item.last_seen_at = now
+                item.updated_at = now
+            else:
+                payload.setdefault("id", uuid.uuid4().hex)
+                payload["subscription_id"] = subscription_id
+                payload.setdefault("first_seen_at", now)
+                payload.setdefault("last_seen_at", now)
+                payload.setdefault("created_at", now)
+                payload.setdefault("updated_at", now)
+                item = SubscriptionItemModel(**payload)
+                session.add(item)
+
+            session.commit()
+            session.refresh(item)
+            changed = created or previous_hash != item.content_hash or previous_status != item.capture_status
+            return {"item": item.to_dict(), "created": created, "changed": changed}
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def list_subscription_items(
+        self,
+        subscription_id: str,
+        *,
+        digest_date: str | None = None,
+        limit: int | None = None,
+    ) -> List[Dict[str, Any]]:
+        session: Session = self.SessionLocal()
+        try:
+            query = session.query(SubscriptionItemModel).filter(
+                SubscriptionItemModel.subscription_id == subscription_id
+            )
+            if digest_date is not None:
+                query = query.filter(SubscriptionItemModel.digest_date == digest_date)
+            query = query.order_by(SubscriptionItemModel.published_at.asc(), SubscriptionItemModel.external_item_id.asc())
+            if limit is not None:
+                query = query.limit(max(1, int(limit)))
+            return [item.to_dict() for item in query.all()]
+        finally:
+            session.close()
+
+    def count_subscription_items(
+        self,
+        subscription_id: str,
+        *,
+        digest_date: str | None = None,
+        capture_statuses: List[str] | None = None,
+    ) -> int:
+        session: Session = self.SessionLocal()
+        try:
+            query = session.query(SubscriptionItemModel).filter(
+                SubscriptionItemModel.subscription_id == subscription_id
+            )
+            if digest_date is not None:
+                query = query.filter(SubscriptionItemModel.digest_date == digest_date)
+            if capture_statuses:
+                query = query.filter(SubscriptionItemModel.capture_status.in_(capture_statuses))
+            return int(query.count())
+        finally:
+            session.close()
+
+    def mark_subscription_items_digested(
+        self,
+        subscription_id: str,
+        digest_date: str,
+        task_id: str,
+    ) -> None:
+        session: Session = self.SessionLocal()
+        try:
+            session.query(SubscriptionItemModel).filter(
+                SubscriptionItemModel.subscription_id == subscription_id,
+                SubscriptionItemModel.digest_date == digest_date,
+                SubscriptionItemModel.capture_status.in_(["CAPTURED", "CAPTURED_UPDATED"]),
+            ).update({"digest_task_id": task_id}, synchronize_session=False)
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def create_subscription_run(
+        self,
+        subscription_id: str,
+        trigger: str,
+        *,
+        cursor_before: str | None = None,
+    ) -> Dict[str, Any]:
+        session: Session = self.SessionLocal()
+        try:
+            run = SubscriptionRunModel(
+                id=uuid.uuid4().hex,
+                subscription_id=subscription_id,
+                trigger=trigger,
+                status="RUNNING",
+                cursor_before=cursor_before,
+                started_at=datetime.utcnow(),
+            )
+            session.add(run)
+            session.commit()
+            session.refresh(run)
+            return run.to_dict()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def update_subscription_run(self, run_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        session: Session = self.SessionLocal()
+        try:
+            run = session.query(SubscriptionRunModel).filter(SubscriptionRunModel.id == run_id).first()
+            if not run:
+                return None
+            for key, value in updates.items():
+                if key != "id" and hasattr(run, key):
+                    setattr(run, key, value)
+            session.commit()
+            session.refresh(run)
+            return run.to_dict()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def list_subscription_runs(self, subscription_id: str, *, limit: int = 30) -> List[Dict[str, Any]]:
+        session: Session = self.SessionLocal()
+        try:
+            runs = (
+                session.query(SubscriptionRunModel)
+                .filter(SubscriptionRunModel.subscription_id == subscription_id)
+                .order_by(SubscriptionRunModel.started_at.desc())
+                .limit(max(1, min(int(limit), 100)))
+                .all()
+            )
+            return [run.to_dict() for run in runs]
+        finally:
+            session.close()
+
+    def claim_due_content_subscriptions(
+        self,
+        owner: str,
+        now: datetime,
+        *,
+        lease_seconds: int = 300,
+        limit: int = 10,
+    ) -> List[Dict[str, Any]]:
+        session: Session = self.SessionLocal()
+        try:
+            candidates = (
+                session.query(ContentSubscriptionModel.id)
+                .filter(
+                    ContentSubscriptionModel.deleted_at.is_(None),
+                    ContentSubscriptionModel.status.in_(["ACTIVE", "DEGRADED", "ERROR"]),
+                    ContentSubscriptionModel.next_poll_at.is_not(None),
+                    ContentSubscriptionModel.next_poll_at <= now,
+                    or_(
+                        ContentSubscriptionModel.lease_expires_at.is_(None),
+                        ContentSubscriptionModel.lease_expires_at <= now,
+                    ),
+                )
+                .order_by(ContentSubscriptionModel.next_poll_at.asc())
+                .limit(max(1, int(limit)))
+                .all()
+            )
+            lease_until = now + timedelta(seconds=max(30, lease_seconds))
+            claimed_ids: list[str] = []
+            for (subscription_id,) in candidates:
+                updated = (
+                    session.query(ContentSubscriptionModel)
+                    .filter(
+                        ContentSubscriptionModel.id == subscription_id,
+                        ContentSubscriptionModel.deleted_at.is_(None),
+                        ContentSubscriptionModel.status.in_(["ACTIVE", "DEGRADED", "ERROR"]),
+                        ContentSubscriptionModel.next_poll_at <= now,
+                        or_(
+                            ContentSubscriptionModel.lease_expires_at.is_(None),
+                            ContentSubscriptionModel.lease_expires_at <= now,
+                        ),
+                    )
+                    .update(
+                        {"lease_owner": owner, "lease_expires_at": lease_until},
+                        synchronize_session=False,
+                    )
+                )
+                if updated:
+                    claimed_ids.append(subscription_id)
+            session.commit()
+            return [
+                item
+                for subscription_id in claimed_ids
+                if (item := self.get_content_subscription(subscription_id)) is not None
+            ]
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def release_content_subscription_lease(self, subscription_id: str, owner: str) -> None:
+        session: Session = self.SessionLocal()
+        try:
+            session.query(ContentSubscriptionModel).filter(
+                ContentSubscriptionModel.id == subscription_id,
+                ContentSubscriptionModel.lease_owner == owner,
+            ).update(
+                {"lease_owner": None, "lease_expires_at": None},
+                synchronize_session=False,
+            )
+            session.commit()
+        except Exception:
+            session.rollback()
             raise
         finally:
             session.close()

@@ -44,6 +44,7 @@ import ThemeSelector from './ThemeSelector.vue'
 import FolderBrowser from './FolderBrowser/FolderBrowser.vue'
 import ConnectedAccountsSettings from './ConnectedAccountsSettings.vue'
 import KnowledgeLibraryTree from './KnowledgeLibrary/KnowledgeLibraryTree.vue'
+import ContentSubscriptions from './ContentSubscriptions.vue'
 
 const videoUrl = defineModel<string>('videoUrl', { required: true })
 const selectedFile = defineModel<File | null>('selectedFile', { default: null })
@@ -156,7 +157,7 @@ const emit = defineEmits<{
 const fileInput = ref<HTMLInputElement | null>(null)
 const isSettingsPanelOpen = ref(false)
 const settingsTab = ref<'llm' | 'transcription' | 'summarization'>('llm')
-const sidebarTab = ref<'quick' | 'library' | 'manage' | 'theme'>('library')
+const sidebarTab = ref<'quick' | 'library' | 'subscriptions' | 'manage' | 'theme'>('library')
 const showLocalPathHelp = ref(false)
 
 const llmApiKey = ref('')
@@ -696,6 +697,20 @@ watch(() => props.summarizationSettings, (settings) => {
         </button>
 
         <button
+          aria-label="打开内容订阅"
+          @click="sidebarTab = 'subscriptions'"
+          :class="[
+            'w-10 h-10 rounded-xl flex items-center justify-center transition-colors',
+            sidebarTab === 'subscriptions'
+              ? 'bg-blue-50 text-primary'
+              : 'text-slate-400 hover:bg-gray-100 hover:text-slate-600'
+          ]"
+          title="内容订阅"
+        >
+          <PhClock :size="20" weight="duotone" />
+        </button>
+
+        <button
           aria-label="打开任务搜索"
           @click="sidebarTab = 'manage'"
           :class="[
@@ -729,6 +744,8 @@ watch(() => props.summarizationSettings, (settings) => {
                       ? '采万象'
                       : sidebarTab === 'library'
                         ? '继学不息'
+                        : sidebarTab === 'subscriptions'
+                          ? '订阅新知'
                         : sidebarTab === 'manage'
                           ? '检索全库'
                           : 'Markdown 样式主题'
@@ -1414,6 +1431,14 @@ watch(() => props.summarizationSettings, (settings) => {
             @changed="emit('libraryChanged')"
             @removed="emit('libraryDocumentRemoved', $event)"
             @syncGit="emit('syncGit')"
+          />
+        </template>
+
+        <template v-else-if="sidebarTab === 'subscriptions'">
+          <ContentSubscriptions
+            :connectedAccounts="connectedAccounts"
+            @changed="emit('libraryChanged')"
+            @openSettings="emit('openSettings')"
           />
         </template>
 

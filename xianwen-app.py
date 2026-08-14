@@ -206,6 +206,9 @@ async def lifespan(app: FastAPI):
 
     logger.info("--- [Lifespan] 服务启动完成，前端已可访问 ---")
 
+    # 订阅事实保存在数据库中；启动时立即恢复到期检查，不补跑每个错过的时间点。
+    api_module.start_subscription_scheduler()
+
     # 后台预热 Workers（避免首次请求时卡住）
     async def _prewarm_workers():
         try:
@@ -231,6 +234,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # Shutdown logic
+    await api_module.stop_subscription_scheduler()
     await api_module.stop_all_workers()
 
     # 注销 mDNS 服务

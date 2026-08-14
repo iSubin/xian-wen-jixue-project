@@ -263,7 +263,13 @@ def _public_source_url(task: Dict[str, Any]) -> str:
 
 def _raw_document_name(task: Dict[str, Any]) -> str:
     source_type = str(task.get("source_type") or "video").strip().lower()
-    if source_type in {"article", "wechat_article", "web_article", "document"}:
+    if source_type in {
+        "article",
+        "document",
+        "homeway_daily_digest",
+        "web_article",
+        "wechat_article",
+    }:
         return "原始正文.md"
     return "原始逐字稿.md"
 

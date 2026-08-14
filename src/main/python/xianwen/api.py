@@ -62,6 +62,12 @@ from .git_sync import (
     validate_repository_url,
     validate_root_path,
 )
+from .homeway_subscription import HomewayAuthenticationError, HomewaySubscriptionError
+from .subscriptions import (
+    INITIAL_SYNC_MODES,
+    SUBSCRIPTION_STATUSES,
+    SubscriptionService,
+)
 
 app = FastAPI(
     title="先闻继学 XianWen API",
@@ -296,6 +302,39 @@ class GitSettingsView(BaseModel):
     last_verified_at: Optional[datetime] = None
     last_used_at: Optional[datetime] = None
     last_error: Optional[str] = None
+
+
+class SubscriptionPreviewRequest(BaseModel):
+    source_url: HttpUrl
+    connected_account_id: Optional[str] = None
+
+
+class ContentSubscriptionCreateRequest(BaseModel):
+    source_url: HttpUrl
+    connected_account_id: Optional[str] = None
+    folder_id: Optional[str] = None
+    initial_sync_mode: str = Field(default="from_now")
+    poll_interval_minutes: int = Field(default=15, ge=5, le=360)
+    active_window_start: str = Field(default="08:30")
+    active_window_end: str = Field(default="18:30")
+    digest_time: str = Field(default="20:30")
+    timezone: str = Field(default="Asia/Shanghai")
+
+
+class ContentSubscriptionUpdateRequest(BaseModel):
+    status: Optional[str] = None
+    connected_account_id: Optional[str] = None
+    folder_id: Optional[str] = None
+    poll_interval_minutes: Optional[int] = Field(default=None, ge=5, le=360)
+    active_window_start: Optional[str] = None
+    active_window_end: Optional[str] = None
+    digest_time: Optional[str] = None
+    timezone: Optional[str] = None
+
+
+class SubscriptionPollRequest(BaseModel):
+    reconciliation: bool = False
+    build_digest: bool = True
 
 
 class LibraryDocumentView(BaseModel):
@@ -658,6 +697,145 @@ def _schedule_git_auto_sync(user_id: str = DEFAULT_LOCAL_USER_ID) -> bool:
 def _mark_and_schedule_git_library(user_id: str = DEFAULT_LOCAL_USER_ID) -> None:
     _mark_git_library_pending(user_id)
     _schedule_git_auto_sync(user_id)
+
+
+_subscription_poll_locks: Dict[str, asyncio.Lock] = {}
+_subscription_scheduler_task: asyncio.Task | None = None
+_subscription_scheduler_owner = f"{os.getpid()}-{uuid.uuid4().hex[:10]}"
+
+
+def get_subscription_service() -> SubscriptionService:
+    return SubscriptionService(db, task_assets_dir)
+
+
+async def _broadcast_subscription_update(
+    user_id: str,
+    subscription_id: str,
+    *,
+    result: Dict[str, Any] | None = None,
+) -> None:
+    subscription = db.get_content_subscription(subscription_id, user_id=user_id)
+    await manager.broadcast(
+        json.dumps(
+            {
+                "type": "subscription_update",
+                "subscription": (
+                    get_subscription_service().subscription_view(subscription)
+                    if subscription
+                    else None
+                ),
+                "subscription_id": subscription_id,
+                "result": result,
+            },
+            ensure_ascii=False,
+            default=str,
+        )
+    )
+
+
+async def _run_subscription_poll(
+    user_id: str,
+    subscription_id: str,
+    *,
+    trigger: str,
+    reconciliation: bool,
+    build_digest: bool,
+) -> Dict[str, Any]:
+    lock = _subscription_poll_locks.setdefault(subscription_id, asyncio.Lock())
+    async with lock:
+        subscription = db.get_content_subscription(subscription_id, user_id=user_id)
+        if not subscription:
+            raise ValueError("订阅不存在")
+        service = get_subscription_service()
+        try:
+            result = await asyncio.to_thread(
+                service.poll_subscription,
+                subscription_id,
+                trigger=trigger,
+                reconciliation=reconciliation,
+                build_digest=build_digest,
+            )
+        except Exception:
+            await _broadcast_subscription_update(user_id, subscription_id)
+            raise
+        for task_id in result.get("digest_task_ids") or []:
+            await notify_task_update(str(task_id))
+        await _broadcast_subscription_update(user_id, subscription_id, result=result)
+        return result
+
+
+async def _run_due_subscriptions_once() -> int:
+    due = await asyncio.to_thread(
+        db.claim_due_content_subscriptions,
+        _subscription_scheduler_owner,
+        datetime.utcnow(),
+        lease_seconds=600,
+        limit=10,
+    )
+    processed = 0
+    for subscription in due:
+        subscription_id = str(subscription["id"])
+        user_id = str(subscription["user_id"])
+        try:
+            service = get_subscription_service()
+            finalize = service.should_finalize_today(subscription)
+            await _run_subscription_poll(
+                user_id,
+                subscription_id,
+                trigger="reconciliation" if finalize else "scheduled",
+                reconciliation=finalize,
+                build_digest=finalize,
+            )
+            processed += 1
+        except Exception as exc:
+            logger.warning(
+                f"[SubscriptionScheduler] 订阅运行失败: subscription={subscription_id}, "
+                f"detail={SubscriptionService._safe_error(exc)}"
+            )
+        finally:
+            await asyncio.to_thread(
+                db.release_content_subscription_lease,
+                subscription_id,
+                _subscription_scheduler_owner,
+            )
+    return processed
+
+
+async def _subscription_scheduler_loop() -> None:
+    while True:
+        try:
+            await _run_due_subscriptions_once()
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.warning(
+                f"[SubscriptionScheduler] 调度扫描失败: {SubscriptionService._safe_error(exc)}"
+            )
+        await asyncio.sleep(30)
+
+
+def start_subscription_scheduler() -> None:
+    global _subscription_scheduler_task
+    if not db.use_db:
+        logger.warning("[SubscriptionScheduler] 数据库不可用，内容订阅调度器未启动")
+        return
+    if _subscription_scheduler_task is None or _subscription_scheduler_task.done():
+        _subscription_scheduler_task = asyncio.create_task(_subscription_scheduler_loop())
+        logger.info("[SubscriptionScheduler] 内容订阅调度器已启动")
+
+
+async def stop_subscription_scheduler() -> None:
+    global _subscription_scheduler_task
+    task = _subscription_scheduler_task
+    _subscription_scheduler_task = None
+    if not task:
+        return
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+    logger.info("[SubscriptionScheduler] 内容订阅调度器已停止")
 
 
 def _git_settings_view(user_id: str) -> Dict[str, Any]:
@@ -3017,6 +3195,167 @@ async def delete_connected_account(account_id: str, request: Request):
     if not deleted:
         raise HTTPException(status_code=404, detail="采集账号不存在")
     return Response(status_code=204)
+
+
+@app.post("/subscriptions/preview")
+async def preview_content_subscription(payload: SubscriptionPreviewRequest, request: Request):
+    try:
+        return await asyncio.to_thread(
+            get_subscription_service().preview_subscription,
+            _current_user_id(request),
+            str(payload.source_url),
+            connected_account_id=payload.connected_account_id,
+        )
+    except HomewayAuthenticationError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except (HomewaySubscriptionError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/subscriptions", status_code=201)
+async def create_content_subscription(payload: ContentSubscriptionCreateRequest, request: Request):
+    if payload.initial_sync_mode not in INITIAL_SYNC_MODES:
+        raise HTTPException(status_code=400, detail="首次同步范围不正确")
+    try:
+        subscription = await asyncio.to_thread(
+            get_subscription_service().create_subscription,
+            _current_user_id(request),
+            str(payload.source_url),
+            connected_account_id=payload.connected_account_id,
+            folder_id=payload.folder_id,
+            initial_sync_mode=payload.initial_sync_mode,
+            poll_interval_minutes=payload.poll_interval_minutes,
+            active_window_start=payload.active_window_start,
+            active_window_end=payload.active_window_end,
+            digest_time=payload.digest_time,
+            timezone_name=payload.timezone,
+        )
+    except HomewayAuthenticationError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except ValueError as exc:
+        status_code = 409 if "已经订阅" in str(exc) else 400
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+    except HomewaySubscriptionError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    await _broadcast_subscription_update(
+        _current_user_id(request),
+        str(subscription["id"]),
+    )
+    return subscription
+
+
+@app.get("/subscriptions")
+async def list_content_subscriptions(request: Request):
+    return await asyncio.to_thread(
+        get_subscription_service().list_subscriptions,
+        _current_user_id(request),
+    )
+
+
+@app.get("/subscriptions/{subscription_id}")
+async def get_content_subscription(subscription_id: str, request: Request):
+    user_id = _current_user_id(request)
+    subscription = db.get_content_subscription(subscription_id, user_id=user_id)
+    if not subscription:
+        raise HTTPException(status_code=404, detail="订阅不存在")
+    result = get_subscription_service().subscription_view(subscription)
+    items = db.list_subscription_items(subscription_id)
+    result["items"] = items[-50:]
+    return result
+
+
+@app.patch("/subscriptions/{subscription_id}")
+async def update_content_subscription(
+    subscription_id: str,
+    payload: ContentSubscriptionUpdateRequest,
+    request: Request,
+):
+    user_id = _current_user_id(request)
+    current = db.get_content_subscription(subscription_id, user_id=user_id)
+    if not current:
+        raise HTTPException(status_code=404, detail="订阅不存在")
+    updates = payload.model_dump(exclude_none=True)
+    status = updates.get("status")
+    if status is not None:
+        normalized_status = str(status).upper()
+        if normalized_status not in {"ACTIVE", "PAUSED"}:
+            raise HTTPException(status_code=400, detail="用户只能继续或暂停订阅")
+        updates["status"] = normalized_status
+        updates["next_poll_at"] = datetime.utcnow() if normalized_status == "ACTIVE" else None
+        if normalized_status == "ACTIVE":
+            updates["last_error"] = None
+            updates["consecutive_failures"] = 0
+    service = get_subscription_service()
+    try:
+        if "active_window_start" in updates:
+            service._validate_clock(str(updates["active_window_start"]), "活跃开始时间")
+        if "active_window_end" in updates:
+            service._validate_clock(str(updates["active_window_end"]), "活跃结束时间")
+        if "digest_time" in updates:
+            service._validate_clock(str(updates["digest_time"]), "每日内容包时间")
+        if "timezone" in updates:
+            service._validate_timezone(str(updates["timezone"]))
+        if "folder_id" in updates and updates["folder_id"] and not db.get_folder(str(updates["folder_id"])):
+            raise ValueError("目标藏经阁目录不存在")
+        if "connected_account_id" in updates:
+            service._resolve_homeway_account(
+                user_id,
+                str(updates["connected_account_id"]),
+                required=True,
+            )
+    except (ValueError, HomewayAuthenticationError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    updated = db.update_content_subscription(
+        subscription_id,
+        updates,
+        user_id=user_id,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="订阅不存在")
+    result = service.subscription_view(updated)
+    await _broadcast_subscription_update(user_id, subscription_id)
+    return result
+
+
+@app.delete("/subscriptions/{subscription_id}", status_code=204)
+async def delete_content_subscription(subscription_id: str, request: Request):
+    user_id = _current_user_id(request)
+    if not db.cancel_content_subscription(subscription_id, user_id):
+        raise HTTPException(status_code=404, detail="订阅不存在")
+    await _broadcast_subscription_update(user_id, subscription_id)
+    return Response(status_code=204)
+
+
+@app.post("/subscriptions/{subscription_id}/poll")
+async def poll_content_subscription(
+    subscription_id: str,
+    payload: SubscriptionPollRequest,
+    request: Request,
+):
+    user_id = _current_user_id(request)
+    if not db.get_content_subscription(subscription_id, user_id=user_id):
+        raise HTTPException(status_code=404, detail="订阅不存在")
+    try:
+        return await _run_subscription_poll(
+            user_id,
+            subscription_id,
+            trigger="manual",
+            reconciliation=payload.reconciliation,
+            build_digest=payload.build_digest,
+        )
+    except HomewayAuthenticationError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except HomewaySubscriptionError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/subscriptions/{subscription_id}/runs")
+async def list_content_subscription_runs(subscription_id: str, request: Request, limit: int = 30):
+    if not db.get_content_subscription(subscription_id, user_id=_current_user_id(request)):
+        raise HTTPException(status_code=404, detail="订阅不存在")
+    return db.list_subscription_runs(subscription_id, limit=limit)
 
 
 @app.post("/bilibili/video-info", response_model=BilibiliVideoInfo)
