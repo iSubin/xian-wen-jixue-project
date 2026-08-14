@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import posixpath
 import re
 import shlex
 import subprocess
@@ -34,6 +33,7 @@ class GitSyncError(RuntimeError):
 class GeneratedFile:
     content: bytes
     task_id: str | None = None
+    content_directory: str | None = None
 
     @property
     def sha256(self) -> str:
@@ -233,16 +233,65 @@ def _frontmatter_value(value: Any) -> str:
     return json.dumps(str(value), ensure_ascii=False)
 
 
-def _render_document(task: Dict[str, Any], summary: str, transcript: str, include_transcript: bool) -> str:
-    title = str(task.get("title") or task.get("topic") or "未命名文档").strip()
+def _metadata_dict(value: Any) -> Dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str) and value.strip():
+        try:
+            payload = json.loads(value)
+            return payload if isinstance(payload, dict) else {}
+        except json.JSONDecodeError:
+            return {}
+    return {}
+
+
+def _source_title(task: Dict[str, Any]) -> str:
+    source_meta = _metadata_dict(task.get("source_meta"))
+    title = str(
+        task.get("title")
+        or source_meta.get("title")
+        or task.get("topic")
+        or "未命名内容"
+    ).strip()
+    return re.sub(r"\s+", " ", title) or "未命名内容"
+
+
+def _public_source_url(task: Dict[str, Any]) -> str:
     source_url = str(task.get("source_url") or task.get("video_url") or "").strip()
+    return "" if source_url.startswith("file://") else source_url
+
+
+def _raw_document_name(task: Dict[str, Any]) -> str:
+    source_type = str(task.get("source_type") or "video").strip().lower()
+    if source_type in {"article", "wechat_article", "web_article", "document"}:
+        return "原始正文.md"
+    return "原始逐字稿.md"
+
+
+def _render_document(task: Dict[str, Any], summary: str, raw_document_name: str | None) -> str:
+    title = _source_title(task)
+    source_url = _public_source_url(task)
+    source_meta = _metadata_dict(task.get("source_meta"))
+    author = str(
+        task.get("author_name")
+        or source_meta.get("author")
+        or source_meta.get("account_name")
+        or ""
+    ).strip()
+    published_at = str(
+        source_meta.get("published_at")
+        or source_meta.get("publish_time")
+        or ""
+    ).strip()
     lines = [
         "---",
         f"xianwen_id: {_frontmatter_value(task.get('id'))}",
         f"title: {_frontmatter_value(title)}",
         f"source_type: {_frontmatter_value(task.get('source_type') or 'video')}",
         f"source_url: {_frontmatter_value(source_url)}",
-        f"created_at: {_frontmatter_value(task.get('created_at'))}",
+        f"author: {_frontmatter_value(author)}",
+        f"published_at: {_frontmatter_value(published_at)}",
+        f"captured_at: {_frontmatter_value(task.get('created_at'))}",
         f"updated_at: {_frontmatter_value(task.get('latest_modified_at'))}",
         "tags:",
         "  - 先闻继学",
@@ -252,13 +301,89 @@ def _render_document(task: Dict[str, Any], summary: str, transcript: str, includ
         f"# {title}",
         "",
     ]
+    source_details: list[str] = []
+    if author:
+        source_details.append(author)
+    if published_at:
+        source_details.append(published_at)
     if source_url:
-        lines.extend([f"> [!info] 原始来源", f"> {source_url}", ""])
+        source_details.append(f"[查看原始来源]({source_url})")
+    if source_details or raw_document_name:
+        lines.append("> [!info] 内容来源")
+        if source_details:
+            lines.append(f"> {' · '.join(source_details)}")
+        if raw_document_name:
+            lines.append(f"> 原始材料：[[{raw_document_name[:-3]}]]")
+        lines.append("")
     if summary:
-        lines.extend(["## 整理文稿", "", summary.strip(), ""])
-    if include_transcript and transcript:
-        lines.extend(["## 原始转写", "", transcript.strip(), ""])
+        lines.extend(["## 整理稿", "", summary.strip(), ""])
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _render_raw_document(
+    task: Dict[str, Any],
+    transcript: str,
+    raw_document_name: str,
+    main_note_name: str,
+) -> str:
+    title = _source_title(task)
+    raw_title = raw_document_name[:-3]
+    lines = [
+        f"# {raw_title}",
+        "",
+        f"> 对应整理稿：{_obsidian_link(main_note_name, title)}",
+        "",
+        transcript.strip(),
+        "",
+    ]
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _assign_content_directory_names(
+    tasks: list[Dict[str, Any]],
+    existing_names: Dict[str, str] | None,
+) -> Dict[str, str]:
+    existing_names = existing_names or {}
+    assigned: Dict[str, str] = {}
+    used: set[str] = set()
+
+    for task in tasks:
+        task_id = str(task.get("id") or "")
+        previous_name = str(existing_names.get(task_id) or "").strip()
+        if not previous_name:
+            continue
+        safe_name = _safe_component(previous_name, "未命名内容")
+        if safe_name in used:
+            continue
+        assigned[task_id] = safe_name
+        used.add(safe_name)
+
+    for task in tasks:
+        task_id = str(task.get("id") or "")
+        if task_id in assigned:
+            continue
+        base_name = _safe_component(_source_title(task), "未命名内容")
+        directory_name = base_name
+        if directory_name in used:
+            suffix = _safe_component(task_id[:8], "内容")
+            postfix = f"__{suffix}"
+            directory_name = f"{base_name[: 120 - len(postfix)].rstrip(' .')}{postfix}"
+            counter = 2
+            while directory_name in used:
+                postfix = f"__{suffix}-{counter}"
+                directory_name = f"{base_name[: 120 - len(postfix)].rstrip(' .')}{postfix}"
+                counter += 1
+        assigned[task_id] = directory_name
+        used.add(directory_name)
+    return assigned
+
+
+def _obsidian_link(path: PurePosixPath | str, title: str) -> str:
+    value = PurePosixPath(path).as_posix()
+    if value.endswith(".md"):
+        value = value[:-3]
+    label = str(title or value).replace("|", "｜").replace("]", "］").replace("[", "［")
+    return f"[[{value}|{label}]]"
 
 
 def build_library_files(
@@ -266,56 +391,136 @@ def build_library_files(
     *,
     include_transcript: bool = True,
     project_root: Path | None = None,
+    content_directory_names: Dict[str, str] | None = None,
 ) -> tuple[Dict[str, GeneratedFile], int]:
     folders = task_db.list_folders()
     folder_paths = _build_folder_paths(folders)
     tasks = task_db.list_library_documents()
     tasks.sort(key=lambda item: (str(item.get("created_at") or ""), str(item.get("id") or "")))
+    directory_names = _assign_content_directory_names(tasks, content_directory_names)
 
     generated: Dict[str, GeneratedFile] = {}
-    document_index: list[tuple[str, str]] = []
+    document_index: list[tuple[str, str, str]] = []
     root = project_root or get_project_root()
 
     for task in tasks:
         task_id = str(task.get("id") or "")
         folder_id = str(task.get("folder_id") or "")
-        folder_path = folder_paths.get(folder_id, PurePosixPath("未归档"))
-        title = _safe_component(task.get("title") or task.get("topic") or "", "未命名文档")
-        relative_path = (folder_path / f"{title}.md").as_posix()
-        if relative_path in generated:
-            relative_path = (folder_path / f"{title}-{task_id[:8]}.md").as_posix()
+        title = _source_title(task)
+        directory_name = directory_names[task_id]
+        content_root = PurePosixPath("内容") / directory_name
+        relative_path = (content_root / f"{directory_name}.md").as_posix()
 
         summary = str(task.get("summary") or "")
         transcript = str(task.get("transcript") or "")
-        document_dir = posixpath.dirname(relative_path) or "."
-        asset_root = PurePosixPath("_assets") / task_id
-        asset_reference = posixpath.relpath(asset_root.as_posix(), start=document_dir).rstrip("/") + "/"
+        asset_root = content_root / "assets"
+        asset_reference = "assets/"
         source_asset_prefix = f"/task-assets/{task_id}/"
         summary = summary.replace(source_asset_prefix, asset_reference)
+        transcript = transcript.replace(source_asset_prefix, asset_reference)
 
-        content = _render_document(task, summary, transcript, include_transcript)
-        generated[relative_path] = GeneratedFile(content.encode("utf-8"), task_id=task_id)
-        document_index.append((relative_path, str(task.get("title") or task.get("topic") or "未命名文档")))
+        raw_document_name = _raw_document_name(task) if include_transcript and transcript else None
+        content = _render_document(task, summary, raw_document_name)
+        generated[relative_path] = GeneratedFile(
+            content.encode("utf-8"),
+            task_id=task_id,
+            content_directory=directory_name,
+        )
+        document_index.append((relative_path, title, folder_id))
+
+        if raw_document_name:
+            raw_path = (content_root / raw_document_name).as_posix()
+            raw_content = _render_raw_document(task, transcript, raw_document_name, directory_name)
+            generated[raw_path] = GeneratedFile(
+                raw_content.encode("utf-8"),
+                task_id=task_id,
+                content_directory=directory_name,
+            )
 
         local_asset_dir = root / "temp" / "task-assets" / task_id
         if local_asset_dir.is_dir():
+            referenced_content = summary + (transcript if include_transcript else "")
             for asset in sorted(path for path in local_asset_dir.rglob("*") if path.is_file()):
                 asset_rel = asset.relative_to(local_asset_dir).as_posix()
+                if asset_rel not in referenced_content:
+                    continue
                 target_rel = (asset_root / asset_rel).as_posix()
-                generated[target_rel] = GeneratedFile(asset.read_bytes(), task_id=task_id)
+                generated[target_rel] = GeneratedFile(
+                    asset.read_bytes(),
+                    task_id=task_id,
+                    content_directory=directory_name,
+                )
+
+    folders_by_parent: Dict[str, list[Dict[str, Any]]] = {}
+    for folder in folders:
+        parent_id = str(folder.get("parent_id") or "")
+        folders_by_parent.setdefault(parent_id, []).append(folder)
+    for children in folders_by_parent.values():
+        children.sort(key=lambda item: (int(item.get("sort_order") or 0), str(item.get("name") or "")))
+
+    documents_by_folder: Dict[str, list[tuple[str, str]]] = {}
+    for path, title, folder_id in document_index:
+        documents_by_folder.setdefault(folder_id, []).append((path, title))
+    for documents in documents_by_folder.values():
+        documents.sort(key=lambda item: item[1])
+
+    for folder in folders:
+        folder_id = str(folder.get("id") or "")
+        folder_path = folder_paths.get(folder_id, PurePosixPath("未归档"))
+        index_path = PurePosixPath("藏经阁") / folder_path / "_目录.md"
+        lines = [f"# {folder.get('name') or '未命名目录'}", ""]
+        child_folders = folders_by_parent.get(folder_id, [])
+        if child_folders:
+            lines.extend(["## 子目录", ""])
+            for child in child_folders:
+                child_path = folder_paths.get(str(child.get("id") or ""), PurePosixPath("未归档"))
+                lines.append(
+                    f"- {_obsidian_link(PurePosixPath('藏经阁') / child_path / '_目录.md', str(child.get('name') or '未命名目录'))}"
+                )
+            lines.append("")
+        documents = documents_by_folder.get(folder_id, [])
+        if documents:
+            lines.extend(["## 内容", ""])
+            for path, document_title in documents:
+                lines.append(f"- {_obsidian_link(path, document_title)}")
+            lines.append("")
+        if not child_folders and not documents:
+            lines.extend(["> 此目录暂无内容。", ""])
+        generated[index_path.as_posix()] = GeneratedFile("\n".join(lines).encode("utf-8"))
+
+    library_lines = ["# 藏经阁", "", "> 内容正文只在 `内容/` 保存一份；藏经阁通过目录索引组织阅读。", ""]
+    root_folders = folders_by_parent.get("", [])
+    if root_folders:
+        library_lines.extend(["## 目录", ""])
+        for folder in root_folders:
+            folder_path = folder_paths.get(str(folder.get("id") or ""), PurePosixPath("未归档"))
+            library_lines.append(
+                f"- {_obsidian_link(PurePosixPath('藏经阁') / folder_path / '_目录.md', str(folder.get('name') or '未命名目录'))}"
+            )
+        library_lines.append("")
+    unfiled = documents_by_folder.get("", [])
+    if unfiled:
+        library_lines.extend(["## 未归档", ""])
+        for path, document_title in unfiled:
+            library_lines.append(f"- {_obsidian_link(path, document_title)}")
+        library_lines.append("")
+    generated["藏经阁/_索引.md"] = GeneratedFile("\n".join(library_lines).encode("utf-8"))
 
     index_lines = [
-        "# 先闻继学 · 文库索引",
+        "# 先闻继学 · 知识库",
         "",
         "> 先闻万象，继学不息。",
         "",
-        f"共收录 **{len(document_index)}** 篇文档。此索引由先闻继学自动维护。",
+        f"共收录 **{len(document_index)}** 篇内容。正文按原始标题归档，目录与专题只负责组织关系。",
+        "",
+        f"- {_obsidian_link('藏经阁/_索引.md', '进入藏经阁')}",
+        "- `专题/` 将用于后续专题管理，并引用 `内容/` 中的同一份正文。",
+        "",
+        "## 全部内容",
         "",
     ]
-    for path, title in sorted(document_index, key=lambda item: item[0]):
-        path_without_suffix = path[:-3] if path.endswith(".md") else path
-        depth = max(0, len(PurePosixPath(path).parts) - 1)
-        index_lines.append(f"{'  ' * depth}- [[{path_without_suffix}|{title}]]")
+    for path, title, _ in sorted(document_index, key=lambda item: item[1]):
+        index_lines.append(f"- {_obsidian_link(path, title)}")
     index_lines.append("")
     generated["_索引.md"] = GeneratedFile("\n".join(index_lines).encode("utf-8"))
     return generated, len(document_index)
@@ -332,14 +537,16 @@ def _file_sha256(path: Path) -> str:
 def _load_manifest(root_dir: Path) -> Dict[str, Any]:
     path = root_dir / MANIFEST_NAME
     if not path.exists():
-        return {"version": 1, "files": {}}
+        return {"version": 2, "files": {}, "content_directories": {}}
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
         if isinstance(payload, dict) and isinstance(payload.get("files"), dict):
+            if not isinstance(payload.get("content_directories"), dict):
+                payload["content_directories"] = {}
             return payload
     except (OSError, json.JSONDecodeError):
         pass
-    return {"version": 1, "files": {}}
+    return {"version": 2, "files": {}, "content_directories": {}}
 
 
 def _cleanup_empty_directories(root_dir: Path) -> None:
@@ -365,6 +572,7 @@ def apply_managed_files(
     manifest = _load_manifest(root_dir)
     previous_files = manifest.get("files") or {}
     next_files: Dict[str, Dict[str, Any]] = {}
+    content_directories: Dict[str, str] = {}
     conflicts: list[str] = []
     created = 0
     updated = 0
@@ -372,6 +580,8 @@ def apply_managed_files(
     removed = 0
 
     for relative_path, artifact in sorted(generated.items()):
+        if artifact.task_id and artifact.content_directory:
+            content_directories[artifact.task_id] = artifact.content_directory
         target = root_dir / Path(*PurePosixPath(relative_path).parts)
         target.parent.mkdir(parents=True, exist_ok=True)
         desired_hash = artifact.sha256
@@ -421,8 +631,9 @@ def apply_managed_files(
             next_files[relative_path] = previous
 
     manifest_payload = {
-        "version": 1,
+        "version": 2,
         "product": "先闻继学",
+        "content_directories": dict(sorted(content_directories.items())),
         "files": next_files,
     }
     manifest_path = root_dir / MANIFEST_NAME
@@ -457,11 +668,6 @@ def sync_library_to_git(
     branch = validate_branch(branch)
     root_path = validate_root_path(root_path)
     derive_public_key(private_key)
-    generated, document_count = build_library_files(
-        task_db,
-        include_transcript=include_transcript,
-    )
-
     with tempfile.TemporaryDirectory(prefix="xianwen-git-sync-") as temp_dir:
         temp_path = Path(temp_dir)
         key_path = _write_private_key(temp_path, private_key)
@@ -481,6 +687,13 @@ def sync_library_to_git(
             ],
             env=env,
             timeout=120,
+        )
+        root_dir = repository_dir / Path(*PurePosixPath(root_path).parts)
+        manifest = _load_manifest(root_dir)
+        generated, document_count = build_library_files(
+            task_db,
+            include_transcript=include_transcript,
+            content_directory_names=manifest.get("content_directories") or {},
         )
         result = apply_managed_files(repository_dir, root_path, generated)
         _run(["git", "config", "user.name", author_name or "先闻继学"], cwd=repository_dir)

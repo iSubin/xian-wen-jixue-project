@@ -437,6 +437,8 @@ export function useTaskViewModel() {
         return
       } else if (data.type === 'collection_created') {
         fetchCollections()
+      } else if (data.type === 'git_sync_update') {
+        window.dispatchEvent(new CustomEvent('xianwen:git-sync-update', { detail: data.settings }))
       } else if (data.type === 'task_update') {
         const updatedTask = data.task
         const index = tasks.value.findIndex(t => t.id === updatedTask.id)

@@ -505,10 +505,28 @@ XIANWEN_POSTGRES_PASSWORD=compose-check-only \
 1. 在 GitHub / GitLab 仓库中创建或添加一个允许写入的 Deploy Key。
 2. 打开先闻继学「设置 → Git 文库」，填写 SSH 仓库地址、分支和文库目录。
 3. 上传与公钥配对的无口令 SSH 私钥；私钥会使用本机生成的独立密钥加密保存。
-4. 测试连接后点击「同步整座文库」。
+4. 开启「采集完成后自动归档」；也可以随时点击「同步整座文库」手动重试。
 5. 在 Obsidian 中 clone 或 pull 该仓库，即可继续阅读和编辑。
 
-同步器通过 `.xianwen-manifest.json` 追踪自己生成的文件。若文件已在 Obsidian 中修改，本次同步会报告冲突并保留外部版本。
+Git 文库采用人类阅读优先的结构：
+
+```text
+先闻继学/
+  内容/
+    原始内容标题/
+      原始内容标题.md
+      原始逐字稿.md        # 文章为“原始正文.md”
+      assets/
+  藏经阁/
+    _索引.md
+    目录名称/_目录.md
+  _索引.md
+  .xianwen-manifest.json
+```
+
+`内容/` 中的正文只保存一份，目录名在首次发布后保持稳定；`藏经阁/` 通过 Obsidian WikiLink 组织目录，后续 `专题/` 也引用同一份正文，不复制内容。同步器通过根目录中的 `.xianwen-manifest.json` 追踪自己生成的文件。用户在 Obsidian 中新增的笔记不会被删除，修改过的受管文件也不会被强制覆盖。
+
+采集完成后，自动归档会等待短暂防抖并在后台执行；Git 失败只记录为待处理错误，不会把已经完成的采集任务改成失败。完整目录约束见 [`docs/architecture/git-obsidian-knowledge-layout.md`](docs/architecture/git-obsidian-knowledge-layout.md)。
 
 
 ---

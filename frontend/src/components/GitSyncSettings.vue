@@ -37,6 +37,7 @@ const rootPath = ref('先闻继学')
 const authorName = ref('先闻继学')
 const authorEmail = ref('xianwen@localhost')
 const includeTranscript = ref(true)
+const autoSync = ref(true)
 const privateKey = ref('')
 const keyFileName = ref('')
 const copied = ref(false)
@@ -51,6 +52,7 @@ watch(
     authorName.value = settings.author_name || '先闻继学'
     authorEmail.value = settings.author_email || 'xianwen@localhost'
     includeTranscript.value = settings.include_transcript
+    autoSync.value = settings.configured ? settings.auto_sync : true
   },
   { immediate: true },
 )
@@ -67,6 +69,8 @@ const canSave = computed(() =>
 const statusLabel = computed(() => {
   if (!props.settings?.configured) return '尚未配置'
   if (props.settings.status === 'error') return '连接异常'
+  if (props.settings.status === 'syncing') return '正在归档'
+  if (props.settings.status === 'pending_sync') return '等待归档'
   return '已安全连接'
 })
 
@@ -86,6 +90,7 @@ const save = () => {
     author_name: authorName.value.trim(),
     author_email: authorEmail.value.trim(),
     include_transcript: includeTranscript.value,
+    auto_sync: autoSync.value,
   }
   if (privateKey.value.trim()) payload.private_key = privateKey.value.trim()
   emit('save', payload)
@@ -110,7 +115,8 @@ const copyPublicKey = async () => {
         <p>按目录生成 Markdown，推送到私人仓库，再由 Obsidian 接续阅读、批注与生长。</p>
       </div>
       <div :class="['status-seal', settings?.status === 'error' ? 'status-error' : '']">
-        <PhCheckCircle v-if="settings?.configured && settings.status !== 'error'" :size="17" weight="fill" />
+        <PhSpinner v-if="settings?.status === 'syncing'" :size="17" class="animate-spin" />
+        <PhCheckCircle v-else-if="settings?.configured && settings.status !== 'error'" :size="17" weight="fill" />
         <PhWarning v-else-if="settings?.status === 'error'" :size="17" weight="fill" />
         <PhGitBranch v-else :size="17" />
         {{ statusLabel }}
@@ -189,13 +195,20 @@ const copyPublicKey = async () => {
         <span>三</span>
         <div>
           <h4>文档内容</h4>
-          <p>整理文稿始终同步；原始转写可按需一并进入 Obsidian。</p>
+          <p>内容按原始标题建立目录；整理稿与原始材料保持适合 Obsidian 阅读的结构。</p>
         </div>
       </div>
+      <button type="button" class="transcript-toggle" @click="autoSync = !autoSync">
+        <span>
+          <strong>采集完成后自动归档</strong>
+          <small>后台合并短时间内的变更；归档失败不会影响采集结果。</small>
+        </span>
+        <i :class="{ on: autoSync }"><b /></i>
+      </button>
       <button type="button" class="transcript-toggle" @click="includeTranscript = !includeTranscript">
         <span>
           <strong>附带原始转写</strong>
-          <small>关闭后，Git 中只保留整理后的学习文稿。</small>
+          <small>关闭后，Git 中只保留整理稿，不生成原始逐字稿或原始正文。</small>
         </span>
         <i :class="{ on: includeTranscript }"><b /></i>
       </button>
@@ -289,6 +302,7 @@ input:focus { border-color: var(--cinnabar); box-shadow: 0 0 0 2px rgba(168, 71,
 .public-key button { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; color: #52664c; font: 600 11px/1 ui-sans-serif, system-ui, sans-serif; }
 .public-key code { display: block; margin-top: 9px; padding-right: 80px; word-break: break-all; color: #4b5547; font-size: 10px; }
 .transcript-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; text-align: left; padding: 12px; border: 1px solid #ded4c4; background: #fbfaf6; }
+.transcript-toggle + .transcript-toggle { margin-top: 8px; }
 .transcript-toggle span { display: flex; flex-direction: column; gap: 4px; }
 .transcript-toggle strong { font: 600 13px/1.3 ui-sans-serif, system-ui, sans-serif; }
 .transcript-toggle small { color: var(--muted); font: 11px/1.4 ui-sans-serif, system-ui, sans-serif; }

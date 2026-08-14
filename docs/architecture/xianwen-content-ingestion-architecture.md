@@ -163,28 +163,29 @@ runtime/         cache / work / logs 等可再生数据
 exports/         用户可见的最终导出物
 ```
 
-## 6. 与消费方的内容契约
+## 6. Git / Obsidian 内容契约
 
-学习平台不应直接读取 `xianwen.db`。推荐通过版本化内容包连接：
+Git 文库首先服务于人类阅读，不把运行态字段拆成大量 JSON 文件。每份内容只在 `内容/` 中保存一次，目录使用采集来源提供的原始标题；藏经阁和后续专题只通过 WikiLink 组织关系：
 
 ```text
-content-package/
-  manifest.json
-  content.md
-  transcript.json
-  metadata.json
-  provenance.json
-  assets/
+先闻继学/
+  内容/<原始标题>/
+    <原始标题>.md
+    原始逐字稿.md | 原始正文.md
+    assets/
+  藏经阁/<目录层级>/_目录.md
+  专题/                         # 后续专题索引，不复制正文
+  _索引.md
+  .xianwen-manifest.json
 ```
 
-- `manifest.json`：内容包版本、内容 ID 和产物清单。
-- `content.md`：标准化正文或总结。
-- `transcript.json`：带时间戳逐字稿。
-- `metadata.json`：标题、作者、标签和发布时间。
-- `provenance.json`：来源与采集信息，默认只供内部追溯。
-- `assets/`：图片、截图、封面和附件。
+- 主文档使用少量 YAML Properties 保存来源 URL、作者、发布时间、采集时间和 `xianwen_id`。
+- 原始逐字稿或原始正文与整理稿分开，保持人类可读；音视频本体不进入普通 Git。
+- 内容目录名在首次发布后写入 manifest 并保持稳定，藏经阁分类变化不移动正文。
+- `.xianwen-manifest.json` 只负责受管文件 hash 与稳定目录映射，不作为阅读入口。
+- 用户新增文件不纳入 manifest；用户修改过的受管文件报告冲突并保留外部版本。
 
-该契约应放入 `contracts/content-package/v1/`，并由契约测试保证兼容性。
+学习平台不应直接读取 `xianwen.db`。如后续消费方确实需要机器契约，可以新增独立的 Content Package Publisher，但不应让机器格式污染默认的 Git / Obsidian 文库。
 
 ## 7. 数据目录原则
 

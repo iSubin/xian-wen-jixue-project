@@ -344,6 +344,7 @@ export interface GitSettings {
   author_name: string;
   author_email: string;
   include_transcript: boolean;
+  auto_sync: boolean;
   has_private_key: boolean;
   public_key: string;
   status: 'not_configured' | 'connected' | 'error' | string;
@@ -359,6 +360,7 @@ export interface GitSettingsUpdate {
   author_name: string;
   author_email: string;
   include_transcript: boolean;
+  auto_sync: boolean;
   private_key?: string;
 }
 

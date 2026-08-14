@@ -1,8 +1,10 @@
 import os
+import subprocess
 import tempfile
 import unittest
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import patch
 
 from src.main.python.xianwen.db import TaskDB
 from src.main.python.xianwen.git_sync import (
@@ -10,6 +12,7 @@ from src.main.python.xianwen.git_sync import (
     GitSyncError,
     apply_managed_files,
     build_library_files,
+    sync_library_to_git,
     validate_branch,
     validate_repository_url,
     validate_root_path,
@@ -26,7 +29,7 @@ class GitSyncExportTest(unittest.TestCase):
             sqlite_path=str(self.root / "xianwen.db"),
         )
 
-    def test_builds_folder_tree_obsidian_index_and_assets(self):
+    def test_builds_human_readable_content_library_indexes_and_assets(self):
         parent_id = "parent"
         child_id = "child"
         task_id = "task-001"
@@ -56,6 +59,7 @@ class GitSyncExportTest(unittest.TestCase):
         asset_dir = self.root / "temp" / "task-assets" / task_id / "frames"
         asset_dir.mkdir(parents=True)
         (asset_dir / "frame.jpg").write_bytes(b"frame")
+        (asset_dir / "unused.jpg").write_bytes(b"unused")
         self.store.save_task(
             task_id,
             {
@@ -78,14 +82,89 @@ class GitSyncExportTest(unittest.TestCase):
             project_root=self.root,
         )
 
-        document_path = "经世/人工智能/从感知到知识.md"
+        content_dir = "内容/从感知到知识"
+        document_path = f"{content_dir}/从感知到知识.md"
+        transcript_path = f"{content_dir}/原始逐字稿.md"
         self.assertEqual(document_count, 1)
         self.assertIn(document_path, generated)
+        self.assertIn(transcript_path, generated)
         content = generated[document_path].content.decode("utf-8")
         self.assertIn("# 从感知到知识", content)
-        self.assertIn("../../_assets/task-001/frames/frame.jpg", content)
-        self.assertIn("经世/人工智能/从感知到知识", generated["_索引.md"].content.decode("utf-8"))
-        self.assertIn("_assets/task-001/frames/frame.jpg", generated)
+        self.assertIn("assets/frames/frame.jpg", content)
+        self.assertIn("[[原始逐字稿]]", content)
+        self.assertNotIn("[000001] 原始转写", content)
+        self.assertIn("[000001] 原始转写", generated[transcript_path].content.decode("utf-8"))
+        self.assertIn("内容/从感知到知识/从感知到知识", generated["_索引.md"].content.decode("utf-8"))
+        self.assertIn("藏经阁/经世/人工智能/_目录.md", generated)
+        self.assertIn(
+            "内容/从感知到知识/从感知到知识",
+            generated["藏经阁/经世/人工智能/_目录.md"].content.decode("utf-8"),
+        )
+        self.assertIn(f"{content_dir}/assets/frames/frame.jpg", generated)
+        self.assertNotIn(f"{content_dir}/assets/frames/unused.jpg", generated)
+
+    def test_uses_original_article_body_name_and_keeps_metadata_minimal(self):
+        task_id = "article-001"
+        now = datetime.utcnow()
+        asset_dir = self.root / "temp" / "task-assets" / task_id / "images"
+        asset_dir.mkdir(parents=True)
+        (asset_dir / "cover.jpg").write_bytes(b"cover")
+        self.store.save_task(
+            task_id,
+            {
+                "video_url": "https://mp.weixin.qq.com/s/example",
+                "source_url": "https://mp.weixin.qq.com/s/example",
+                "source_type": "wechat_article",
+                "source_meta": '{"publish_time":"2026-08-01","account_name":"测试公众号"}',
+                "status": "COMPLETED",
+                "created_at": now,
+                "latest_modified_at": now,
+                "progress": 1.0,
+                "title": "一篇原始文章",
+                "author_name": "测试作者",
+                "summary": "整理后的内容",
+                "transcript": "原始正文\n\n![封面](/task-assets/article-001/images/cover.jpg)",
+            },
+        )
+
+        generated, _ = build_library_files(self.store, project_root=self.root)
+
+        main = generated["内容/一篇原始文章/一篇原始文章.md"].content.decode("utf-8")
+        raw = generated["内容/一篇原始文章/原始正文.md"].content.decode("utf-8")
+        self.assertIn('author: "测试作者"', main)
+        self.assertIn('published_at: "2026-08-01"', main)
+        self.assertIn("[[原始正文]]", main)
+        self.assertIn("assets/images/cover.jpg", raw)
+        self.assertIn("内容/一篇原始文章/assets/images/cover.jpg", generated)
+
+    def test_disambiguates_duplicate_titles_and_reuses_published_directory_name(self):
+        now = datetime.utcnow()
+        for task_id in ("task-aaa11111", "task-bbb22222"):
+            self.store.save_task(
+                task_id,
+                {
+                    "video_url": f"https://example.com/{task_id}",
+                    "source_type": "video",
+                    "status": "COMPLETED",
+                    "created_at": now,
+                    "latest_modified_at": now,
+                    "progress": 1.0,
+                    "title": "同名内容",
+                    "summary": "整理稿",
+                    "transcript": "逐字稿",
+                },
+            )
+
+        generated, _ = build_library_files(self.store, project_root=self.root)
+        self.assertIn("内容/同名内容/同名内容.md", generated)
+        self.assertIn("内容/同名内容__task-bbb/同名内容__task-bbb.md", generated)
+
+        generated, _ = build_library_files(
+            self.store,
+            project_root=self.root,
+            content_directory_names={"task-aaa11111": "首次发布标题"},
+        )
+        self.assertIn("内容/首次发布标题/首次发布标题.md", generated)
 
     def test_preserves_obsidian_edits_as_conflicts(self):
         repository = self.root / "repository"
@@ -122,12 +201,97 @@ class GitSyncExportTest(unittest.TestCase):
         )
         generated, document_count = build_library_files(self.store, project_root=self.root)
         self.assertEqual(document_count, 1)
-        self.assertIn("未归档/手写文档.md", generated)
+        self.assertIn("内容/手写文档/手写文档.md", generated)
+        self.assertNotIn("内容/手写文档/原始逐字稿.md", generated)
 
         self.store.update_task("manual-001", {"library_visible": False})
         generated, document_count = build_library_files(self.store, project_root=self.root)
         self.assertEqual(document_count, 0)
-        self.assertNotIn("未归档/手写文档.md", generated)
+        self.assertNotIn("内容/手写文档/手写文档.md", generated)
+
+    def test_manifest_records_stable_content_directory_names(self):
+        repository = self.root / "repository"
+        repository.mkdir()
+        generated = {
+            "内容/原始标题/原始标题.md": GeneratedFile(
+                b"content\n",
+                task_id="task-1",
+                content_directory="原始标题",
+            )
+        }
+
+        apply_managed_files(repository, "先闻继学", generated)
+
+        manifest = (repository / "先闻继学" / ".xianwen-manifest.json").read_text(encoding="utf-8")
+        self.assertIn('"version": 2', manifest)
+        self.assertIn('"task-1": "原始标题"', manifest)
+
+    def test_sync_commits_and_pushes_human_readable_vault_to_git(self):
+        remote = self.root / "remote.git"
+        seed = self.root / "seed"
+        subprocess.run(["git", "init", "--bare", "--initial-branch=main", str(remote)], check=True, capture_output=True)
+        subprocess.run(["git", "init", "--initial-branch=main", str(seed)], check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=seed, check=True)
+        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=seed, check=True)
+        (seed / "README.md").write_text("# Knowledge\n", encoding="utf-8")
+        subprocess.run(["git", "add", "README.md"], cwd=seed, check=True)
+        subprocess.run(["git", "commit", "-m", "init"], cwd=seed, check=True, capture_output=True)
+        subprocess.run(["git", "remote", "add", "origin", str(remote)], cwd=seed, check=True)
+        subprocess.run(["git", "push", "-u", "origin", "main"], cwd=seed, check=True, capture_output=True)
+
+        now = datetime.utcnow()
+        self.store.save_task(
+            "task-e2e",
+            {
+                "video_url": "https://example.com/video",
+                "source_type": "video",
+                "status": "COMPLETED",
+                "created_at": now,
+                "latest_modified_at": now,
+                "progress": 1.0,
+                "title": "真实 Git 归档",
+                "summary": "整理稿",
+                "transcript": "逐字稿",
+            },
+        )
+
+        def fake_key(directory: Path, _: str) -> Path:
+            key_path = directory / "deploy_key"
+            key_path.write_text("test", encoding="utf-8")
+            return key_path
+
+        with (
+            patch("src.main.python.xianwen.git_sync.validate_repository_url", side_effect=lambda value: value),
+            patch("src.main.python.xianwen.git_sync.derive_public_key", return_value="ssh-ed25519 test"),
+            patch("src.main.python.xianwen.git_sync._write_private_key", side_effect=fake_key),
+        ):
+            first = sync_library_to_git(
+                self.store,
+                repository_url=str(remote),
+                branch="main",
+                root_path="先闻继学",
+                private_key="test",
+                author_name="先闻继学",
+                author_email="xianwen@example.com",
+                include_transcript=True,
+            )
+            second = sync_library_to_git(
+                self.store,
+                repository_url=str(remote),
+                branch="main",
+                root_path="先闻继学",
+                private_key="test",
+                author_name="先闻继学",
+                author_email="xianwen@example.com",
+                include_transcript=True,
+            )
+
+        checkout = self.root / "checkout"
+        subprocess.run(["git", "clone", "--branch", "main", str(remote), str(checkout)], check=True, capture_output=True)
+        self.assertTrue(first["committed"])
+        self.assertFalse(second["committed"])
+        self.assertTrue((checkout / "先闻继学" / "内容" / "真实 Git 归档" / "真实 Git 归档.md").is_file())
+        self.assertTrue((checkout / "先闻继学" / "藏经阁" / "_索引.md").is_file())
 
     def test_rejects_unsafe_git_inputs(self):
         self.assertEqual(

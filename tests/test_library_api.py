@@ -1,3 +1,4 @@
+import asyncio
 import os
 import tempfile
 import unittest
@@ -10,6 +11,15 @@ from src.main.python.xianwen import api as api_module
 from src.main.python.xianwen.db import TaskDB
 
 
+def run_async(coroutine):
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop.run_until_complete(coroutine)
+
+
 class LibraryApiTest(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -20,6 +30,9 @@ class LibraryApiTest(unittest.TestCase):
             sqlite_path=os.path.join(self.temp_dir.name, "test.db"),
         )
         self.addCleanup(lambda: setattr(api_module, "db", self.original_db))
+        api_module._git_auto_sync_pending.clear()
+        api_module._git_auto_sync_tasks.clear()
+        api_module._git_sync_locks.clear()
         self.client = TestClient(api_module.app)
 
     def test_library_projects_documents_and_rejects_folder_cycles(self):
@@ -73,8 +86,62 @@ class LibraryApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertTrue(payload["has_private_key"])
+        self.assertTrue(payload["auto_sync"])
         self.assertNotIn("private_key", payload)
         self.assertNotIn("secret", response.text)
+
+    def test_completed_content_marks_git_pending_and_requests_auto_sync(self):
+        now = datetime.utcnow()
+        api_module.db.save_task(
+            "completed-1",
+            {
+                "video_url": "https://example.com/video",
+                "status": "COMPLETED",
+                "created_at": now,
+                "latest_modified_at": now,
+                "progress": 1.0,
+                "title": "完成内容",
+                "summary": "整理稿",
+                "transcript": "逐字稿",
+            },
+        )
+
+        with patch.object(api_module, "_schedule_git_auto_sync", return_value=True) as schedule:
+            run_async(api_module.notify_task_update("completed-1"))
+
+        schedule.assert_called_once_with(api_module.DEFAULT_LOCAL_USER_ID)
+
+    def test_saved_git_account_sync_updates_runtime_status(self):
+        with patch.object(api_module, "derive_public_key", return_value="ssh-ed25519 public"):
+            response = self.client.put(
+                "/git/settings",
+                json={
+                    "repository_url": "git@github.com:owner/repo.git",
+                    "branch": "main",
+                    "root_path": "先闻继学",
+                    "auto_sync": True,
+                    "private_key": "-----BEGIN OPENSSH PRIVATE KEY-----\nsecret\n-----END OPENSSH PRIVATE KEY-----",
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+
+        expected = {
+            "success": True,
+            "document_count": 0,
+            "committed": False,
+            "commit_sha": "",
+            "created": 0,
+            "updated": 0,
+            "adopted": 0,
+            "removed": 0,
+            "conflicts": [],
+        }
+        with patch.object(api_module, "sync_library_to_git", return_value=expected) as sync:
+            result = run_async(api_module._sync_saved_git_account(api_module.DEFAULT_LOCAL_USER_ID))
+
+        self.assertEqual(result, expected)
+        self.assertEqual(self.client.get("/git/settings").json()["status"], "connected")
+        sync.assert_called_once()
 
     def test_document_crud_preserves_source_task(self):
         invalid = self.client.post(

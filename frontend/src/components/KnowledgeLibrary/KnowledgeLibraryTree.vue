@@ -71,6 +71,7 @@ const rootDocuments = computed(() =>
 
 const rootFolderCount = computed(() => props.folderTree.length)
 const pendingSync = computed(() => props.gitStatus === 'pending_sync')
+const syncingGit = computed(() => props.isSyncingGit || props.gitStatus === 'syncing')
 
 const openCreate = () => {
   editingDocument.value = null
@@ -127,13 +128,13 @@ const removeCurrentDocument = async () => {
         <button
           type="button"
           :class="['sync-button', pendingSync ? 'pending' : '']"
-          :disabled="!gitConfigured || isSyncingGit"
+          :disabled="!gitConfigured || syncingGit"
           :title="gitConfigured ? '把当前文库快照同步到 Git' : '请先在设置中配置 Git 文库'"
           @click="emit('syncGit')"
         >
-          <PhSpinner v-if="isSyncingGit" :size="13" class="spin" />
+          <PhSpinner v-if="syncingGit" :size="13" class="spin" />
           <PhCloudArrowUp v-else :size="13" />
-          {{ isSyncingGit ? '同步中' : pendingSync ? '待同步' : '同步 Git' }}
+          {{ syncingGit ? '同步中' : pendingSync ? '待同步' : '同步 Git' }}
         </button>
       </div>
 

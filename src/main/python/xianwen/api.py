@@ -277,6 +277,7 @@ class GitSettingsUpdate(BaseModel):
     author_name: str = Field(default="先闻继学", min_length=1, max_length=120)
     author_email: str = Field(default="xianwen@localhost", min_length=3, max_length=254)
     include_transcript: bool = True
+    auto_sync: bool = True
     private_key: Optional[str] = Field(default=None, description="SSH Deploy Key 私钥；留空保持已有私钥")
 
 
@@ -288,6 +289,7 @@ class GitSettingsView(BaseModel):
     author_name: str = "先闻继学"
     author_email: str = "xianwen@localhost"
     include_transcript: bool = True
+    auto_sync: bool = False
     has_private_key: bool = False
     public_key: str = ""
     status: str = "not_configured"
@@ -554,6 +556,110 @@ def _mark_git_library_pending(user_id: str) -> None:
     )
 
 
+_GIT_AUTO_SYNC_DEBOUNCE_SECONDS = 2.0
+_git_auto_sync_pending: Dict[str, bool] = {}
+_git_auto_sync_tasks: Dict[str, asyncio.Task] = {}
+_git_sync_locks: Dict[str, asyncio.Lock] = {}
+
+
+def _git_auto_sync_enabled(user_id: str) -> bool:
+    _, secret = _git_account_bundle(user_id)
+    return bool(secret and secret.get("auto_sync", False) and secret.get("private_key"))
+
+
+async def _broadcast_git_settings(user_id: str) -> None:
+    await manager.broadcast(
+        json.dumps(
+            {
+                "type": "git_sync_update",
+                "settings": _git_settings_view(user_id),
+            },
+            ensure_ascii=False,
+            default=str,
+        )
+    )
+
+
+async def _sync_saved_git_account(user_id: str) -> Dict[str, Any]:
+    lock = _git_sync_locks.setdefault(user_id, asyncio.Lock())
+    async with lock:
+        account, secret = _git_account_bundle(user_id)
+        if not account or not secret or not secret.get("private_key"):
+            raise GitSyncError("请先配置 Git 仓库和 Deploy Key")
+
+        db.update_connected_account_runtime(
+            user_id,
+            str(account["id"]),
+            status="syncing",
+            last_error=None,
+        )
+        await _broadcast_git_settings(user_id)
+        try:
+            result = await asyncio.to_thread(
+                sync_library_to_git,
+                db,
+                repository_url=str(secret.get("repository_url") or ""),
+                branch=str(secret.get("branch") or "main"),
+                root_path=str(secret.get("root_path") or DEFAULT_ROOT_PATH),
+                private_key=str(secret.get("private_key") or ""),
+                author_name=str(secret.get("author_name") or "先闻继学"),
+                author_email=str(secret.get("author_email") or "xianwen@localhost"),
+                include_transcript=bool(secret.get("include_transcript", True)),
+            )
+        except Exception as exc:
+            db.update_connected_account_runtime(
+                user_id,
+                str(account["id"]),
+                status="error",
+                last_error=str(exc),
+            )
+            await _broadcast_git_settings(user_id)
+            if isinstance(exc, GitSyncError):
+                raise
+            raise GitSyncError(str(exc) or "Git 同步失败") from exc
+
+        db.update_connected_account_runtime(
+            user_id,
+            str(account["id"]),
+            status="connected",
+            last_error=None,
+            used=True,
+        )
+        await _broadcast_git_settings(user_id)
+        return result
+
+
+async def _drain_git_auto_sync(user_id: str) -> None:
+    try:
+        while _git_auto_sync_pending.pop(user_id, False):
+            await asyncio.sleep(_GIT_AUTO_SYNC_DEBOUNCE_SECONDS)
+            if not _git_auto_sync_enabled(user_id):
+                return
+            try:
+                await _sync_saved_git_account(user_id)
+            except GitSyncError as exc:
+                logger.warning(f"[GitAutoSync] 自动归档失败: user={user_id}, detail={exc}")
+    finally:
+        _git_auto_sync_tasks.pop(user_id, None)
+        if _git_auto_sync_pending.get(user_id) and _git_auto_sync_enabled(user_id):
+            _git_auto_sync_tasks[user_id] = asyncio.create_task(_drain_git_auto_sync(user_id))
+
+
+def _schedule_git_auto_sync(user_id: str = DEFAULT_LOCAL_USER_ID) -> bool:
+    if not _git_auto_sync_enabled(user_id):
+        return False
+    _git_auto_sync_pending[user_id] = True
+    task = _git_auto_sync_tasks.get(user_id)
+    if task is None or task.done():
+        _git_auto_sync_tasks[user_id] = asyncio.create_task(_drain_git_auto_sync(user_id))
+    return True
+
+
+def _mark_and_schedule_git_library(user_id: str = DEFAULT_LOCAL_USER_ID) -> None:
+    _mark_git_library_pending(user_id)
+    _schedule_git_auto_sync(user_id)
+
+
 def _git_settings_view(user_id: str) -> Dict[str, Any]:
     account, secret = _git_account_bundle(user_id)
     if not account or not secret:
@@ -566,6 +672,7 @@ def _git_settings_view(user_id: str) -> Dict[str, Any]:
         "author_name": str(secret.get("author_name") or "先闻继学"),
         "author_email": str(secret.get("author_email") or "xianwen@localhost"),
         "include_transcript": bool(secret.get("include_transcript", True)),
+        "auto_sync": bool(secret.get("auto_sync", False)),
         "has_private_key": bool(secret.get("private_key")),
         "public_key": str(secret.get("public_key") or ""),
         "status": str(account.get("status") or "connected"),
@@ -803,6 +910,11 @@ async def notify_task_update(task_id: str, task_data: dict = None):
         })
 
         await manager.broadcast(message)
+
+        status = task_data.get("status")
+        status_value = getattr(status, "value", status)
+        if str(status_value or "") == TaskStatus.COMPLETED.value:
+            _mark_and_schedule_git_library(DEFAULT_LOCAL_USER_ID)
     else:
         # 添加日志：任务不存在
         logger.warning(f"[WebSocket] Task not found for broadcast: task_id={task_id}")
@@ -2270,7 +2382,7 @@ async def re_transcribe_task(task_id: str, payload: ReTranscribeRequest | None =
 
 
 @app.delete("/tasks/{task_id}", status_code=204)
-async def delete_task(task_id: str):
+async def delete_task(task_id: str, request: Request):
     """
     删除任务
     """
@@ -2303,13 +2415,14 @@ async def delete_task(task_id: str):
         logger.info(f"[delete_task] 任务 {task_id} 取消结果: " + ", ".join(cancellation_reports))
 
     db.delete_task(task_id)
+    _mark_and_schedule_git_library(_current_user_id(request))
     return None
 
 
 # ── Folder API ──
 
 @app.post("/folders/", response_model=Folder, status_code=201)
-async def create_folder(folder_in: FolderCreate):
+async def create_folder(folder_in: FolderCreate, request: Request):
     if folder_in.parent_id and not db.get_folder(folder_in.parent_id):
         raise HTTPException(status_code=404, detail="父目录不存在")
     folder_id = str(uuid.uuid4())
@@ -2324,6 +2437,7 @@ async def create_folder(folder_in: FolderCreate):
     }
     result = db.create_folder(folder_data)
     await manager.broadcast(json.dumps({"type": "folder_created", "folder": result}))
+    _mark_and_schedule_git_library(_current_user_id(request))
     return result
 
 
@@ -2345,7 +2459,7 @@ async def get_folder(folder_id: str):
 
 
 @app.patch("/folders/{folder_id}", response_model=Folder)
-async def update_folder(folder_id: str, folder_update: FolderUpdate):
+async def update_folder(folder_id: str, folder_update: FolderUpdate, request: Request):
     folder = db.get_folder(folder_id)
     if not folder:
         raise HTTPException(status_code=404, detail="Folder not found")
@@ -2358,21 +2472,23 @@ async def update_folder(folder_id: str, folder_update: FolderUpdate):
             raise HTTPException(status_code=400, detail="不能把目录移动到自身或其子目录中")
     result = db.update_folder(folder_id, updates)
     await manager.broadcast(json.dumps({"type": "folder_updated", "folder": result}))
+    _mark_and_schedule_git_library(_current_user_id(request))
     return result
 
 
 @app.delete("/folders/{folder_id}", status_code=204)
-async def delete_folder(folder_id: str):
+async def delete_folder(folder_id: str, request: Request):
     folder = db.get_folder(folder_id)
     if not folder:
         raise HTTPException(status_code=404, detail="Folder not found")
     db.delete_folder(folder_id)
     await manager.broadcast(json.dumps({"type": "folder_deleted", "folder_id": folder_id}))
+    _mark_and_schedule_git_library(_current_user_id(request))
     return None
 
 
 @app.patch("/tasks/{task_id}/folder", response_model=Task)
-async def assign_task_folder(task_id: str, payload: TaskFolderAssign):
+async def assign_task_folder(task_id: str, payload: TaskFolderAssign, request: Request):
     task = db.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -2381,11 +2497,12 @@ async def assign_task_folder(task_id: str, payload: TaskFolderAssign):
     db.assign_task_to_folder(task_id, payload.folder_id)
     updated = db.get_task(task_id)
     await notify_task_update(task_id, updated)
+    _mark_and_schedule_git_library(_current_user_id(request))
     return updated
 
 
 @app.post("/folders/backfill-multi-p")
-async def backfill_multi_p_folders():
+async def backfill_multi_p_folders(request: Request):
     """一键迁移历史多P任务到文件夹：扫描 title 匹配 "XXX - Pn" 的任务并自动建文件夹。"""
     import re
     tasks = db.list_tasks()
@@ -2436,6 +2553,8 @@ async def backfill_multi_p_folders():
                 db.assign_task_to_folder(task["id"], folder_id)
                 assigned_tasks += 1
 
+    if created_folders or assigned_tasks:
+        _mark_and_schedule_git_library(_current_user_id(request))
     return {
         "created_folders": created_folders,
         "assigned_tasks": assigned_tasks,
@@ -2509,6 +2628,7 @@ async def update_git_settings(payload: GitSettingsUpdate, request: Request):
             "author_name": payload.author_name.strip(),
             "author_email": author_email,
             "include_transcript": bool(payload.include_transcript),
+            "auto_sync": bool(payload.auto_sync),
             "private_key": private_key,
             "public_key": public_key,
         },
@@ -2567,34 +2687,10 @@ async def test_saved_git_settings(request: Request):
 @app.post("/git/sync")
 async def sync_library_to_saved_git(request: Request):
     user_id = _current_user_id(request)
-    account, secret = _require_git_secret(user_id)
+    _require_git_secret(user_id)
     try:
-        result = await asyncio.to_thread(
-            sync_library_to_git,
-            db,
-            repository_url=str(secret.get("repository_url") or ""),
-            branch=str(secret.get("branch") or "main"),
-            root_path=str(secret.get("root_path") or DEFAULT_ROOT_PATH),
-            private_key=str(secret.get("private_key") or ""),
-            author_name=str(secret.get("author_name") or "先闻继学"),
-            author_email=str(secret.get("author_email") or "xianwen@localhost"),
-            include_transcript=bool(secret.get("include_transcript", True)),
-        )
-        db.update_connected_account_runtime(
-            user_id,
-            str(account["id"]),
-            status="connected",
-            last_error=None,
-            used=True,
-        )
-        return result
+        return await _sync_saved_git_account(user_id)
     except GitSyncError as exc:
-        db.update_connected_account_runtime(
-            user_id,
-            str(account["id"]),
-            status="error",
-            last_error=str(exc),
-        )
         raise HTTPException(status_code=400, detail=f"同步失败：{exc}") from exc
 
 

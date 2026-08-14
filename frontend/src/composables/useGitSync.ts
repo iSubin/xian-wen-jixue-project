@@ -1,4 +1,4 @@
-import { onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import axios from 'axios'
 import type { GitSettings, GitSettingsUpdate, GitSyncResult } from '../types'
 
@@ -100,7 +100,18 @@ export function useGitSync() {
     }
   }
 
-  onMounted(fetchGitSettings)
+  const handleGitSyncUpdate = (event: Event) => {
+    const settings = (event as CustomEvent<GitSettings>).detail
+    if (settings) gitSettings.value = settings
+  }
+
+  onMounted(() => {
+    window.addEventListener('xianwen:git-sync-update', handleGitSyncUpdate)
+    fetchGitSettings()
+  })
+  onBeforeUnmount(() => {
+    window.removeEventListener('xianwen:git-sync-update', handleGitSyncUpdate)
+  })
 
   return {
     gitSettings,
