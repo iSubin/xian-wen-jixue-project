@@ -31,6 +31,7 @@ import {
   type ConnectedAccount,
   type ConnectedAccountBrowserImportRequest,
   type ConnectedAccountUpsertRequest,
+  type SettingsModalTab,
   type Task,
   type SummaryMode,
   type LLMProvider,
@@ -90,7 +91,7 @@ const emit = defineEmits<{
   selectTask: [task: Task]
   deleteTask: [taskId: string]
   showInfo: [task: Task]
-  openSettings: []
+  openSettings: [tab?: SettingsModalTab]
   createFolder: [name: string, parentId: string | null]
   renameFolder: [folderId: string, newName: string]
   deleteFolder: [folderId: string]
@@ -1438,7 +1439,7 @@ watch(() => props.summarizationSettings, (settings) => {
           <ContentSubscriptions
             :connectedAccounts="connectedAccounts"
             @changed="emit('libraryChanged')"
-            @openSettings="emit('openSettings')"
+            @openSettings="emit('openSettings', $event)"
           />
         </template>
 

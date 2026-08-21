@@ -28,12 +28,14 @@ import type {
   GitSettings,
   GitSettingsUpdate,
   GitSyncResult,
+  SettingsModalTab,
 } from '../types'
 import ConnectedAccountsSettings from './ConnectedAccountsSettings.vue'
 import GitSyncSettings from './GitSyncSettings.vue'
 
 const props = defineProps<{
   isOpen: boolean
+  initialTab?: SettingsModalTab
   llmProviders: LLMProvider[]
   llmSettings: LLMSettings | null
   activeProfileId: string
@@ -114,7 +116,11 @@ const emit = defineEmits<{
   deleteGitSettings: []
 }>()
 
-const settingsTab = ref<'llm' | 'transcription' | 'summarization' | 'git'>('llm')
+const settingsTab = ref<SettingsModalTab>('llm')
+
+watch(() => props.isOpen, (isOpen) => {
+  if (isOpen) settingsTab.value = props.initialTab || 'llm'
+})
 
 // LLM Profile form — bound to profileFormState prop
 const llmProfileName = computed({
@@ -379,6 +385,19 @@ const handleSaveSummarizationSettings = () => {
             </button>
 
             <button
+              @click="settingsTab = 'accounts'"
+              :class="[
+                'flex items-center gap-2 md:gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap',
+                settingsTab === 'accounts'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-slate-600 hover:bg-white/50 hover:text-slate-800'
+              ]"
+            >
+              <PhKey :size="18" :weight="settingsTab === 'accounts' ? 'fill' : 'regular'" />
+              <span>采集账号</span>
+            </button>
+
+            <button
               @click="settingsTab = 'summarization'"
               :class="[
                 'flex items-center gap-2 md:gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap',
@@ -416,6 +435,8 @@ const handleSaveSummarizationSettings = () => {
                   ? 'LLM 配置'
                   : settingsTab === 'transcription'
                     ? '转录设置'
+                    : settingsTab === 'accounts'
+                      ? '采集账号'
                     : settingsTab === 'summarization'
                       ? 'Agent 设置'
                       : 'Git 文库'
@@ -846,6 +867,20 @@ const handleSaveSummarizationSettings = () => {
             </div>
             </div>
 
+            <button
+              @click="handleSaveTranscriptionSettings"
+              :disabled="isUpdatingTranscriptionSettings"
+              class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <PhSpinner v-if="isUpdatingTranscriptionSettings" :size="16" class="animate-spin" />
+              <span>{{ isUpdatingTranscriptionSettings ? '保存中...' : '保存设置' }}</span>
+            </button>
+          </div>
+
+          <div v-if="settingsTab === 'accounts'" class="space-y-4">
+            <div class="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-800">
+              连接内容来源账号后，先闻继学只会采集该账号在原站明确有权阅读的内容。登录态加密保存在本机数据库中。
+            </div>
             <ConnectedAccountsSettings
               :captureProviders="captureProviders"
               :connectedAccounts="connectedAccounts"
@@ -855,15 +890,6 @@ const handleSaveSummarizationSettings = () => {
               @importConnectedAccountFromBrowser="(provider, payload) => emit('importConnectedAccountFromBrowser', provider, payload)"
               @deleteConnectedAccount="(accountId) => emit('deleteConnectedAccount', accountId)"
             />
-
-            <button
-              @click="handleSaveTranscriptionSettings"
-              :disabled="isUpdatingTranscriptionSettings"
-              class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <PhSpinner v-if="isUpdatingTranscriptionSettings" :size="16" class="animate-spin" />
-              <span>{{ isUpdatingTranscriptionSettings ? '保存中...' : '保存设置' }}</span>
-            </button>
           </div>
 
           <!-- Agent 设置 -->

@@ -376,6 +376,8 @@ export interface GitSyncResult {
   conflicts: string[];
 }
 
+export type SettingsModalTab = 'llm' | 'transcription' | 'accounts' | 'summarization' | 'git';
+
 export type ContentSubscriptionStatus = 'ACTIVE' | 'PAUSED' | 'AUTH_REQUIRED' | 'DEGRADED' | 'ERROR';
 export type ContentSubscriptionInitialSyncMode = 'from_now' | 'today' | 'last_7_days';
 

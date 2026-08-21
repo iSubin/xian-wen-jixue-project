@@ -26,6 +26,7 @@ import type {
   ConnectedAccountUpsertRequest,
   LocalFolderScanResult,
   MarkdownHeadingItem,
+  SettingsModalTab,
   Task,
   GitSettingsUpdate,
 } from './types'
@@ -153,6 +154,7 @@ const {
 // 状态变量
 const showInfoModal = ref(false)
 const isSettingsModalOpen = ref(false)
+const settingsModalInitialTab = ref<SettingsModalTab>('llm')
 const isEditingTopic = ref(false)
 const editingTopicValue = ref('')
 const isTestingLlm = ref(false)
@@ -206,6 +208,11 @@ const handleSyncGit = async () => {
   if (await syncGit()) {
     success(gitSyncResult.value?.committed ? '文库已推送到 Git' : 'Git 文库已经是最新')
   }
+}
+
+const openSettings = (tab: SettingsModalTab = 'llm') => {
+  settingsModalInitialTab.value = tab
+  isSettingsModalOpen.value = true
 }
 
 const handleDeleteGitSettings = async () => {
@@ -955,6 +962,7 @@ watch(
     <!-- 设置弹窗 -->
     <SettingsModal
       :isOpen="isSettingsModalOpen"
+      :initialTab="settingsModalInitialTab"
       :llmProviders="llmProviders"
       :llmSettings="llmSettings"
       :activeProfileId="activeProfileId"
@@ -1058,7 +1066,7 @@ watch(
       @startTestLlm="handleTestLlm"
       @focusSearchMatch="handleFocusSearchMatch"
       @showInfo="(task) => { handleSelectTask(task); showInfoModal = true; }"
-      @openSettings="isSettingsModalOpen = true"
+      @openSettings="openSettings"
       @createFolder="(name: string, parentId: string | null) => createFolder(name, parentId)"
       @renameFolder="(folderId: string, newName: string) => renameFolder(folderId, newName)"
       @deleteFolder="deleteFolder"

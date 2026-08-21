@@ -16,6 +16,7 @@ import type {
   ConnectedAccount,
   ContentSubscription,
   ContentSubscriptionInitialSyncMode,
+  SettingsModalTab,
 } from '../types'
 
 const props = defineProps<{
@@ -24,7 +25,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   changed: []
-  openSettings: []
+  openSettings: [tab: SettingsModalTab]
 }>()
 
 const {
@@ -172,7 +173,7 @@ const removeSubscription = async (subscription: ContentSubscription) => {
             <div>
               <p class="font-semibold">需要投研大师账号</p>
               <p class="mt-1 leading-5 text-amber-700">先从浏览器导入 <code>web_qtstr</code>，系统只采集该账号明确有权阅读的内容。</p>
-              <button type="button" class="mt-1.5 font-semibold underline" @click="emit('openSettings')">
+              <button type="button" class="mt-1.5 font-semibold underline" @click="emit('openSettings', 'accounts')">
                 打开采集账号设置
               </button>
             </div>
