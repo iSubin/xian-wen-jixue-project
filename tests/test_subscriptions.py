@@ -230,6 +230,126 @@ class SubscriptionServiceTest(unittest.TestCase):
         task = self.store.get_task(second["digest_task_ids"][0])
         self.assertEqual(task["title"], "枪大侠｜2026-08-14")
 
+    def test_reconciliation_catches_up_to_durable_cursor_after_multi_day_gap(self):
+        subscription = self.create_subscription()
+        self.store.update_content_subscription(
+            subscription["id"],
+            {
+                "last_success_at": datetime(2026, 8, 14, 2, 0),
+                "last_cursor": "2026-08-14 09:00:00",
+            },
+        )
+        watermark = HomewayListItem(
+            external_item_id="item-14",
+            lecturer_id="1669029704",
+            lecturer_name="枪大侠",
+            published_at=parse_homeway_datetime("2026-08-14 09:00:00"),
+            published_at_text="2026-08-14 09:00:00",
+            preview_text="已采集的水位内容",
+            image_urls=[],
+            is_charge=False,
+        )
+        self.store.upsert_subscription_item(
+            subscription["id"],
+            {
+                "provider": "homeway",
+                "external_item_id": watermark.external_item_id,
+                "source_url": watermark.source_url,
+                "published_at": watermark.published_at.replace(tzinfo=None),
+                "preview_text": watermark.preview_text,
+                "raw_html": "<p>旧正文</p>",
+                "raw_markdown": "旧正文",
+                "content_hash": "existing-hash",
+                "source_meta": {},
+                "access_scope": "public",
+                "capture_status": "CAPTURED",
+                "digest_date": "2026-08-14",
+            },
+        )
+
+        def item(day):
+            published_at_text = f"2026-08-{day:02d} 09:00:00"
+            return HomewayListItem(
+                external_item_id=f"item-{day}",
+                lecturer_id="1669029704",
+                lecturer_name="枪大侠",
+                published_at=parse_homeway_datetime(published_at_text),
+                published_at_text=published_at_text,
+                preview_text=f"{day} 日内容",
+                image_urls=[],
+                is_charge=False,
+            )
+
+        pages = {
+            None: [item(21), item(20)],
+            "2026-08-20 09:00:00": [item(19), item(18)],
+            "2026-08-18 09:00:00": [item(17), watermark],
+        }
+
+        class CatchUpAdapter:
+            def __init__(self):
+                self.cursors = []
+
+            def list_items(adapter_self, lecturer_id, *, cursor=None, token=None):
+                adapter_self.cursors.append(cursor)
+                return pages.get(cursor, [])
+
+            def capture_item(adapter_self, list_item, *, token=None):
+                return HomewayCapturedItem(
+                    external_item_id=list_item.external_item_id,
+                    capture_status="CAPTURED",
+                    access_scope="public",
+                    raw_html=f"<p>{list_item.preview_text}</p>",
+                    source_meta={"published_at_source": list_item.published_at_text},
+                )
+
+        adapter = CatchUpAdapter()
+        self.service.adapter_factory = lambda: adapter
+        self.now = datetime(2026, 8, 21, 12, 0, tzinfo=timezone.utc)
+        result = self.service.poll_subscription(
+            subscription["id"],
+            trigger="reconciliation",
+            reconciliation=True,
+            build_digest=False,
+        )
+
+        self.assertEqual(
+            adapter.cursors,
+            [None, "2026-08-20 09:00:00", "2026-08-18 09:00:00"],
+        )
+        self.assertEqual(result["run"]["captured_count"], 5)
+        self.assertEqual(
+            {entry["external_item_id"] for entry in self.store.list_subscription_items(subscription["id"])},
+            {"item-14", "item-17", "item-18", "item-19", "item-20", "item-21"},
+        )
+
+    def test_manual_digest_does_not_finalize_day_and_stale_early_marker_is_repaired(self):
+        subscription = self.create_subscription()
+        self.service.poll_subscription(subscription["id"], trigger="manual", build_digest=True)
+        current = self.store.get_content_subscription(subscription["id"])
+        self.assertIsNone(current["last_digest_date"])
+
+        self.store.update_content_subscription(
+            subscription["id"],
+            {
+                "last_digest_date": "2026-08-14",
+                "last_digest_at": datetime(2026, 8, 14, 4, 0),
+            },
+        )
+        self.now = datetime(2026, 8, 14, 12, 31, tzinfo=timezone.utc)
+        stale = self.store.get_content_subscription(subscription["id"])
+        self.assertTrue(self.service.should_finalize_today(stale))
+
+        self.service.poll_subscription(
+            subscription["id"],
+            trigger="reconciliation",
+            reconciliation=True,
+            build_digest=True,
+        )
+        repaired = self.store.get_content_subscription(subscription["id"])
+        self.assertEqual(repaired["last_digest_date"], "2026-08-14")
+        self.assertFalse(self.service.should_finalize_today(repaired))
+
     def test_database_lease_prevents_two_scheduler_owners(self):
         subscription = self.create_subscription()
         now_naive = self.now.replace(tzinfo=None)

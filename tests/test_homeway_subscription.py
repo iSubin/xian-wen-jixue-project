@@ -191,29 +191,27 @@ class HomewaySubscriptionAdapterTest(unittest.TestCase):
         self.assertEqual(captured.image_urls, [image_url])
         self.assertIn(image_url, captured.raw_html)
 
-    def test_paid_response_fails_closed_even_when_vip_content_is_present(self):
+    def test_paid_item_fails_closed_without_positive_membership_permission(self):
         session = FakeSession(
             [
                 {
                     "code": 1000,
                     "data": {
-                        "lecturer": {"id": "1669029704", "name": "枪大侠", "is_vip": False},
-                        "lecturer_feed": {
-                            "id": "198488",
-                            "content": "<p>公开预览</p>",
-                            "vip_content": "<p>不应保存的付费全文</p>",
-                            "is_vip": True,
-                            "can_read": "",
-                            "is_blocked": False,
-                        },
+                        "vipPermissionLecIds": "",
+                        "vipNeedSignLecturerIds": "",
+                        "vipReSignLecturerIds": "",
                     },
                 }
             ]
         )
-        captured = HomewaySubscriptionAdapter(session).capture_item(list_item(is_charge=True))
+        captured = HomewaySubscriptionAdapter(session).capture_item(
+            list_item(is_charge=True),
+            token="secret-token",
+        )
         self.assertEqual(captured.capture_status, "LOCKED")
         self.assertEqual(captured.raw_html, "")
-        self.assertNotIn("付费全文", captured.failure_detail or "")
+        self.assertEqual(len(session.calls), 1)
+        self.assertIn("queryUserEvaluationInfo", session.calls[0][0])
 
     def test_paid_item_uses_vip_content_only_with_positive_entitlement(self):
         session = FakeSession(
@@ -221,7 +219,15 @@ class HomewaySubscriptionAdapterTest(unittest.TestCase):
                 {
                     "code": 1000,
                     "data": {
-                        "lecturer": {"id": "1669029704", "name": "枪大侠", "is_vip": True},
+                        "vipPermissionLecIds": "1669029704",
+                        "vipNeedSignLecturerIds": "",
+                        "vipReSignLecturerIds": "",
+                    },
+                },
+                {
+                    "code": 1000,
+                    "data": {
+                        "lecturer": {"id": "1669029704", "name": "枪大侠", "is_vip": False},
                         "lecturer_feed": {
                             "id": "198488",
                             "content": "<p>公开预览</p>",
@@ -232,10 +238,35 @@ class HomewaySubscriptionAdapterTest(unittest.TestCase):
                 }
             ]
         )
-        captured = HomewaySubscriptionAdapter(session).capture_item(list_item(is_charge=True))
+        captured = HomewaySubscriptionAdapter(session).capture_item(
+            list_item(is_charge=True),
+            token="secret-token",
+        )
         self.assertEqual(captured.capture_status, "CAPTURED")
         self.assertEqual(captured.access_scope, "entitled")
         self.assertIn("已授权全文", captured.raw_html)
+        self.assertIn("queryUserEvaluationInfo", session.calls[0][0])
+        self.assertIn("topicDetail", session.calls[1][0])
+
+    def test_paid_item_stays_locked_while_membership_requires_resign(self):
+        session = FakeSession(
+            [
+                {
+                    "code": 1000,
+                    "data": {
+                        "vipPermissionLecIds": ["1669029704"],
+                        "vipNeedSignLecturerIds": "",
+                        "vipReSignLecturerIds": "1669029704",
+                    },
+                }
+            ]
+        )
+        captured = HomewaySubscriptionAdapter(session).capture_item(
+            list_item(is_charge=True),
+            token="secret-token",
+        )
+        self.assertEqual(captured.capture_status, "LOCKED")
+        self.assertEqual(len(session.calls), 1)
 
     def test_markdown_rewrites_downloaded_images(self):
         original = "https://tyds-cos.homeway.com.cn/article/a.png"

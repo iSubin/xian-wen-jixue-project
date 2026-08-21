@@ -227,7 +227,11 @@ class SubscriptionService:
         digest_clock = _parse_clock(str(subscription.get("digest_time") or "20:30"), time(20, 30))
         return (
             local_now.time() >= digest_clock
-            and str(subscription.get("last_digest_date") or "") != local_now.date().isoformat()
+            and not self._digest_finalized_for_local_date(
+                subscription,
+                local_now=local_now,
+                digest_clock=digest_clock,
+            )
         )
 
     def poll_due_subscription(self, subscription_id: str) -> Dict[str, Any]:
@@ -249,6 +253,7 @@ class SubscriptionService:
         trigger: str = "manual",
         reconciliation: bool = False,
         build_digest: bool = True,
+        backfill_from: datetime | None = None,
     ) -> Dict[str, Any]:
         subscription = self.db.get_content_subscription(subscription_id)
         if not subscription:
@@ -281,7 +286,10 @@ class SubscriptionService:
                 required=True,
             )
             adapter = self.adapter_factory()
-            lower_bound = self._poll_lower_bound(subscription, reconciliation=reconciliation)
+            lower_bound = self._poll_lower_bound(subscription, backfill_from=backfill_from)
+            prior_cursor = str(subscription.get("last_cursor") or "").strip()
+            cursor_watermark = prior_cursor if lower_bound is None else ""
+            reconciliation_lower_bound = self.now() - timedelta(days=2) if reconciliation else None
             cursor: str | None = None
             cursor_history: set[str] = set()
             seen_external_ids: set[str] = set()
@@ -297,6 +305,7 @@ class SubscriptionService:
 
                 page_existing_overlap = False
                 page_has_older = False
+                page_reached_watermark = False
                 for list_item in page:
                     if list_item.external_item_id in seen_external_ids:
                         continue
@@ -304,6 +313,12 @@ class SubscriptionService:
                     counts["discovered_count"] += 1
                     if not newest_cursor or list_item.published_at_text > newest_cursor:
                         newest_cursor = list_item.published_at_text
+                    if (
+                        cursor_watermark
+                        and not list_item.top
+                        and list_item.published_at_text <= cursor_watermark
+                    ):
+                        page_reached_watermark = True
                     if lower_bound and list_item.published_at < lower_bound:
                         page_has_older = True
                         continue
@@ -316,11 +331,18 @@ class SubscriptionService:
                     if existing and not list_item.top:
                         page_existing_overlap = True
                     existing_status = str((existing or {}).get("capture_status") or "")
+                    reconcile_existing = bool(
+                        reconciliation_lower_bound
+                        and list_item.published_at >= reconciliation_lower_bound
+                    )
                     should_capture = (
                         existing is None
-                        or reconciliation
+                        or reconcile_existing
                         or existing_status in {"FAILED", "DISCOVERED"}
-                        or (trigger == "manual" and existing_status == "LOCKED")
+                        or (
+                            (trigger == "manual" or backfill_from is not None)
+                            and existing_status == "LOCKED"
+                        )
                     )
                     if not should_capture:
                         continue
@@ -375,7 +397,9 @@ class SubscriptionService:
 
                 if lower_bound and page_has_older:
                     break
-                if lower_bound is None and page_existing_overlap:
+                if cursor_watermark and page_reached_watermark:
+                    break
+                if lower_bound is None and not cursor_watermark and page_existing_overlap:
                     break
                 next_cursor = oldest_homeway_cursor(page)
                 if not next_cursor or next_cursor == cursor or next_cursor in cursor_history:
@@ -383,9 +407,9 @@ class SubscriptionService:
                 cursor_history.add(next_cursor)
                 cursor = next_cursor
 
-            local_today = self.now().astimezone(
-                ZoneInfo(str(subscription.get("timezone") or "Asia/Shanghai"))
-            ).date().isoformat()
+            timezone_value = ZoneInfo(str(subscription.get("timezone") or "Asia/Shanghai"))
+            local_now = self.now().astimezone(timezone_value)
+            local_today = local_now.date().isoformat()
             first_success = not subscription.get("last_success_at")
             if build_digest:
                 affected_dates.update(
@@ -400,7 +424,7 @@ class SubscriptionService:
                         for item in self.db.list_subscription_items(subscription_id)
                         if item.get("capture_status") in CAPTURED_ITEM_STATUSES
                     )
-                if trigger in {"manual", "reconciliation"}:
+                if reconciliation:
                     affected_dates.add(local_today)
                 for digest_date in sorted(affected_dates):
                     task_id = self.build_daily_digest(subscription_id, digest_date)
@@ -410,7 +434,11 @@ class SubscriptionService:
             now = self.now()
             last_digest_date = subscription.get("last_digest_date")
             last_digest_at = _stored_datetime(subscription.get("last_digest_at"))
-            if build_digest and local_today in affected_dates:
+            digest_clock = _parse_clock(
+                str(subscription.get("digest_time") or "20:30"),
+                time(20, 30),
+            )
+            if build_digest and reconciliation and local_now.time() >= digest_clock:
                 last_digest_date = local_today
                 last_digest_at = now
             updates = {
@@ -600,7 +628,11 @@ class SubscriptionService:
             poll_local = datetime.combine(local_now.date() + timedelta(days=1), start_clock, timezone_value)
 
         candidates = [poll_local]
-        if str(subscription.get("last_digest_date") or "") != local_now.date().isoformat():
+        if not self._digest_finalized_for_local_date(
+            subscription,
+            local_now=local_now,
+            digest_clock=digest_clock,
+        ):
             digest_local = datetime.combine(local_now.date(), digest_clock, timezone_value)
             if digest_local <= local_now:
                 digest_local = local_now + timedelta(seconds=5)
@@ -816,10 +848,35 @@ class SubscriptionService:
             return account, ""
         return account, token
 
-    def _poll_lower_bound(self, subscription: Dict[str, Any], *, reconciliation: bool) -> datetime | None:
+    @staticmethod
+    def _digest_finalized_for_local_date(
+        subscription: Dict[str, Any],
+        *,
+        local_now: datetime,
+        digest_clock: time,
+    ) -> bool:
+        if str(subscription.get("last_digest_date") or "") != local_now.date().isoformat():
+            return False
+        finalized_at = _stored_datetime(subscription.get("last_digest_at"))
+        if finalized_at is None:
+            return False
+        local_finalized_at = finalized_at.astimezone(local_now.tzinfo or timezone.utc)
+        return (
+            local_finalized_at.date() == local_now.date()
+            and local_finalized_at.time() >= digest_clock
+        )
+
+    def _poll_lower_bound(
+        self,
+        subscription: Dict[str, Any],
+        *,
+        backfill_from: datetime | None = None,
+    ) -> datetime | None:
         now = self.now()
-        if reconciliation:
-            return now - timedelta(days=2)
+        if backfill_from is not None:
+            if backfill_from.tzinfo is None:
+                return backfill_from.replace(tzinfo=timezone.utc)
+            return backfill_from.astimezone(timezone.utc)
         if subscription.get("last_success_at"):
             return None
         timezone_value = ZoneInfo(str(subscription.get("timezone") or "Asia/Shanghai"))

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from hashlib import sha256
 from html import escape
+import re
 from typing import Any, Dict, Iterable
 from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
@@ -89,6 +91,14 @@ def _truthy(value: Any) -> bool:
     if value is True or value == 1:
         return True
     return str(value or "").strip().lower() in {"1", "true", "yes", "y", "allowed"}
+
+
+def _homeway_id_set(value: Any) -> set[str]:
+    if isinstance(value, (list, tuple, set)):
+        values = value
+    else:
+        values = re.split(r"[,\s]+", str(value or "").strip())
+    return {str(item).strip() for item in values if str(item).strip()}
 
 
 def _parse_fragment_query(fragment: str) -> tuple[str, Dict[str, list[str]]]:
@@ -179,6 +189,7 @@ def render_homeway_markdown(raw_html: str, image_paths: Dict[str, str] | None = 
 class HomewaySubscriptionAdapter:
     def __init__(self, session: requests.Session | None = None):
         self.session = session or requests.Session()
+        self._vip_entitlement_cache: Dict[tuple[str, str], bool] = {}
         self.session.headers.update(
             {
                 "User-Agent": USER_AGENT,
@@ -279,6 +290,16 @@ class HomewaySubscriptionAdapter:
         return result
 
     def capture_item(self, item: HomewayListItem, *, token: str | None = None) -> HomewayCapturedItem:
+        if item.is_charge and not self._has_vip_entitlement(item.lecturer_id, token=token):
+            return HomewayCapturedItem(
+                external_item_id=item.external_item_id,
+                capture_status="LOCKED",
+                access_scope="locked",
+                source_meta=self._source_meta(item, {}, {}),
+                failure_code="ENTITLEMENT_REQUIRED",
+                failure_detail="当前账号没有得到站点明确的会员文字阅读授权",
+            )
+
         payload = self._request_json(
             "/lecturers/info/topicDetail",
             {"lecturer_feed_id": item.external_item_id},
@@ -291,8 +312,7 @@ class HomewaySubscriptionAdapter:
             raise HomewaySubscriptionError("投研大师没有返回对应文字详情")
 
         blocked = _truthy(feed.get("is_blocked"))
-        positive_entitlement = _truthy(feed.get("can_read")) or _truthy(lecturer.get("is_vip"))
-        if blocked or (item.is_charge and not positive_entitlement):
+        if blocked:
             return HomewayCapturedItem(
                 external_item_id=item.external_item_id,
                 capture_status="LOCKED",
@@ -328,6 +348,28 @@ class HomewaySubscriptionAdapter:
             image_urls=image_urls,
             source_meta=self._source_meta(item, lecturer, feed),
         )
+
+    def _has_vip_entitlement(self, lecturer_id: str, *, token: str | None) -> bool:
+        clean_token = _sanitize_token(token)
+        if not clean_token:
+            return False
+        cache_key = (sha256(clean_token.encode("utf-8")).hexdigest(), str(lecturer_id))
+        if cache_key in self._vip_entitlement_cache:
+            return self._vip_entitlement_cache[cache_key]
+
+        payload = self._request_json(
+            "/lecturers/order/queryUserEvaluationInfo",
+            {},
+            token=clean_token,
+        )
+        data = payload.get("data") or {}
+        lecturer_value = str(lecturer_id)
+        has_permission = lecturer_value in _homeway_id_set(data.get("vipPermissionLecIds"))
+        needs_signature = lecturer_value in _homeway_id_set(data.get("vipNeedSignLecturerIds"))
+        needs_resign = lecturer_value in _homeway_id_set(data.get("vipReSignLecturerIds"))
+        entitled = has_permission and not needs_signature and not needs_resign
+        self._vip_entitlement_cache[cache_key] = entitled
+        return entitled
 
     @staticmethod
     def _source_meta(
