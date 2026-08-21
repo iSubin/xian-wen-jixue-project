@@ -1,7 +1,6 @@
 import os
 import asyncio
 import json
-import glob
 import ipaddress
 import yt_dlp
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Request, Response
@@ -25,6 +24,16 @@ from .transcriber.transcriber import ModelLoadError
 from .utils.media import (
     SUPPORTED_MEDIA_EXTENSIONS,
     build_transcriber_payload,
+)
+from .storage import (
+    ensure_storage_layout,
+    get_task_assets_dir,
+    get_task_assets_root,
+    get_task_upload_dir,
+    get_task_work_dir,
+    preserve_article_source,
+    preserve_original_file,
+    resolve_data_path,
 )
 from .collection_jobs import (
     build_aggregate_markdown,
@@ -234,8 +243,8 @@ app.add_middleware(
 # api.py 位于 src/main/python/xianwen/api.py，需要向上跳 5 级到达项目根目录
 base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 dist_dir = os.path.join(base_dir, "frontend", "dist")
-task_assets_dir = os.path.join(base_dir, "temp", "task-assets")
-os.makedirs(task_assets_dir, exist_ok=True)
+ensure_storage_layout()
+task_assets_dir = str(get_task_assets_root())
 app.mount("/task-assets", StaticFiles(directory=task_assets_dir), name="task-assets")
 
 if os.path.exists(dist_dir):
@@ -1374,9 +1383,8 @@ def _build_wechat_article_task_data(task_id: str, article: Any, folder_id: str |
 
 
 async def _enqueue_wechat_article_summary(task_id: str, raw_markdown: str, summary_mode: str) -> None:
-    temp_dir = "temp"
-    os.makedirs(temp_dir, exist_ok=True)
-    intermediate_file = os.path.join(temp_dir, f"{task_id}_wechat_article.md")
+    work_dir = get_task_work_dir(task_id)
+    intermediate_file = str(work_dir / "transcript.md")
     with open(intermediate_file, "w", encoding="utf-8") as file:
         file.write(raw_markdown)
 
@@ -1384,9 +1392,28 @@ async def _enqueue_wechat_article_summary(task_id: str, raw_markdown: str, summa
     await worker.add_task({
         "task_id": task_id,
         "intermediate_file_path": intermediate_file,
-        "output_file": os.path.join(temp_dir, f"{task_id}_wechat_summary.md"),
+        "output_file": str(work_dir / "summary.md"),
         "summary_mode": summary_mode,
     })
+
+
+def _preserve_wechat_article(task_id: str, article: Any) -> None:
+    records = preserve_article_source(
+        task_id=task_id,
+        content_id=task_id,
+        title=str(article.title or task_id),
+        source_url=str(article.source_url or ""),
+        source_type="wechat_article",
+        raw_html=str(getattr(article, "raw_html", "") or ""),
+        raw_markdown=str(article.raw_markdown or ""),
+        asset_paths=[
+            image.local_path
+            for image in article.images
+            if image.status == "downloaded" and image.local_path
+        ],
+    )
+    for record in records:
+        db.upsert_content_asset(record)
 
 
 async def _try_resolve_and_persist_author(task_id: str, video_url: str) -> bool:
@@ -1451,24 +1478,23 @@ def _trigger_author_resolution_if_needed(task: dict | None):
 
 
 def _resolve_local_media_file(task_id: str, task: dict) -> str | None:
-    # 1) 优先尝试任务中记录的 file:// 路径
+    # 1) 优先使用已经登记并校验过路径边界的原始物料。
+    for asset in db.list_content_assets(task_id, role="original"):
+        if asset.get("asset_type") not in {"video", "audio"}:
+            continue
+        try:
+            candidate = resolve_data_path(str(asset.get("relative_path") or ""))
+        except (ValueError, OSError):
+            continue
+        if candidate.is_file():
+            return str(candidate)
+
+    # 2) 兼容任务中记录的受管 file:// 路径。
     video_url = str(task.get("video_url") or "")
     if video_url.startswith("file://"):
         candidate = _resolve_file_url_path(video_url)
         if candidate and os.path.exists(candidate):
             return candidate
-
-    # 2) 尝试上传任务的惯例命名：temp/{task_id}.<ext>
-    for ext in SUPPORTED_MEDIA_EXTENSIONS:
-        candidate = os.path.join("temp", f"{task_id}{ext}")
-        if os.path.exists(candidate):
-            return candidate
-
-    # 3) 兜底扫描：temp/{task_id}.*
-    for path in glob.glob(os.path.join("temp", f"{task_id}.*")):
-        ext = os.path.splitext(path)[1].lower()
-        if ext in SUPPORTED_MEDIA_EXTENSIONS and os.path.exists(path):
-            return path
     return None
 
 
@@ -1492,12 +1518,8 @@ async def upload_file(
     # 创建任务 ID
     task_id = str(uuid.uuid4())
 
-    # 保存上传的文件到临时目录
-    temp_dir = "temp"
-    os.makedirs(temp_dir, exist_ok=True)
-
-    # 临时保存路径（在 FileUploadWorker 处理后会重命名）
-    temp_file_path = os.path.join(temp_dir, f"{task_id}_temp{file_ext}")
+    upload_dir = get_task_upload_dir(task_id)
+    temp_file_path = str(upload_dir / f"incoming{file_ext}")
 
     try:
         # 保存文件
@@ -1543,8 +1565,8 @@ async def upload_file(
             "task_id": task_id,
             "file_path": temp_file_path,
             "filename": file.filename or "uploaded_file",
-                "summary_mode": resolved_summary_mode,
-            })
+            "summary_mode": resolved_summary_mode,
+        })
 
         await notify_task_update(task_id)
         return task_data
@@ -1664,10 +1686,21 @@ async def upload_local_path(payload: LocalPathTaskCreate, request: Request):
     task_id = str(uuid.uuid4())
     title = os.path.splitext(os.path.basename(local_path))[0] or "Local File"
     resolved_summary_mode = _normalize_summary_mode(payload.summary_mode)
-    os.makedirs("temp", exist_ok=True)
+    preserved_path, asset_record = preserve_original_file(
+        local_path,
+        task_id=task_id,
+        title=title,
+        source_url=f"file://{local_path}",
+        source_type="local_file",
+        move=False,
+    )
+    db.upsert_content_asset(asset_record)
+    managed_url = f"file://{preserved_path}"
     task_data = {
         "id": task_id,
-        "video_url": f"file://{local_path}",
+        "video_url": managed_url,
+        "source_type": "local_file",
+        "source_url": managed_url,
         "status": TaskStatus.TRANSCRIBING,
         "created_at": datetime.utcnow(),
         "latest_modified_at": datetime.utcnow(),
@@ -1684,8 +1717,8 @@ async def upload_local_path(payload: LocalPathTaskCreate, request: Request):
 
     payload_data = build_transcriber_payload(
         task_id=task_id,
-        media_path=local_path,
-        output_dir="temp",
+        media_path=str(preserved_path),
+        output_dir=str(get_task_work_dir(task_id)),
         summary_mode=resolved_summary_mode,
     )
 
@@ -1739,7 +1772,7 @@ async def _get_bilibili_video_title_and_parts(video_url: str) -> tuple[str, list
 async def create_wechat_article_task(payload: WechatArticleCreate):
     source_url = str(payload.url)
     task_id = str(uuid.uuid4())
-    article_assets_dir = os.path.join(task_assets_dir, task_id)
+    article_assets_dir = str(get_task_assets_dir(task_id))
     resolved_summary_mode = _normalize_summary_mode(payload.summary_mode)
 
     try:
@@ -1758,6 +1791,7 @@ async def create_wechat_article_task(payload: WechatArticleCreate):
         summary_mode=resolved_summary_mode,
     )
     db.save_task(task_id, task_data)
+    _preserve_wechat_article(task_id, article)
 
     try:
         await _enqueue_wechat_article_summary(task_id, article.raw_markdown, resolved_summary_mode)
@@ -1971,7 +2005,7 @@ async def _create_wechat_article_collection_task(
     task_id = str(uuid.uuid4())
     source_url = str(item.get("source_url") or "").strip()
     fallback_title = str(item.get("title") or source_url or "公众号文章")
-    article_assets_dir = os.path.join(task_assets_dir, task_id)
+    article_assets_dir = str(get_task_assets_dir(task_id))
 
     try:
         article = capture_wechat_article(
@@ -2016,6 +2050,7 @@ async def _create_wechat_article_collection_task(
         summary_mode=summary_mode,
     )
     db.save_task(task_id, task_data)
+    _preserve_wechat_article(task_id, article)
 
     try:
         await _enqueue_wechat_article_summary(task_id, article.raw_markdown, summary_mode)
@@ -2240,6 +2275,21 @@ async def get_task(task_id: str):
     return task
 
 
+@app.get("/tasks/{task_id}/assets")
+async def list_task_assets(task_id: str):
+    """列出任务已登记的持久原始物料；不会暴露文件绝对路径。"""
+    if not db.get_task(task_id):
+        raise HTTPException(status_code=404, detail="Task not found")
+    assets = db.list_content_assets(task_id)
+    for asset in assets:
+        if str(asset.get("source_url") or "").startswith("file://"):
+            asset["source_url"] = None
+    return {
+        "task_id": task_id,
+        "assets": assets,
+    }
+
+
 @app.get("/library/tree", response_model=LibraryTreeView)
 async def get_library_tree():
     """返回数据库中的当前文库快照；Git 发布器消费同一份快照。"""
@@ -2410,15 +2460,15 @@ async def re_summarize_task(task_id: str, payload: ReSummarizeRequest | None = N
         },
     )
 
-    temp_file = os.path.join("temp", f"{task_id}_re.txt")
-    os.makedirs("temp", exist_ok=True)
+    work_dir = get_task_work_dir(task_id)
+    temp_file = str(work_dir / "re-summarize-transcript.txt")
     with open(temp_file, "w", encoding="utf-8") as f:
         f.write(task["transcript"])
 
     await worker.add_task({
         "task_id": task_id,
         "intermediate_file_path": temp_file,
-        "output_file": os.path.join("temp", f"{task_id}_re_summary.md"),
+        "output_file": str(work_dir / "re-summarize-summary.md"),
         "summary_mode": resolved_summary_mode,
     })
 
@@ -2542,7 +2592,7 @@ async def re_transcribe_task(task_id: str, payload: ReTranscribeRequest | None =
             build_transcriber_payload(
                 task_id=task_id,
                 media_path=local_media_file,
-                output_dir="temp",
+                output_dir=str(get_task_work_dir(task_id)),
                 summary_mode=resolved_summary_mode,
             )
         )

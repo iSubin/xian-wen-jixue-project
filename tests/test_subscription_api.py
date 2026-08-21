@@ -92,7 +92,7 @@ class SubscriptionApiTest(unittest.TestCase):
         self.account_id = account["id"]
         self.service = SubscriptionService(
             api_module.db,
-            self.root / "temp" / "task-assets",
+            self.root / "data" / "assets",
             adapter_factory=ApiFakeHomewayAdapter,
             now_provider=lambda: datetime(2026, 8, 14, 4, 0, tzinfo=timezone.utc),
         )

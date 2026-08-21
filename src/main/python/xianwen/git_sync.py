@@ -14,6 +14,7 @@ from typing import Any, Dict, Iterable
 from urllib.parse import urlparse
 
 from .utils.project_root import get_project_root
+from .storage import get_task_assets_root
 
 
 MANIFEST_NAME = ".xianwen-manifest.json"
@@ -274,6 +275,48 @@ def _raw_document_name(task: Dict[str, Any]) -> str:
     return "原始逐字稿.md"
 
 
+def _publishable_asset_paths(task_db: Any, task_id: str) -> set[str]:
+    """Git 仅允许发布明确登记为衍生物的二进制资产。"""
+    list_assets = getattr(task_db, "list_content_assets", None)
+    if not callable(list_assets):
+        return set()
+    prefix = f"assets/{task_id}/"
+    publishable: set[str] = set()
+    for asset in list_assets(task_id):
+        if asset.get("role") != "derived" or asset.get("status") != "available":
+            continue
+        relative_path = str(asset.get("relative_path") or "").replace("\\", "/")
+        if relative_path.startswith(prefix):
+            publishable.add(relative_path[len(prefix):])
+    return publishable
+
+
+def _rewrite_publishable_asset_references(
+    markdown: str,
+    task_id: str,
+    publishable_paths: set[str],
+) -> str:
+    prefix = re.escape(f"/task-assets/{task_id}/")
+    image_pattern = re.compile(rf"!\[([^\]]*)\]\({prefix}([^\s)]+)(?:\s+[^)]*)?\)")
+    link_pattern = re.compile(rf"(?<!!)\[([^\]]+)\]\({prefix}([^\s)]+)(?:\s+[^)]*)?\)")
+
+    def replace_image(match: re.Match[str]) -> str:
+        asset_path = match.group(2)
+        if asset_path in publishable_paths:
+            return f"![{match.group(1)}](assets/{asset_path})"
+        return ""
+
+    def replace_link(match: re.Match[str]) -> str:
+        asset_path = match.group(2)
+        if asset_path in publishable_paths:
+            return f"[{match.group(1)}](assets/{asset_path})"
+        return match.group(1)
+
+    rewritten = image_pattern.sub(replace_image, markdown or "")
+    rewritten = link_pattern.sub(replace_link, rewritten)
+    return re.sub(r"\n{3,}", "\n\n", rewritten).strip()
+
+
 def _render_document(task: Dict[str, Any], summary: str, raw_document_name: str | None) -> str:
     title = _source_title(task)
     source_url = _public_source_url(task)
@@ -420,10 +463,9 @@ def build_library_files(
         summary = str(task.get("summary") or "")
         transcript = str(task.get("transcript") or "")
         asset_root = content_root / "assets"
-        asset_reference = "assets/"
-        source_asset_prefix = f"/task-assets/{task_id}/"
-        summary = summary.replace(source_asset_prefix, asset_reference)
-        transcript = transcript.replace(source_asset_prefix, asset_reference)
+        publishable_assets = _publishable_asset_paths(task_db, task_id)
+        summary = _rewrite_publishable_asset_references(summary, task_id, publishable_assets)
+        transcript = _rewrite_publishable_asset_references(transcript, task_id, publishable_assets)
 
         raw_document_name = _raw_document_name(task) if include_transcript and transcript else None
         content = _render_document(task, summary, raw_document_name)
@@ -443,11 +485,16 @@ def build_library_files(
                 content_directory=directory_name,
             )
 
-        local_asset_dir = root / "temp" / "task-assets" / task_id
+        if project_root is None:
+            local_asset_dir = get_task_assets_root() / task_id
+        else:
+            local_asset_dir = root / "data" / "assets" / task_id
         if local_asset_dir.is_dir():
             referenced_content = summary + (transcript if include_transcript else "")
             for asset in sorted(path for path in local_asset_dir.rglob("*") if path.is_file()):
                 asset_rel = asset.relative_to(local_asset_dir).as_posix()
+                if asset_rel not in publishable_assets:
+                    continue
                 if asset_rel not in referenced_content:
                     continue
                 target_rel = (asset_root / asset_rel).as_posix()

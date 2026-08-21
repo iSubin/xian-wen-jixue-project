@@ -1,5 +1,7 @@
 import os
 
+from ..storage import get_task_work_dir
+
 VIDEO_MEDIA_EXTENSIONS = {
     ".mp4", ".avi", ".mov", ".mkv", ".flv", ".wmv", ".webm", ".m4v"
 }
@@ -20,7 +22,7 @@ def is_audio_media(file_path_or_name: str) -> bool:
 def build_transcriber_payload(
     task_id: str,
     media_path: str,
-    output_dir: str = "temp",
+    output_dir: str | None = None,
     summary_mode: str | None = None,
 ) -> dict:
     file_ext = get_media_extension(media_path)
@@ -29,9 +31,12 @@ def build_transcriber_payload(
             f"不支持的文件格式: {file_ext}。支持的格式: {', '.join(sorted(SUPPORTED_MEDIA_EXTENSIONS))}"
         )
 
+    resolved_output_dir = str(output_dir or get_task_work_dir(task_id))
+    os.makedirs(resolved_output_dir, exist_ok=True)
     payload = {
         "task_id": task_id,
-        "output_file": os.path.join(output_dir, f"{task_id}_summary.md"),
+        "output_file": os.path.join(resolved_output_dir, "summary.md"),
+        "transcript_file": os.path.join(resolved_output_dir, "transcript.txt"),
     }
     if summary_mode:
         payload["summary_mode"] = str(summary_mode)
@@ -42,6 +47,6 @@ def build_transcriber_payload(
         payload["audio_file"] = media_path
     else:
         payload["video_file"] = media_path
-        payload["audio_file"] = os.path.join(output_dir, f"{task_id}.mp3")
+        payload["audio_file"] = os.path.join(resolved_output_dir, "audio.mp3")
 
     return payload

@@ -35,7 +35,9 @@ services:
       - "${XIANWEN_APP_BIND:-127.0.0.1}:${XIANWEN_APP_PORT:-8000}:8000"
     volumes:
       - xianwen-config:/app/config
-      - xianwen-temp:/app/temp
+      - xianwen-data:/app/data
+      - xianwen-runtime:/app/runtime
+      - xianwen-exports:/app/exports
       - xianwen-model-cache:/home/xianwen/.cache
     healthcheck:
       test:
@@ -60,5 +62,7 @@ services:
 volumes:
   xianwen-postgres-data:
   xianwen-config:
-  xianwen-temp:
+  xianwen-data:
+  xianwen-runtime:
+  xianwen-exports:
   xianwen-model-cache:

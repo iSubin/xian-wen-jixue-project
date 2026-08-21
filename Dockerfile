@@ -38,8 +38,8 @@ COPY --chown=xianwen:xianwen src ./src
 COPY --chown=xianwen:xianwen config/settings.example.json ./config/settings.example.json
 COPY --from=frontend-build --chown=xianwen:xianwen /build/frontend/dist ./frontend/dist
 
-RUN mkdir -p /app/config /app/temp /home/xianwen/.cache \
-    && chown -R xianwen:xianwen /app/config /app/temp /home/xianwen
+RUN mkdir -p /app/config /app/data /app/runtime /app/exports /home/xianwen/.cache \
+    && chown -R xianwen:xianwen /app/config /app/data /app/runtime /app/exports /home/xianwen
 
 USER xianwen
 

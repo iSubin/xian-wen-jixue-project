@@ -75,10 +75,10 @@ class TestVideoDownloaderFrameQuality(unittest.TestCase):
             quality="audio_only",
             progress_hook=lambda _: None,
             enable_frame_snapshots=True,
-            output_template="temp/task-123_source_%(id)s.%(ext)s",
+            output_template="runtime/downloads/task-123/source_%(id)s.%(ext)s",
         )
 
-        self.assertEqual(opts["outtmpl"], "temp/task-123_source_%(id)s.%(ext)s")
+        self.assertEqual(opts["outtmpl"], "runtime/downloads/task-123/source_%(id)s.%(ext)s")
 
     def test_normalizes_bilibili_bare_domain_to_www(self):
         worker = VideoDownloaderWorker(name="test-downloader")
@@ -428,7 +428,7 @@ class TestVideoDownloaderFrameQuality(unittest.TestCase):
         }
         worker.is_task_cancelled = lambda task_id: False
         worker._download_source_video_for_frames = (
-            lambda video_url, task_id, quality, bilibili_sessdata=None: "/tmp/high-quality-source.mp4"
+            lambda video_url, task_id, quality, bilibili_sessdata=None, title="", source_url="": "/tmp/high-quality-source.mp4"
         )
 
         def submit_coro(coro):

@@ -58,7 +58,7 @@
     "chunk_prompt_file": "src/main/python/xianwen/prompt_for_chunk.md",
     "max_agent_value_chars": 500,
     "chunk_debug_dump_enabled": false,
-    "chunk_debug_dump_dir": "temp/chunk_debug",
+    "chunk_debug_dump_dir": "runtime/debug/chunks",
     "enable_agent_pipeline": false,
     "transcript_chunk_emit_duration_sec": 600
   }

@@ -24,6 +24,7 @@ from .homeway_subscription import (
     oldest_homeway_cursor,
     render_homeway_markdown,
 )
+from .storage import get_task_assets_root, preserve_article_source
 
 
 CAPTURED_ITEM_STATUSES = {"CAPTURED", "CAPTURED_UPDATED"}
@@ -109,6 +110,12 @@ class SubscriptionService:
         self.adapter_factory = adapter_factory
         self.image_session_factory = image_session_factory
         self.now_provider = now_provider
+        try:
+            self.manage_originals = self.asset_root.resolve().is_relative_to(
+                get_task_assets_root().resolve()
+            )
+        except (OSError, ValueError):
+            self.manage_originals = False
 
     def now(self) -> datetime:
         value = self.now_provider()
@@ -643,6 +650,37 @@ class SubscriptionService:
         raw_markdown = render_homeway_markdown(captured.raw_html, image_paths)
         if not raw_markdown:
             raise HomewaySubscriptionError("投研大师文字详情无法转换为 Markdown")
+        if self.manage_originals:
+            preview_title = re.sub(r"\s+", " ", str(list_item.preview_text or "")).strip()[:48]
+            published_label = list_item.published_at.astimezone(timezone.utc).strftime("%Y-%m-%d %H%M")
+            source_title = "｜".join(
+                value
+                for value in (
+                    str(subscription.get("display_name") or "投研大师"),
+                    published_label,
+                    preview_title,
+                )
+                if value
+            )
+            image_files = [
+                self.asset_root / str(entry.get("relative_path") or "")
+                for entry in image_manifest
+                if entry.get("status") == "downloaded" and entry.get("relative_path")
+            ]
+            records = preserve_article_source(
+                task_id=task_id,
+                content_id=f"homeway-{list_item.external_item_id}",
+                title=source_title,
+                source_url=list_item.source_url,
+                source_type="homeway_article",
+                raw_html=captured.raw_html,
+                raw_markdown=raw_markdown,
+                asset_paths=image_files,
+            )
+            upsert_asset = getattr(self.db, "upsert_content_asset", None)
+            if callable(upsert_asset):
+                for record in records:
+                    upsert_asset(record)
         content_hash = hashlib.sha256(
             json.dumps(
                 {

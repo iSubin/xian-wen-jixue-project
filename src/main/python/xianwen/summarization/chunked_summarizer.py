@@ -80,7 +80,7 @@ class ChunkedSummarizer:
         max_agent_value_chars: int,
         cancel_check: Callable[[], bool] | None = None,
         chunk_debug_dump_enabled: bool = False,
-        chunk_debug_dump_dir: str = "temp/chunk_debug",
+        chunk_debug_dump_dir: str = "runtime/debug/chunks",
     ):
         self._llm_client = llm_client
         self._chunk_system_prompt = chunk_system_prompt

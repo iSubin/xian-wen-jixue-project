@@ -40,6 +40,7 @@ class CapturedArticle:
     description: str | None
     raw_markdown: str
     plain_text: str
+    raw_html: str = ""
     images: list[CapturedImage] = field(default_factory=list)
     metadata: dict = field(default_factory=dict)
 
@@ -500,6 +501,7 @@ def capture_wechat_article_from_html(
         description=description,
         raw_markdown=markdown,
         plain_text=plain_text,
+        raw_html=html,
         images=images,
         metadata=metadata,
     )

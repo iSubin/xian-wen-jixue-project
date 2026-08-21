@@ -319,7 +319,10 @@ class TranscriberWorker(Worker):
             logger.info(f"[{self.name}] 实时率 (RTF): {result.real_time_factor:.2f}")
             logger.info(f"[{self.name}] 检测到的语言: {result.language} (置信度: {result.language_probability:.2f})")
 
-            intermediate_file_path = os.path.splitext(output_file)[0] + ".txt"
+            intermediate_file_path = str(
+                payload.get("transcript_file")
+                or (os.path.splitext(output_file)[0] + ".txt")
+            )
             self._save_transcription_to_file(result, intermediate_file_path)
 
             if task_id:
@@ -372,4 +375,3 @@ class TranscriberWorker(Worker):
                         "error_message": _build_actionable_transcription_error(str(e)),
                     },
                 ))
-

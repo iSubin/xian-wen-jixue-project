@@ -20,6 +20,7 @@ from src.main.python.xianwen.db import TaskStatus
 from src.main.python.xianwen.version import APP_VERSION
 import src.main.python.xianwen.api as api_module
 from src.main.python.xianwen.config.settings import config
+from src.main.python.xianwen.storage import ensure_storage_layout, get_task_assets_root
 from datetime import datetime
 import uuid
 
@@ -264,8 +265,8 @@ app.include_router(api_module.app.router)
 # 重新挂载静态文件目录 (这部分不会被 include_router 包含)
 dist_dir = config.app.frontend_dist_dir
 assets_dir = os.path.join(dist_dir, "assets")
-task_assets_dir = os.path.join(path, "temp", "task-assets")
-os.makedirs(task_assets_dir, exist_ok=True)
+ensure_storage_layout()
+task_assets_dir = str(get_task_assets_root())
 app.mount("/task-assets", StaticFiles(directory=task_assets_dir), name="task-assets")
 
 if os.path.exists(dist_dir):

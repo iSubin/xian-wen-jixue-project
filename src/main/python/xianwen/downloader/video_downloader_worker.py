@@ -12,6 +12,12 @@ import yt_dlp
 from ..worker import Worker, TaskCancelledError
 from ..utils.logger import logger
 from ..utils.ffmpeg_helper import FFmpegHelper
+from ..storage import (
+    get_runtime_root,
+    get_task_download_dir,
+    get_task_work_dir,
+    preserve_original_file,
+)
 from .bilibili_author_resolver import resolve_bilibili_author, BilibiliAuthorResolveError
 from .homeway_resolver import (
     HomewayResolveError,
@@ -40,7 +46,7 @@ class VideoDownloaderWorker(Worker):
         self.next_worker = next_worker
         self.summary_worker = summary_worker
         self.transcription_settings_manager = transcription_settings_manager
-        self.output_dir = "temp"
+        self.output_dir = str(get_runtime_root() / "downloads")
         os.makedirs(self.output_dir, exist_ok=True)
 
     @staticmethod
@@ -144,7 +150,7 @@ class VideoDownloaderWorker(Worker):
     def _sanitize_cookie_value(value: str | None) -> str:
         return (value or "").strip().replace("\r", "").replace("\n", "")
 
-    def _write_bilibili_sessdata_cookie_file(self, sessdata: str | None) -> str:
+    def _write_bilibili_sessdata_cookie_file(self, sessdata: str | None, task_id: str = "") -> str:
         sessdata = self._sanitize_cookie_value(sessdata)
         if not sessdata:
             return ""
@@ -152,7 +158,7 @@ class VideoDownloaderWorker(Worker):
         fd, cookie_path = tempfile.mkstemp(
             prefix="xianwen-bilibili-",
             suffix=".cookies.txt",
-            dir=self.output_dir,
+            dir=str(get_task_download_dir(task_id or "shared")),
         )
         os.close(fd)
         os.chmod(cookie_path, 0o600)
@@ -555,8 +561,7 @@ class VideoDownloaderWorker(Worker):
         return ydl_opts
 
     def _build_frame_source_outtmpl(self, task_id: str) -> str:
-        safe_task_id = re.sub(r"[^0-9A-Za-z_.-]+", "_", str(task_id or "task")).strip("._-") or "task"
-        return os.path.join(self.output_dir, f"{safe_task_id}_source_%(id)s.%(ext)s")
+        return str(get_task_download_dir(task_id) / "source_%(id)s.%(ext)s")
 
     def _download_source_video_for_frames(
         self,
@@ -564,6 +569,8 @@ class VideoDownloaderWorker(Worker):
         task_id: str,
         quality: str,
         bilibili_sessdata: str | None = None,
+        title: str = "",
+        source_url: str = "",
     ) -> str | None:
         video_url = self._normalize_bilibili_url_for_download(str(video_url))
         logger.info(f"[{self.name}] 为知识文档截图下载高清视频源: task_id={task_id}, url={video_url}")
@@ -573,7 +580,7 @@ class VideoDownloaderWorker(Worker):
                 raise TaskCancelledError(f"任务已取消，停止截图源视频下载: {task_id}")
 
         try:
-            cookiefile = self._write_bilibili_sessdata_cookie_file(bilibili_sessdata)
+            cookiefile = self._write_bilibili_sessdata_cookie_file(bilibili_sessdata, task_id)
             ydl_opts = self._build_ydl_opts(
                 quality=quality,
                 progress_hook=progress_hook,
@@ -588,8 +595,18 @@ class VideoDownloaderWorker(Worker):
                     video_path = ydl.prepare_filename(info_dict)
             finally:
                 self._remove_temp_cookie_file(cookiefile)
-            logger.info(f"[{self.name}] 截图源视频下载完成: {video_path}")
-            return video_path
+            preserved_path, asset_record = preserve_original_file(
+                video_path,
+                task_id=task_id,
+                title=title or str(task_id),
+                source_url=source_url or video_url,
+                source_type="video",
+                move=True,
+            )
+            from ..db import db
+            db.upsert_content_asset(asset_record)
+            logger.info(f"[{self.name}] 截图源视频已固化: {preserved_path}")
+            return str(preserved_path)
         except TaskCancelledError:
             raise
         except Exception as e:
@@ -647,8 +664,9 @@ class VideoDownloaderWorker(Worker):
                 return False
 
             transcript = subtitle_result["transcript"]
-            intermediate_file_path = os.path.join(self.output_dir, f"{task_id}_subtitle.txt")
-            output_file = os.path.join(self.output_dir, f"{task_id}_summary.md")
+            work_dir = get_task_work_dir(str(task_id))
+            intermediate_file_path = str(work_dir / "transcript.txt")
+            output_file = str(work_dir / "summary.md")
             source_video_file = None
             if bool(payload.get("enable_frame_snapshots", True)):
                 source_video_file = self._download_source_video_for_frames(
@@ -656,6 +674,8 @@ class VideoDownloaderWorker(Worker):
                     task_id=str(task_id),
                     quality=str(payload.get("quality") or "best"),
                     bilibili_sessdata=sessdata,
+                    title=str(subtitle_result.get("title") or task_id),
+                    source_url=video_url,
                 )
 
             with open(intermediate_file_path, "w", encoding="utf-8", errors="replace") as f:
@@ -754,8 +774,9 @@ class VideoDownloaderWorker(Worker):
             else:
                 title = f"{title} (已合并 {len(part_indices)} 个分P)"
 
-            intermediate_file_path = os.path.join(self.output_dir, f"{task_id}_subtitle.txt")
-            output_file = os.path.join(self.output_dir, f"{task_id}_summary.md")
+            work_dir = get_task_work_dir(str(task_id))
+            intermediate_file_path = str(work_dir / "transcript.txt")
+            output_file = str(work_dir / "summary.md")
 
             with open(intermediate_file_path, "w", encoding="utf-8", errors="replace") as f:
                 f.write(merged_transcript)
@@ -956,18 +977,14 @@ class VideoDownloaderWorker(Worker):
             ydl_sessdata = ""
             if self._is_bilibili_url(str(video_url)):
                 ydl_sessdata, _ = self._resolve_bilibili_sessdata(payload)
-            cookiefile = self._write_bilibili_sessdata_cookie_file(ydl_sessdata)
+            cookiefile = self._write_bilibili_sessdata_cookie_file(ydl_sessdata, str(task_id or "shared"))
             ydl_opts = self._build_ydl_opts(
                 quality=quality,
                 progress_hook=progress_hook,
                 enable_frame_snapshots=enable_frame_snapshots,
                 bilibili_sessdata=ydl_sessdata,
                 bilibili_cookiefile=cookiefile,
-                output_template=(
-                    self._build_frame_source_outtmpl(str(task_id))
-                    if enable_frame_snapshots and task_id
-                    else None
-                ),
+                output_template=self._build_frame_source_outtmpl(str(task_id or "shared")),
             )
 
             try:
@@ -983,7 +1000,24 @@ class VideoDownloaderWorker(Worker):
                 video_url=str(video_url),
             )
 
-            logger.info(f"[{self.name}] 视频下载成功: {video_path}")
+            original_source_url = str(
+                payload.get("source_video_url")
+                or payload.get("video_url")
+                or video_url
+            )
+            video_title = str(payload.get("resolved_title") or info_dict.get("title") or task_id or "未命名视频")
+            preserved_path, asset_record = preserve_original_file(
+                video_path,
+                task_id=str(task_id or uuid.uuid4()),
+                title=video_title,
+                source_url=original_source_url,
+                source_type="video",
+                move=True,
+            )
+            from ..db import db
+            db.upsert_content_asset(asset_record)
+            video_path = str(preserved_path)
+            logger.info(f"[{self.name}] 视频下载并固化成功: {video_path}")
 
             if task_id and self.is_task_cancelled(task_id):
                 raise TaskCancelledError(f"任务已取消，停止后续处理: {task_id}")
@@ -1000,7 +1034,6 @@ class VideoDownloaderWorker(Worker):
                 from ..db import TaskStatus
                 from ..task_updater import update_and_notify
                 updates = {"status": TaskStatus.TRANSCRIBING}
-                video_title = payload.get("resolved_title") or info_dict.get("title")
                 if video_title:
                     updates["title"] = str(video_title)
                 self._submit_coro(update_and_notify(task_id, updates))
@@ -1008,9 +1041,10 @@ class VideoDownloaderWorker(Worker):
             if self.next_worker:
                 next_payload = payload.copy()
                 next_payload['video_file'] = video_path
-                base_name = os.path.splitext(os.path.basename(video_path))[0]
-                next_payload['audio_file'] = os.path.join(self.output_dir, f"{base_name}.mp3")
-                next_payload['output_file'] = os.path.join(self.output_dir, f"{base_name}_summary.md")
+                work_dir = get_task_work_dir(str(task_id or "shared"))
+                next_payload['audio_file'] = str(work_dir / "audio.mp3")
+                next_payload['transcript_file'] = str(work_dir / "transcript.txt")
+                next_payload['output_file'] = str(work_dir / "summary.md")
                 
                 self._submit_coro(self.next_worker.add_task(next_payload))
 

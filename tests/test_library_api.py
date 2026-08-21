@@ -90,6 +90,37 @@ class LibraryApiTest(unittest.TestCase):
         self.assertNotIn("private_key", payload)
         self.assertNotIn("secret", response.text)
 
+    def test_task_assets_do_not_expose_local_source_paths(self):
+        api_module.db.save_task(
+            "local-asset-1",
+            {
+                "video_url": "file:///private/runtime/incoming.mp4",
+                "status": "COMPLETED",
+                "title": "本地物料",
+            },
+        )
+        api_module.db.upsert_content_asset(
+            {
+                "id": "asset-1",
+                "task_id": "local-asset-1",
+                "role": "original",
+                "asset_type": "video",
+                "relative_path": "originals/local/2026/local-asset/source.mp4",
+                "original_filename": "incoming.mp4",
+                "content_type": "video/mp4",
+                "sha256": "0" * 64,
+                "size_bytes": 123,
+                "source_url": "file:///private/runtime/incoming.mp4",
+                "status": "available",
+            }
+        )
+
+        response = self.client.get("/tasks/local-asset-1/assets")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.json()["assets"][0]["source_url"])
+        self.assertNotIn("/private/runtime", response.text)
+
     def test_completed_content_marks_git_pending_and_requests_auto_sync(self):
         now = datetime.utcnow()
         api_module.db.save_task(

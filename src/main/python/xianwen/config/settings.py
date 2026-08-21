@@ -197,7 +197,7 @@ class SummarizationConfig:
     chunk_prompt_file: str = "src/main/python/xianwen/prompt_for_chunk.md"
     max_agent_value_chars: int = 500
     chunk_debug_dump_enabled: bool = False
-    chunk_debug_dump_dir: str = "temp/chunk_debug"
+    chunk_debug_dump_dir: str = "runtime/debug/chunks"
     enable_agent_pipeline: bool = False
     transcript_chunk_emit_duration_sec: int = 600
 
@@ -220,6 +220,8 @@ class SummarizationConfig:
         self.max_agent_value_chars = max(100, int(self.max_agent_value_chars))
         self.transcript_chunk_emit_duration_sec = max(30, int(self.transcript_chunk_emit_duration_sec))
         self.chunk_prompt_file = _resolve_project_path(self.chunk_prompt_file)
+        if Path(str(self.chunk_debug_dump_dir)).as_posix().rstrip("/") == "temp/chunk_debug":
+            self.chunk_debug_dump_dir = "runtime/debug/chunks"
         self.chunk_debug_dump_dir = _resolve_project_path(self.chunk_debug_dump_dir)
 
 

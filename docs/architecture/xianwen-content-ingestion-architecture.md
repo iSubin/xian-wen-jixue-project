@@ -180,7 +180,8 @@ Git 文库首先服务于人类阅读，不把运行态字段拆成大量 JSON �
 ```
 
 - 主文档使用少量 YAML Properties 保存来源 URL、作者、发布时间、采集时间和 `xianwen_id`。
-- 原始逐字稿或原始正文与整理稿分开，保持人类可读；音视频本体不进入普通 Git。
+- 原始逐字稿或提炼后的原始正文与整理稿分开，保持人类可读；原始音视频、原始 HTML、来源图片和物料 manifest 永不进入普通 Git。
+- Git 对二进制资产采用 fail-closed：只发布 `content_assets.role=derived` 且被正文引用的必要衍生资产；未登记资产和 `role=original` 资产均不发布。
 - 内容目录名在首次发布后写入 manifest 并保持稳定，藏经阁分类变化不移动正文。
 - `.xianwen-manifest.json` 只负责受管文件 hash 与稳定目录映射，不作为阅读入口。
 - 用户新增文件不纳入 manifest；用户修改过的受管文件报告冲突并保留外部版本。
@@ -189,13 +190,45 @@ Git 文库首先服务于人类阅读，不把运行态字段拆成大量 JSON �
 
 ## 7. 数据目录原则
 
-当前 `temp/` 同时包含缓存、媒体文件、摘要和导出结果，后续应区分：
+本地数据按生命周期分为三层，业务代码统一通过 `storage.py` 获取路径，不再直接写入根目录 `temp/` 或 `download/`：
 
-- `data/`：数据库、持久内容和不可随意删除的资源。
-- `runtime/`：缓存、任务中间文件和日志，可重新生成。
+```text
+data/                                      # 持久层：不得自动删除
+  originals/
+    <provider>/<YYYY>/<原始标题>__<内容ID>/
+      source.<ext>                         # 原始视频或音频
+      article.html                         # 原始文章页面
+      original.md                          # 忠实转换的原始正文
+      manifest.json                        # URL、大小、SHA-256、物料清单
+  assets/<task_id>/
+    images/                                # 原文图片
+    homeway/<item_id>/                     # 投研大师原文图片
+    frames/                                # 被知识文档引用的关键帧
+  migrations/                              # 数据迁移报告
+
+runtime/                                   # 运行层：可再生、按任务隔离
+  downloads/<task_id>/                     # yt-dlp 下载中转
+  uploads/<task_id>/                       # 上传接收中转
+  tasks/<task_id>/
+    audio.mp3                              # 转录用衍生音频
+    transcript.txt                         # 中间逐字稿
+    summary.md                             # 中间整理稿
+  debug/chunks/                            # 可选调试输出
+
+exports/                                   # 用户明确生成的交付结果
+```
+
+其中：
+
+- `data/originals/` 与 `content_assets` 表共同构成原始物料账本；每项记录保存相对路径、角色、类型、大小、SHA-256、来源 URL 和状态。
+- 在线视频先下载到 `runtime/downloads/<task_id>/`，校验后原子移动到 `data/originals/`，后续转录始终读取固化后的文件。
+- 微信文章保存原始 HTML、原始 Markdown 和图片；投研大师保存原始 HTML、Markdown 和图片。原文图片与知识文档引用资产进入持久层。
+- `runtime/` 只保存下载/上传中转和可再生衍生物；任一任务不与其他任务平铺混放。
 - `exports/`：用户明确生成并需要交付的结果。
+- 删除知识任务默认不删除 `content_assets` 和物理原始物料。未来若增加“删除原始物料”，必须是独立、明确确认的操作。
+- 普通 Git/Obsidian 发布只包含采集后的 Markdown、原始正文/逐字稿、整理稿，以及明确登记为 `derived` 的必要衍生资产；原始物料全部留在本地。
 
-数据迁移前必须先确认现有文件的生命周期，不能仅按扩展名批量移动。
+历史数据使用 `python tools/migrate_storage_layout.py` 先 dry-run，再以 `--apply` 执行；迁移报告写入 `data/migrations/storage-layout-v1.json`。
 
 ## 8. 渐进迁移顺序
 

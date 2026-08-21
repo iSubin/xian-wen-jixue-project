@@ -300,7 +300,7 @@ def enrich_summary_with_video_frames(
     task_id: str,
     video_path: str | None,
     transcript_text: str | None = None,
-    assets_root: str | os.PathLike[str] = "temp/task-assets",
+    assets_root: str | os.PathLike[str] | None = None,
     public_url_base: str = "/task-assets",
     frame_writer: FrameWriter = write_high_quality_frame,
     max_frames: int = 12,
@@ -333,6 +333,9 @@ def enrich_summary_with_video_frames(
     if not candidates:
         return summary
 
+    if assets_root is None:
+        from .storage import get_task_assets_root
+        assets_root = get_task_assets_root()
     frame_dir = Path(assets_root) / task_id / "frames"
     references: list[FrameReference] = []
     for candidate in candidates:

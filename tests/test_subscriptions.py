@@ -130,7 +130,7 @@ class SubscriptionServiceTest(unittest.TestCase):
         self.now = datetime(2026, 8, 14, 4, 0, tzinfo=timezone.utc)
         self.service = SubscriptionService(
             self.store,
-            self.root / "temp" / "task-assets",
+            self.root / "data" / "assets",
             adapter_factory=FakeHomewayAdapter,
             image_session_factory=FakeImageSession,
             now_provider=lambda: self.now,
@@ -170,7 +170,7 @@ class SubscriptionServiceTest(unittest.TestCase):
         self.assertIsNone(locked["raw_markdown"])
         self.assertIn("/task-assets/homeway-digest-", captured["raw_markdown"])
 
-        image_path = self.root / "temp" / "task-assets" / captured["image_manifest"][0]["relative_path"]
+        image_path = self.root / "data" / "assets" / captured["image_manifest"][0]["relative_path"]
         self.assertEqual(image_path.read_bytes(), b"png-data")
         self.assertEqual(len(result["digest_task_ids"]), 1)
         task = self.store.get_task(result["digest_task_ids"][0])
@@ -187,11 +187,13 @@ class SubscriptionServiceTest(unittest.TestCase):
         self.assertEqual(document_count, 1)
         self.assertIn(f"{content_dir}/枪大侠｜2026-08-14.md", generated)
         self.assertIn(f"{content_dir}/原始正文.md", generated)
-        self.assertIn(f"{content_dir}/assets/homeway/public-1/image_01.png", generated)
+        self.assertNotIn(f"{content_dir}/assets/homeway/public-1/image_01.png", generated)
+        raw_export = generated[f"{content_dir}/原始正文.md"].content.decode("utf-8")
+        self.assertNotIn("/task-assets/", raw_export)
         main = generated[f"{content_dir}/枪大侠｜2026-08-14.md"].content.decode("utf-8")
         raw = generated[f"{content_dir}/原始正文.md"].content.decode("utf-8")
         self.assertIn("[[原始正文]]", main)
-        self.assertIn("assets/homeway/public-1/image_01.png", raw)
+        self.assertNotIn("assets/homeway/public-1/image_01.png", raw)
         self.assertNotIn(str(self.root), main + raw)
 
     def test_repeated_poll_is_idempotent_and_keeps_digest_timestamp_stable(self):

@@ -12,6 +12,10 @@ __pycache__
 *.sqlite3
 tasks.json
 temp
+data
+runtime
+exports
+download
 config/settings.json
 config/.credential_secret
 frontend/node_modules

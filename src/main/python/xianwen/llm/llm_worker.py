@@ -13,7 +13,7 @@ from ..summarization.chunker import count_timestamp_lines, split_transcript_into
 from ..summarization.protocol import strip_state_instruction_blocks
 from ..summarization.assembler import remove_program_markers
 from ..frame_enricher import FrameWriter, enrich_summary_with_video_frames, write_high_quality_frame
-from ..utils.project_root import get_project_root
+from ..storage import describe_managed_asset, get_task_assets_root
 from ..utils.logger import logger
 from ..worker import TaskCancelledError, Worker
 from .llm import LLM, LLMError, LLMMessage
@@ -43,7 +43,7 @@ class LLMWorker(Worker):
         self.system_prompt: str | None = None
         self._chunk_prompt_cache_path: str | None = None
         self._chunk_prompt_cache_text: str | None = None
-        self._frame_assets_root = frame_assets_root or str(get_project_root() / "temp" / "task-assets")
+        self._frame_assets_root = frame_assets_root or str(get_task_assets_root())
         self._frame_writer = frame_writer
 
     def load_system_prompt(self, prompt_file: str):
@@ -164,6 +164,7 @@ class LLMWorker(Worker):
             payload=payload,
             transcript_text=transcript_text,
         )
+        self._register_derived_frame_assets(task_id, final_summary)
 
         try:
             Path(output_file).parent.mkdir(parents=True, exist_ok=True)
@@ -220,6 +221,24 @@ class LLMWorker(Worker):
             assets_root=self._frame_assets_root,
             frame_writer=self._frame_writer,
         )
+
+    def _register_derived_frame_assets(self, task_id: str | None, summary: str) -> None:
+        if not task_id:
+            return
+        pattern = re.compile(rf"/task-assets/{re.escape(task_id)}/(frames/[^)\s]+)")
+        from ..db import db
+
+        for relative_path in sorted(set(pattern.findall(summary or ""))):
+            path = get_task_assets_root() / task_id / relative_path
+            if not path.is_file():
+                continue
+            record = describe_managed_asset(
+                path,
+                task_id=task_id,
+                role="derived",
+                asset_type="frame",
+            )
+            db.upsert_content_asset(record)
 
     def _resolve_requested_mode(self, payload: dict[str, Any], task_data: dict[str, Any] | None) -> str:
         payload_mode = str(payload.get("summary_mode") or "").strip().lower()

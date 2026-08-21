@@ -56,10 +56,24 @@ class GitSyncExportTest(unittest.TestCase):
                 "created_at": now,
             }
         )
-        asset_dir = self.root / "temp" / "task-assets" / task_id / "frames"
+        asset_dir = self.root / "data" / "assets" / task_id / "frames"
         asset_dir.mkdir(parents=True)
         (asset_dir / "frame.jpg").write_bytes(b"frame")
         (asset_dir / "unused.jpg").write_bytes(b"unused")
+        self.store.upsert_content_asset(
+            {
+                "id": "asset-frame",
+                "task_id": task_id,
+                "role": "derived",
+                "asset_type": "frame",
+                "relative_path": f"assets/{task_id}/frames/frame.jpg",
+                "original_filename": "frame.jpg",
+                "content_type": "image/jpeg",
+                "sha256": "frame-hash",
+                "size_bytes": 5,
+                "status": "available",
+            }
+        )
         self.store.save_task(
             task_id,
             {
@@ -106,9 +120,23 @@ class GitSyncExportTest(unittest.TestCase):
     def test_uses_original_article_body_name_and_keeps_metadata_minimal(self):
         task_id = "article-001"
         now = datetime.utcnow()
-        asset_dir = self.root / "temp" / "task-assets" / task_id / "images"
+        asset_dir = self.root / "data" / "assets" / task_id / "images"
         asset_dir.mkdir(parents=True)
         (asset_dir / "cover.jpg").write_bytes(b"cover")
+        self.store.upsert_content_asset(
+            {
+                "id": "asset-cover",
+                "task_id": task_id,
+                "role": "original",
+                "asset_type": "image",
+                "relative_path": f"assets/{task_id}/images/cover.jpg",
+                "original_filename": "cover.jpg",
+                "content_type": "image/jpeg",
+                "sha256": "cover-hash",
+                "size_bytes": 5,
+                "status": "available",
+            }
+        )
         self.store.save_task(
             task_id,
             {
@@ -134,8 +162,9 @@ class GitSyncExportTest(unittest.TestCase):
         self.assertIn('author: "测试作者"', main)
         self.assertIn('published_at: "2026-08-01"', main)
         self.assertIn("[[原始正文]]", main)
-        self.assertIn("assets/images/cover.jpg", raw)
-        self.assertIn("内容/一篇原始文章/assets/images/cover.jpg", generated)
+        self.assertNotIn("/task-assets/", raw)
+        self.assertNotIn("assets/images/cover.jpg", raw)
+        self.assertNotIn("内容/一篇原始文章/assets/images/cover.jpg", generated)
 
     def test_disambiguates_duplicate_titles_and_reuses_published_directory_name(self):
         now = datetime.utcnow()

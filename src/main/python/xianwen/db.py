@@ -14,6 +14,7 @@ from sqlalchemy import (
     String,
     Float,
     Integer,
+    BigInteger,
     Text,
     DateTime,
     Boolean,
@@ -95,6 +96,46 @@ class TaskModel(Base):
             "source_url": self.source_url or self.video_url,
             "source_meta": self.source_meta,
             "library_visible": self.library_visible is not False,
+        }
+
+
+class ContentAssetModel(Base):
+    """与任务关联、由先闻继学管理的持久内容物料。"""
+
+    __tablename__ = "content_assets"
+    __table_args__ = (
+        UniqueConstraint("task_id", "relative_path", name="uq_content_asset_task_path"),
+    )
+
+    id = Column(String, primary_key=True)
+    task_id = Column(String, nullable=False, index=True)
+    role = Column(String, nullable=False, index=True)
+    asset_type = Column(String, nullable=False, index=True)
+    relative_path = Column(Text, nullable=False)
+    original_filename = Column(Text, nullable=True)
+    content_type = Column(String, nullable=True)
+    sha256 = Column(String, nullable=False)
+    size_bytes = Column(BigInteger, nullable=False, default=0)
+    source_url = Column(Text, nullable=True)
+    status = Column(String, nullable=False, default="available", index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "task_id": self.task_id,
+            "role": self.role,
+            "asset_type": self.asset_type,
+            "relative_path": self.relative_path,
+            "original_filename": self.original_filename,
+            "content_type": self.content_type,
+            "sha256": self.sha256,
+            "size_bytes": self.size_bytes,
+            "source_url": self.source_url,
+            "status": self.status,
+            "created_at": self.created_at.isoformat() + "Z" if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() + "Z" if self.updated_at else None,
         }
 
 
@@ -752,6 +793,70 @@ class TaskDB:
             if serialized:
                 return self._deserialize_task(serialized)
             return None
+
+    def upsert_content_asset(self, asset_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        if not self.use_db:
+            return None
+        task_id = str(asset_data.get("task_id") or "").strip()
+        relative_path = str(asset_data.get("relative_path") or "").strip()
+        if not task_id or not relative_path:
+            raise ValueError("内容物料必须包含 task_id 和 relative_path")
+
+        session: Session = self.SessionLocal()
+        try:
+            asset = (
+                session.query(ContentAssetModel)
+                .filter(
+                    ContentAssetModel.task_id == task_id,
+                    ContentAssetModel.relative_path == relative_path,
+                )
+                .first()
+            )
+            now = datetime.utcnow()
+            payload = {
+                key: value
+                for key, value in asset_data.items()
+                if hasattr(ContentAssetModel, key)
+            }
+            if asset:
+                for key, value in payload.items():
+                    if key not in {"id", "task_id", "created_at"}:
+                        setattr(asset, key, value)
+                asset.updated_at = now
+            else:
+                payload.setdefault("id", uuid.uuid4().hex)
+                payload.setdefault("created_at", now)
+                payload.setdefault("updated_at", now)
+                asset = ContentAssetModel(**payload)
+                session.add(asset)
+            session.commit()
+            session.refresh(asset)
+            return asset.to_dict()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def list_content_assets(
+        self,
+        task_id: str,
+        *,
+        role: Optional[str] = None,
+        status: Optional[str] = "available",
+    ) -> List[Dict[str, Any]]:
+        if not self.use_db:
+            return []
+        session: Session = self.SessionLocal()
+        try:
+            query = session.query(ContentAssetModel).filter(ContentAssetModel.task_id == task_id)
+            if role:
+                query = query.filter(ContentAssetModel.role == role)
+            if status:
+                query = query.filter(ContentAssetModel.status == status)
+            return [asset.to_dict() for asset in query.order_by(ContentAssetModel.created_at.asc()).all()]
+        finally:
+            session.close()
 
     def list_tasks(self) -> List[Dict[str, Any]]:
         if self.use_db:

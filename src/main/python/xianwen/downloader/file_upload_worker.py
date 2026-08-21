@@ -4,6 +4,7 @@ from typing import Any
 
 from ..worker import Worker
 from ..utils.logger import logger
+from ..storage import get_task_work_dir, preserve_original_file
 from ..utils.media import (
     AUDIO_MEDIA_EXTENSIONS,
     VIDEO_MEDIA_EXTENSIONS,
@@ -28,8 +29,6 @@ class FileUploadWorker(Worker):
     def __init__(self, name: str, next_worker: Worker = None):
         super().__init__(name)
         self.next_worker = next_worker
-        self.output_dir = "temp"
-        os.makedirs(self.output_dir, exist_ok=True)
 
     async def process_task(self, payload: Any):
         """
@@ -86,31 +85,40 @@ class FileUploadWorker(Worker):
                     await notify_progress_update(task_id, progress)
                 await asyncio.sleep(0.05)  # 轻微延迟，让前端能看到进度
 
-            # 确定最终文件路径
-            final_path = os.path.join(self.output_dir, f"{task_id}{file_ext}")
-
-            # 如果文件已经在 temp 目录且命名正确，无需移动
-            if file_path != final_path:
-                # 移动文件到最终位置
-                import shutil
-                shutil.move(file_path, final_path)
-                logger.info(f"[{self.name}] 文件已移动到: {final_path}")
-            else:
-                logger.info(f"[{self.name}] 文件已在目标位置: {final_path}")
-
             # 获取文件标题（用于显示）
             title = os.path.splitext(filename)[0]
+            final_path, asset_record = preserve_original_file(
+                file_path,
+                task_id=str(task_id),
+                title=title,
+                source_url=f"file://{file_path}",
+                source_type="upload",
+                move=True,
+            )
+            from ..db import db
+            db.upsert_content_asset(asset_record)
+            logger.info(f"[{self.name}] 原始上传物料已固化到: {final_path}")
             if task_id:
                 from ..db import TaskStatus
                 from ..task_updater import update_and_notify
-                await update_and_notify(task_id, {"title": title, "status": TaskStatus.TRANSCRIBING})
+                managed_url = f"file://{final_path}"
+                await update_and_notify(
+                    task_id,
+                    {
+                        "title": title,
+                        "status": TaskStatus.TRANSCRIBING,
+                        "video_url": managed_url,
+                        "source_url": managed_url,
+                        "source_type": "local_file",
+                    },
+                )
 
             # 传递给下一个 Worker
             if self.next_worker:
                 next_payload = build_transcriber_payload(
                     task_id=task_id,
-                    media_path=final_path,
-                    output_dir=self.output_dir,
+                    media_path=str(final_path),
+                    output_dir=str(get_task_work_dir(str(task_id))),
                     summary_mode=str(payload.get("summary_mode") or ""),
                 )
                 await self.next_worker.add_task(next_payload)
