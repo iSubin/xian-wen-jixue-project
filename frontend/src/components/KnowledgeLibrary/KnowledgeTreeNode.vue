@@ -38,6 +38,13 @@ const documentCount = computed(() => {
   const ids = new Set(descendantFolderIds(props.node))
   return props.documents.filter(document => document.folder_id && ids.has(document.folder_id)).length
 })
+
+const displayDocumentTitle = (document: Task) => {
+  const title = document.title || document.topic || '未命名文档'
+  return document.source_type === 'homeway_post'
+    ? title.replace(/^\d{4}-\d{2}-\d{2}\s+/, '')
+    : title
+}
 </script>
 
 <template>
@@ -64,8 +71,8 @@ const documentCount = computed(() => {
         <button type="button" class="document-main" @click="emit('select', document)">
           <PhArticle :size="14" weight="duotone" />
           <span>
-            <strong>{{ document.title || document.topic || '未命名文档' }}</strong>
-            <small>{{ document.source_type === 'manual' ? '手写文档' : document.source_type === 'wechat_article' ? '公众号文章' : '整理文稿' }}</small>
+            <strong>{{ displayDocumentTitle(document) }}</strong>
+            <small>{{ document.source_type === 'manual' ? '手写文档' : document.source_type === 'wechat_article' ? '公众号文章' : document.source_type === 'homeway_post' ? '订阅帖子' : '整理文稿' }}</small>
           </span>
         </button>
         <button type="button" class="edit-button" title="编辑文档" @click="emit('edit', document)">

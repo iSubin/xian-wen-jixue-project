@@ -858,6 +858,29 @@ class TaskDB:
         finally:
             session.close()
 
+    def delete_content_assets(
+        self,
+        task_id: str,
+        *,
+        relative_path_prefix: Optional[str] = None,
+    ) -> int:
+        """删除任务下已明确废弃的物料索引；未指定前缀时删除该任务的全部索引。"""
+        if not self.use_db:
+            return 0
+        session: Session = self.SessionLocal()
+        try:
+            query = session.query(ContentAssetModel).filter(ContentAssetModel.task_id == task_id)
+            if relative_path_prefix:
+                query = query.filter(ContentAssetModel.relative_path.startswith(relative_path_prefix))
+            deleted = query.delete(synchronize_session=False)
+            session.commit()
+            return int(deleted or 0)
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
     def list_tasks(self) -> List[Dict[str, Any]]:
         if self.use_db:
             session: Session = self.SessionLocal()
@@ -1012,6 +1035,59 @@ class TaskDB:
         except Exception as e:
             session.rollback()
             logger.error(f"Failed to ensure folder path: {e}")
+            raise
+        finally:
+            session.close()
+
+    def ensure_child_folder(
+        self,
+        parent_id: str,
+        name: str,
+        *,
+        folder_type: str = "auto",
+        source_url: str | None = None,
+        sort_order: int = 0,
+    ) -> str:
+        """Return a stable child folder without rebuilding the parent's full path."""
+        clean_parent_id = str(parent_id or "").strip()
+        clean_name = str(name or "").strip()
+        if not clean_parent_id or not clean_name:
+            raise ValueError("子目录必须包含父目录和名称")
+
+        session: Session = self.SessionLocal()
+        try:
+            parent = session.query(FolderModel).filter(FolderModel.id == clean_parent_id).first()
+            if not parent:
+                raise ValueError("父目录不存在")
+            folder = (
+                session.query(FolderModel)
+                .filter(
+                    FolderModel.parent_id == clean_parent_id,
+                    FolderModel.name == clean_name,
+                )
+                .order_by(FolderModel.created_at.asc())
+                .first()
+            )
+            if not folder:
+                folder = FolderModel(
+                    id=uuid.uuid4().hex,
+                    name=clean_name,
+                    parent_id=clean_parent_id,
+                    folder_type=folder_type,
+                    source_video_url=source_url,
+                    sort_order=sort_order,
+                )
+                session.add(folder)
+            elif folder.folder_type == "auto":
+                folder.sort_order = sort_order
+                if source_url:
+                    folder.source_video_url = source_url
+            session.commit()
+            session.refresh(folder)
+            return str(folder.id)
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Failed to ensure child folder: {e}")
             raise
         finally:
             session.close()

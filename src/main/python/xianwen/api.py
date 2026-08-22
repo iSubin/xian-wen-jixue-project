@@ -767,7 +767,7 @@ async def _run_subscription_poll(
         except Exception:
             await _broadcast_subscription_update(user_id, subscription_id)
             raise
-        for task_id in result.get("digest_task_ids") or []:
+        for task_id in result.get("content_task_ids") or result.get("digest_task_ids") or []:
             await notify_task_update(str(task_id))
         await _broadcast_subscription_update(user_id, subscription_id, result=result)
         return result

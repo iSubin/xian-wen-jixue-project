@@ -71,7 +71,9 @@ const formattedTranscript = computed(() => {
   return formatTranscriptForDisplay(props.task.transcript || '', { videoUrl: props.task.source_url || props.task.video_url })
 })
 
-const isArticleTask = computed(() => props.task.source_type === 'wechat_article')
+const isArticleTask = computed(() =>
+  ['wechat_article', 'homeway_daily_digest', 'homeway_post'].includes(props.task.source_type || ''),
+)
 
 const compiledTranscriptMarkdown = computed(() => {
   if (!isArticleTask.value || !props.task.transcript) return ''

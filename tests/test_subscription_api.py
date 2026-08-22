@@ -156,8 +156,10 @@ class SubscriptionApiTest(unittest.TestCase):
             json={"reconciliation": False, "build_digest": True},
         )
         self.assertEqual(manual.status_code, 200)
-        task_id = manual.json()["digest_task_ids"][0]
-        self.assertEqual(api_module.db.get_task(task_id)["title"], "枪大侠｜2026-08-14")
+        task_id = manual.json()["content_task_ids"][0]
+        task = api_module.db.get_task(task_id)
+        self.assertEqual(task["source_type"], "homeway_post")
+        self.assertTrue(task["title"].startswith("2026-08-14 09:20｜"))
         self.notify.assert_awaited_once_with(task_id)
 
         runs = self.client.get(f"/subscriptions/{subscription_id}/runs")

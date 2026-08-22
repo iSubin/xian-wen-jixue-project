@@ -317,7 +317,13 @@ def _rewrite_publishable_asset_references(
     return re.sub(r"\n{3,}", "\n\n", rewritten).strip()
 
 
-def _render_document(task: Dict[str, Any], summary: str, raw_document_name: str | None) -> str:
+def _render_document(
+    task: Dict[str, Any],
+    summary: str,
+    raw_document_name: str | None,
+    *,
+    body: str = "",
+) -> str:
     title = _source_title(task)
     source_url = _public_source_url(task)
     source_meta = _metadata_dict(task.get("source_meta"))
@@ -366,6 +372,8 @@ def _render_document(task: Dict[str, Any], summary: str, raw_document_name: str 
         lines.append("")
     if summary:
         lines.extend(["## 整理稿", "", summary.strip(), ""])
+    if body:
+        lines.extend(["## 正文", "", body.strip(), ""])
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -467,8 +475,24 @@ def build_library_files(
         summary = _rewrite_publishable_asset_references(summary, task_id, publishable_assets)
         transcript = _rewrite_publishable_asset_references(transcript, task_id, publishable_assets)
 
-        raw_document_name = _raw_document_name(task) if include_transcript and transcript else None
-        content = _render_document(task, summary, raw_document_name)
+        inline_transcript = (
+            transcript
+            if include_transcript
+            and transcript
+            and str(task.get("source_type") or "").lower() == "homeway_post"
+            else ""
+        )
+        raw_document_name = (
+            _raw_document_name(task)
+            if include_transcript and transcript and not inline_transcript
+            else None
+        )
+        content = _render_document(
+            task,
+            summary,
+            raw_document_name,
+            body=inline_transcript,
+        )
         generated[relative_path] = GeneratedFile(
             content.encode("utf-8"),
             task_id=task_id,

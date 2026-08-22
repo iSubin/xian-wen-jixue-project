@@ -131,7 +131,7 @@ const removeSubscription = async (subscription: ContentSubscription) => {
       <div class="flex items-center justify-between gap-3">
         <div>
           <h2 class="text-sm font-semibold text-slate-800">内容订阅</h2>
-          <p class="mt-0.5 text-[11px] text-slate-400">持续来源，每日形成一份知识内容包</p>
+          <p class="mt-0.5 text-[11px] text-slate-400">持续来源，按日期归档每一篇独立帖子</p>
         </div>
         <button
           type="button"
@@ -221,7 +221,7 @@ const removeSubscription = async (subscription: ContentSubscription) => {
               </select>
             </label>
             <label class="text-[10px] font-semibold text-slate-500">
-              每日内容包
+              每日归档时间
               <input
                 v-model="digestTime"
                 type="time"
@@ -257,7 +257,7 @@ const removeSubscription = async (subscription: ContentSubscription) => {
       >
         <PhClock :size="28" class="mx-auto text-slate-300" />
         <p class="mt-3 text-sm font-semibold text-slate-600">还没有内容订阅</p>
-        <p class="mt-1 text-xs leading-5 text-slate-400">添加持续更新的作者主页，先闻继学会按时检查并形成每日内容包。</p>
+        <p class="mt-1 text-xs leading-5 text-slate-400">添加持续更新的作者主页，先闻继学会按日期整理每一篇独立帖子。</p>
       </div>
 
       <article

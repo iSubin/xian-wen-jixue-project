@@ -378,7 +378,9 @@ export function useTaskViewModel() {
     try {
       const response = await axios.get(`${apiBaseUrl}/tasks/${task.id}`)
       selectedTask.value = response.data
-      if (selectedTask.value?.status === 'PENDING' || selectedTask.value?.status === 'DOWNLOADING' || selectedTask.value?.status === 'TRANSCRIBING' || selectedTask.value?.status === 'SUMMARIZING') {
+      if (['homeway_daily_digest', 'homeway_post'].includes(selectedTask.value?.source_type || '')) {
+        activeTab.value = 'transcript'
+      } else if (selectedTask.value?.status === 'PENDING' || selectedTask.value?.status === 'DOWNLOADING' || selectedTask.value?.status === 'TRANSCRIBING' || selectedTask.value?.status === 'SUMMARIZING') {
         activeTab.value = 'summary'
       }
     } catch (err) {

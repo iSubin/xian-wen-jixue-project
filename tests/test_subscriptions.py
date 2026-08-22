@@ -4,7 +4,7 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
-from src.main.python.xianwen.db import TaskDB
+from src.main.python.xianwen.db import TaskDB, TaskStatus
 from src.main.python.xianwen.homeway_subscription import (
     HomewayCapturedItem,
     HomewayLecturerPreview,
@@ -12,7 +12,7 @@ from src.main.python.xianwen.homeway_subscription import (
     parse_homeway_datetime,
 )
 from src.main.python.xianwen.git_sync import build_library_files
-from src.main.python.xianwen.subscriptions import SubscriptionService
+from src.main.python.xianwen.subscriptions import SubscriptionService, _digest_task_id
 
 
 IMAGE_URL = "https://tyds-cos.homeway.com.cn/article/source.png"
@@ -150,7 +150,7 @@ class SubscriptionServiceTest(unittest.TestCase):
             initial_sync_mode="today",
         )
 
-    def test_poll_captures_text_image_locked_metadata_and_daily_digest(self):
+    def test_poll_captures_text_image_locked_metadata_and_one_document_per_post(self):
         subscription = self.create_subscription()
         result = self.service.poll_subscription(
             subscription["id"],
@@ -168,38 +168,44 @@ class SubscriptionServiceTest(unittest.TestCase):
         self.assertEqual(captured["capture_status"], "CAPTURED")
         self.assertEqual(locked["capture_status"], "LOCKED")
         self.assertIsNone(locked["raw_markdown"])
-        self.assertIn("/task-assets/homeway-digest-", captured["raw_markdown"])
+        self.assertIn("/task-assets/homeway-post-", captured["raw_markdown"])
 
         image_path = self.root / "data" / "assets" / captured["image_manifest"][0]["relative_path"]
         self.assertEqual(image_path.read_bytes(), b"png-data")
-        self.assertEqual(len(result["digest_task_ids"]), 1)
-        task = self.store.get_task(result["digest_task_ids"][0])
-        self.assertEqual(task["source_type"], "homeway_daily_digest")
-        self.assertEqual(task["title"], "枪大侠｜2026-08-14")
+        self.assertEqual(len(result["content_task_ids"]), 1)
+        task = self.store.get_task(result["content_task_ids"][0])
+        self.assertEqual(task["source_type"], "homeway_post")
+        self.assertEqual(task["title"], "2026-08-14 09:20｜【短线】公开市场观察")
         self.assertIn("公开正文", task["transcript"])
-        self.assertIn("来源 ID：`public-1`", task["transcript"])
         self.assertNotIn("需要会员的内容", task["transcript"])
-        self.assertEqual(task["folder_id"], subscription["folder_id"])
-        self.assertEqual([folder["name"] for folder in self.store.list_folders()], ["订阅", "投研大师", "枪大侠"])
+        date_folder = self.store.get_folder(task["folder_id"])
+        self.assertEqual(date_folder["name"], "2026-08-14")
+        self.assertEqual(date_folder["parent_id"], subscription["folder_id"])
+        self.assertEqual(
+            [folder["name"] for folder in self.store.list_folders()],
+            ["2026-08-14", "订阅", "投研大师", "枪大侠"],
+        )
 
         generated, document_count = build_library_files(self.store, project_root=self.root)
-        content_dir = "内容/枪大侠｜2026-08-14"
+        content_dir = "内容/2026-08-14 09-20｜【短线】公开市场观察"
         self.assertEqual(document_count, 1)
-        self.assertIn(f"{content_dir}/枪大侠｜2026-08-14.md", generated)
-        self.assertIn(f"{content_dir}/原始正文.md", generated)
+        self.assertIn(f"{content_dir}/2026-08-14 09-20｜【短线】公开市场观察.md", generated)
+        self.assertNotIn(f"{content_dir}/原始正文.md", generated)
         self.assertNotIn(f"{content_dir}/assets/homeway/public-1/image_01.png", generated)
-        raw_export = generated[f"{content_dir}/原始正文.md"].content.decode("utf-8")
-        self.assertNotIn("/task-assets/", raw_export)
-        main = generated[f"{content_dir}/枪大侠｜2026-08-14.md"].content.decode("utf-8")
-        raw = generated[f"{content_dir}/原始正文.md"].content.decode("utf-8")
-        self.assertIn("[[原始正文]]", main)
-        self.assertNotIn("assets/homeway/public-1/image_01.png", raw)
-        self.assertNotIn(str(self.root), main + raw)
+        main = generated[f"{content_dir}/2026-08-14 09-20｜【短线】公开市场观察.md"].content.decode("utf-8")
+        self.assertIn("## 正文", main)
+        self.assertIn("公开正文", main)
+        self.assertNotIn("/task-assets/", main)
+        self.assertNotIn("assets/homeway/public-1/image_01.png", main)
+        self.assertNotIn(str(self.root), main)
+        daily_index = "藏经阁/订阅/投研大师/枪大侠/2026-08-14/_目录.md"
+        self.assertIn(daily_index, generated)
+        self.assertIn("公开市场观察", generated[daily_index].content.decode("utf-8"))
 
     def test_repeated_poll_is_idempotent_and_keeps_digest_timestamp_stable(self):
         subscription = self.create_subscription()
         first = self.service.poll_subscription(subscription["id"], trigger="manual", build_digest=True)
-        task_id = first["digest_task_ids"][0]
+        task_id = first["content_task_ids"][0]
         first_task = self.store.get_task(task_id)
 
         second = self.service.poll_subscription(subscription["id"], trigger="manual", build_digest=True)
@@ -209,6 +215,104 @@ class SubscriptionServiceTest(unittest.TestCase):
         self.assertEqual(second["run"]["updated_count"], 0)
         self.assertEqual(len(self.store.list_subscription_items(subscription["id"])), 2)
         self.assertEqual(first_task["latest_modified_at"], second_task["latest_modified_at"])
+        self.assertEqual(second["content_task_ids"], [])
+
+    def test_organize_existing_daily_digest_removes_replaced_images_and_is_idempotent(self):
+        subscription = self.create_subscription()
+        digest_date = "2026-08-14"
+        legacy_task_id = _digest_task_id(subscription["id"], digest_date)
+        old_relative = f"{legacy_task_id}/homeway/public-1/image_01.png"
+        old_image = self.root / "data" / "assets" / old_relative
+        old_image.parent.mkdir(parents=True, exist_ok=True)
+        old_image.write_bytes(b"legacy-image")
+        self.store.upsert_content_asset(
+            {
+                "task_id": legacy_task_id,
+                "role": "original",
+                "asset_type": "image",
+                "relative_path": f"assets/{old_relative}",
+                "sha256": "legacy-image-sha",
+                "size_bytes": len(b"legacy-image"),
+                "status": "available",
+            }
+        )
+        legacy_original = self.root / "data" / "originals" / "homeway" / "2026" / "legacy" / "article.html"
+        legacy_original.parent.mkdir(parents=True, exist_ok=True)
+        legacy_original.write_text("<p>原始响应</p>", encoding="utf-8")
+        self.store.upsert_content_asset(
+            {
+                "task_id": legacy_task_id,
+                "role": "original",
+                "asset_type": "article_html",
+                "relative_path": "originals/homeway/2026/legacy/article.html",
+                "sha256": "legacy-original-sha",
+                "size_bytes": legacy_original.stat().st_size,
+                "status": "available",
+            }
+        )
+        old_markdown_path = f"/task-assets/{old_relative}"
+        self.store.upsert_subscription_item(
+            subscription["id"],
+            {
+                "provider": "homeway",
+                "external_item_id": "public-1",
+                "source_url": "https://tyds.homeway.com.cn/#/GraphicView?key=public-1",
+                "published_at": datetime(2026, 8, 14, 1, 20),
+                "content_hash": "legacy-hash",
+                "preview_text": "【短线】公开市场观察",
+                "raw_html": "<p>公开正文</p>",
+                "raw_markdown": f"公开正文\n\n![原文图片]({old_markdown_path})",
+                "image_manifest": [
+                    {
+                        "original_url": IMAGE_URL,
+                        "status": "downloaded",
+                        "relative_path": old_relative,
+                        "markdown_path": old_markdown_path,
+                        "size": len(b"legacy-image"),
+                    }
+                ],
+                "source_meta": {"published_at_source": "2026-08-14 09:20:00"},
+                "access_scope": "public",
+                "capture_status": "CAPTURED",
+                "digest_date": digest_date,
+                "digest_task_id": legacy_task_id,
+            },
+        )
+        self.store.save_task(
+            legacy_task_id,
+            {
+                "video_url": subscription["source_url"],
+                "source_url": subscription["source_url"],
+                "source_type": "homeway_daily_digest",
+                "status": TaskStatus.COMPLETED,
+                "progress": 1.0,
+                "title": "枪大侠｜2026-08-14",
+                "summary": "旧日报",
+                "transcript": "旧日报正文",
+                "folder_id": subscription["folder_id"],
+                "library_visible": True,
+            },
+        )
+
+        first = self.service.organize_captured_content(subscription["id"])
+        item = self.store.get_subscription_item(subscription["id"], "public-1")
+        post_task_id = item["source_meta"]["content_task_id"]
+        new_relative = item["image_manifest"][0]["relative_path"]
+
+        self.assertEqual(first["created_count"], 1)
+        self.assertFalse(old_image.exists())
+        self.assertTrue((self.root / "data" / "assets" / new_relative).is_file())
+        self.assertNotIn(legacy_task_id, item["raw_markdown"])
+        self.assertIn(post_task_id, item["raw_markdown"])
+        self.assertIsNone(self.store.get_task(legacy_task_id))
+        self.assertTrue(self.store.get_task(post_task_id)["library_visible"])
+        remaining_legacy_assets = self.store.list_content_assets(legacy_task_id, status=None)
+        self.assertEqual([asset["asset_type"] for asset in remaining_legacy_assets], ["article_html"])
+        self.assertTrue(legacy_original.is_file())
+
+        second = self.service.organize_captured_content(subscription["id"])
+        self.assertEqual(second["created_count"], 0)
+        self.assertEqual(second["updated_count"], 0)
 
     def test_next_reconciliation_archives_items_published_after_prior_digest(self):
         subscription = self.create_subscription()
@@ -217,7 +321,7 @@ class SubscriptionServiceTest(unittest.TestCase):
             trigger="scheduled",
             build_digest=False,
         )
-        self.assertEqual(first["digest_task_ids"], [])
+        self.assertEqual(first["content_task_ids"], [])
 
         self.now = datetime(2026, 8, 15, 4, 0, tzinfo=timezone.utc)
         second = self.service.poll_subscription(
@@ -226,9 +330,9 @@ class SubscriptionServiceTest(unittest.TestCase):
             reconciliation=True,
             build_digest=True,
         )
-        self.assertEqual(len(second["digest_task_ids"]), 1)
-        task = self.store.get_task(second["digest_task_ids"][0])
-        self.assertEqual(task["title"], "枪大侠｜2026-08-14")
+        self.assertEqual(len(second["content_task_ids"]), 1)
+        task = self.store.get_task(second["content_task_ids"][0])
+        self.assertEqual(task["source_type"], "homeway_post")
 
     def test_reconciliation_catches_up_to_durable_cursor_after_multi_day_gap(self):
         subscription = self.create_subscription()
@@ -365,7 +469,7 @@ class SubscriptionServiceTest(unittest.TestCase):
     def test_cancel_stops_future_runs_but_preserves_content(self):
         subscription = self.create_subscription()
         result = self.service.poll_subscription(subscription["id"], trigger="manual", build_digest=True)
-        task_id = result["digest_task_ids"][0]
+        task_id = result["content_task_ids"][0]
 
         self.assertTrue(self.store.cancel_content_subscription(subscription["id"], "local-user"))
         self.assertEqual(self.store.list_content_subscriptions("local-user"), [])
