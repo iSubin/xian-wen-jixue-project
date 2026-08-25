@@ -30,6 +30,7 @@ import type {
   Task,
   GitSettingsUpdate,
 } from './types'
+import { TaskStatus } from './types'
 import Sidebar from './components/Sidebar.vue'
 import FloatingToolbar from './components/FloatingToolbar.vue'
 import TaskInfoModal from './components/TaskInfoModal.vue'
@@ -53,6 +54,7 @@ const {
   quality,
   summaryMode,
   isSubmitting,
+  retryingTaskId,
   error,
   activeTab,
   llmProviders,
@@ -92,6 +94,7 @@ const {
   deleteTask,
   reSummarize,
   reTranscribe,
+  retryTask,
   updateTaskTopic,
   updateProfile,
   createProfile,
@@ -454,6 +457,21 @@ const handleReTranscribe = (taskId: string) => {
   const { info } = useToast()
   info('正在重新转录原文...')
   reTranscribe(taskId)
+}
+
+const handleRetryTask = async (taskId: string) => {
+  const task = tasks.value.find(item => item.id === taskId) || selectedTask.value
+  if (task?.status === TaskStatus.COMPLETED && !confirm('重新处理会更新逐字稿和整理稿，本地原始物料会继续保留。是否继续？')) {
+    return
+  }
+
+  info(task?.status === TaskStatus.FAILED ? '正在从失败位置补录...' : '正在重新处理内容...')
+  try {
+    await retryTask(taskId)
+    success(task?.status === TaskStatus.FAILED ? '任务已重新提交补录' : '任务已开始更新')
+  } catch {
+    toastError(error.value || '任务重试失败')
+  }
 }
 
 const handleDownloadMarkdown = () => {
@@ -1155,6 +1173,8 @@ watch(
     <TaskInfoModal
       v-model:show="showInfoModal"
       :selectedTask="selectedTask"
+      :isRetrying="retryingTaskId === selectedTask?.id"
+      @retry="handleRetryTask"
     />
     
     <!-- Mermaid 查看器模态框 -->

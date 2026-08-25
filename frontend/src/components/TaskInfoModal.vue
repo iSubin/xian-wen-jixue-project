@@ -1,12 +1,23 @@
 <script setup lang="ts">
-import { PhInfo, PhX, PhArrowSquareOut } from '@phosphor-icons/vue'
+import { computed } from 'vue'
+import { PhInfo, PhX, PhArrowSquareOut, PhArrowClockwise, PhSpinner } from '@phosphor-icons/vue'
 import { TaskStatus, type Task } from '../types'
 
 const show = defineModel<boolean>('show', { required: true })
 
-defineProps<{
+const props = defineProps<{
   selectedTask: Task | null
+  isRetrying?: boolean
 }>()
+
+const emit = defineEmits<{
+  retry: [taskId: string]
+}>()
+
+const canRetry = computed(() => (
+  props.selectedTask?.status === TaskStatus.FAILED
+  || props.selectedTask?.status === TaskStatus.COMPLETED
+))
 
 const getStatusLabel = (status: TaskStatus) => {
   switch (status) {
@@ -79,10 +90,25 @@ const getStatusClass = (status: TaskStatus) => {
             <div class="text-red-600 break-words">{{ selectedTask.error_message || '无' }}</div>
           </div>
         </div>
-        <div class="p-4 bg-gray-50 flex justify-end">
-          <button @click="show = false" class="px-4 py-2 bg-white border border-gray-200 text-slate-600 rounded-lg hover:bg-gray-50 font-medium text-sm transition-colors">
-            关闭
-          </button>
+        <div class="p-4 bg-gray-50 flex items-center justify-between gap-3">
+          <p class="text-xs leading-5 text-slate-500">
+            失败后补录，或在完成后更新处理；本地原始物料会继续保留。
+          </p>
+          <div class="flex shrink-0 items-center gap-2">
+            <button @click="show = false" class="px-4 py-2 bg-white border border-gray-200 text-slate-600 rounded-lg hover:bg-gray-50 font-medium text-sm transition-colors">
+              关闭
+            </button>
+            <button
+              :disabled="!canRetry || isRetrying"
+              :title="canRetry ? '重新提交当前任务' : '任务完成或失败后可重试'"
+              class="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 font-medium text-sm transition-colors"
+              @click="selectedTask && emit('retry', selectedTask.id)"
+            >
+              <PhSpinner v-if="isRetrying" :size="15" class="animate-spin" />
+              <PhArrowClockwise v-else :size="15" />
+              {{ isRetrying ? '提交中' : '重试' }}
+            </button>
+          </div>
         </div>
       </div>
     </div>

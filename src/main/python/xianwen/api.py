@@ -462,6 +462,13 @@ class ReTranscribeRequest(BaseModel):
     )
 
 
+class TaskRetryRequest(BaseModel):
+    summary_mode: Optional[str] = Field(
+        default=None,
+        description="重试任务时指定模式: standard | agent | auto",
+    )
+
+
 class LLMProviderInfo(BaseModel):
     id: str
     label: str
@@ -2650,6 +2657,7 @@ async def re_summarize_task(task_id: str, payload: ReSummarizeRequest | None = N
             "summary_chunk_total": None,
             "summary_chunk_done": None,
             "summary_meta": None,
+            "error_message": None,
         },
     )
 
@@ -2739,7 +2747,11 @@ async def backfill_task_authors(limit: int = 50):
 
 
 @app.post("/tasks/{task_id}/re-transcribe", response_model=Task)
-async def re_transcribe_task(task_id: str, payload: ReTranscribeRequest | None = None):
+async def re_transcribe_task(
+    task_id: str,
+    request: Request,
+    payload: ReTranscribeRequest | None = None,
+):
     """
     重新转录任务（并继续触发总结流程）。
     优先复用本地媒体文件；若无本地文件且原始 URL 可用，则重新下载。
@@ -2793,13 +2805,78 @@ async def re_transcribe_task(task_id: str, payload: ReTranscribeRequest | None =
 
     downloader_w = await _resolve_worker_or_raise(get_downloader_worker, task_id=task_id)
     await update_and_notify(task_id, {"status": TaskStatus.DOWNLOADING})
-    await downloader_w.add_task({
+    downloader_payload = {
         "task_id": task_id,
         "video_url": video_url,
         "quality": "audio_only",
         "summary_mode": resolved_summary_mode,
-    })
+    }
+    credential_task = TaskCreate(
+        video_url=video_url,
+        quality="audio_only",
+        summary_mode=resolved_summary_mode,
+    )
+    _attach_connected_account_credentials(
+        request,
+        video_url,
+        downloader_payload,
+        credential_task,
+    )
+    await downloader_w.add_task(downloader_payload)
     return db.get_task(task_id)
+
+
+@app.post("/tasks/{task_id}/retry", response_model=Task)
+async def retry_task(
+    task_id: str,
+    request: Request,
+    payload: TaskRetryRequest | None = None,
+):
+    """
+    重试单个采集任务：
+    - 失败且已有逐字稿：从总结阶段继续；
+    - 失败且无逐字稿：优先复用本地原始物料重新转录；
+    - 已完成视频：复用原始物料更新逐字稿和整理稿；
+    - 已完成文章：复用已保存原文更新整理稿。
+    """
+    task = db.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    status = str(task.get("status") or "").upper()
+    retryable_statuses = {TaskStatus.FAILED.value, TaskStatus.COMPLETED.value}
+    if status not in retryable_statuses:
+        raise HTTPException(
+            status_code=409,
+            detail="任务正在处理中，完成或失败后才能重试。",
+        )
+
+    requested_mode = payload.summary_mode if payload else None
+    resolved_summary_mode = _normalize_summary_mode(
+        requested_mode,
+        fallback=str(task.get("summary_mode") or ""),
+    )
+    transcript = str(task.get("transcript") or "").strip()
+    source_type = str(task.get("source_type") or "video").strip().lower()
+    is_media_task = source_type in {"video", "local_file"}
+
+    if transcript and (status == TaskStatus.FAILED.value or not is_media_task):
+        return await re_summarize_task(
+            task_id,
+            ReSummarizeRequest(summary_mode=resolved_summary_mode),
+        )
+
+    if not is_media_task:
+        raise HTTPException(
+            status_code=400,
+            detail="该内容没有可复用的原文，暂时无法自动补录。",
+        )
+
+    return await re_transcribe_task(
+        task_id,
+        request,
+        ReTranscribeRequest(summary_mode=resolved_summary_mode),
+    )
 
 
 @app.delete("/tasks/{task_id}", status_code=204)

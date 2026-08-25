@@ -154,6 +154,7 @@ export function useTaskViewModel() {
   const quality = ref('audio_only')
   const summaryMode = ref<Exclude<SummaryMode, 'auto'>>('standard')
   const isSubmitting = ref(false)
+  const retryingTaskId = ref<string | null>(null)
   const error = ref<string | null>(null)
   const activeTab = ref<'summary' | 'transcript'>('summary')
   const isSidebarOpen = ref(false)
@@ -1024,6 +1025,7 @@ export function useTaskViewModel() {
     quality,
     summaryMode,
     isSubmitting,
+    retryingTaskId,
     error,
     activeTab,
     isSidebarOpen,
@@ -1168,6 +1170,28 @@ export function useTaskViewModel() {
         } else {
           error.value = '重新转录失败'
         }
+      }
+    },
+    retryTask: async (taskId: string) => {
+      retryingTaskId.value = taskId
+      error.value = null
+      try {
+        const response = await axios.post<Task>(`${apiBaseUrl}/tasks/${taskId}/retry`, {
+          summary_mode: summaryMode.value
+        })
+        const updatedTask = response.data
+        const index = tasks.value.findIndex(task => task.id === taskId)
+        if (index !== -1) tasks.value[index] = updatedTask
+        if (selectedTask.value?.id === taskId) {
+          selectedTask.value = { ...selectedTask.value, ...updatedTask }
+        }
+        return updatedTask
+      } catch (err) {
+        console.error('Failed to retry task:', err)
+        error.value = getAxiosErrorMessage(err, '任务重试失败')
+        throw err
+      } finally {
+        retryingTaskId.value = null
       }
     },
     updateTaskTopic: async (taskId: string, newTopic: string) => {
