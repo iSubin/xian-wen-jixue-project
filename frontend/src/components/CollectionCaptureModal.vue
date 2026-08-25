@@ -65,9 +65,10 @@ const providerLabel = (provider: string) => {
   return provider || '未知来源'
 }
 
-const sourceTypeLabel = (sourceType: string) => {
+const sourceTypeLabel = (sourceType: string, provider: string) => {
   if (sourceType === 'wechat_account_history') return '历史文章'
   if (sourceType === 'bilibili_multi_part') return '多 P 视频'
+  if (sourceType === 'xiaoet_video_list' || provider === 'xiaoetong') return '课时列表'
   if (sourceType === 'url_list') return '链接列表'
   if (sourceType === 'single_url') return '单链接'
   return sourceType || '批量采集'
@@ -171,8 +172,8 @@ watch(() => props.isOpen, (isOpen) => {
                 <PhBooks :size="22" weight="fill" />
               </div>
               <div>
-                <h2 class="text-base font-semibold text-slate-900">合集采集</h2>
-                <p class="text-xs text-slate-500">批量提交视频或文章，完成后聚合成知识文档</p>
+                <h2 class="text-base font-semibold text-slate-900">批量采集</h2>
+                <p class="text-xs text-slate-500">支持小鹅通已购课时、视频与文章链接列表</p>
               </div>
             </div>
             <button
@@ -187,12 +188,12 @@ watch(() => props.isOpen, (isOpen) => {
             <div class="grid gap-4 md:grid-cols-[1fr_260px]">
               <div class="space-y-3">
                 <label class="block">
-                  <span class="mb-1.5 block text-xs font-medium text-slate-500">粘贴合集链接 / 公众号文章 / 链接列表</span>
+                  <span class="mb-1.5 block text-xs font-medium text-slate-500">粘贴小鹅通课时 / 合集 / 文章链接</span>
                   <textarea
                     v-model="sourceInput"
                     rows="7"
                     class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm leading-6 text-slate-700 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-100"
-                    placeholder="可以粘贴 B 站多 P 链接、公众号文章链接，或一行一个可采集链接。"
+                    placeholder="小鹅通具体课时可一次粘贴多条，每行一条；也支持 B 站多 P 和公众号文章。"
                   ></textarea>
                 </label>
 
@@ -246,7 +247,7 @@ watch(() => props.isOpen, (isOpen) => {
                 <div>
                   <h3 class="text-sm font-semibold text-slate-800">{{ preview.title }}</h3>
                   <p class="text-xs text-slate-500">
-                    {{ providerLabel(preview.provider) }} · {{ sourceTypeLabel(preview.source_type) }} · 共 {{ preview.total_items }} 条
+                    {{ providerLabel(preview.provider) }} · {{ sourceTypeLabel(preview.source_type, preview.provider) }} · 共 {{ preview.total_items }} 条
                   </p>
                 </div>
                 <div class="flex items-center gap-2">
@@ -287,7 +288,7 @@ watch(() => props.isOpen, (isOpen) => {
           </div>
 
           <footer class="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
-            <p class="text-xs text-slate-500">每个条目会创建独立任务，并自动归入同一个文件夹。</p>
+            <p class="text-xs text-slate-500">每个课时或文章都会成为独立内容，并自动归入同一个文件夹。</p>
             <div class="flex items-center gap-2">
               <button
                 class="rounded-xl px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-white hover:text-slate-900"

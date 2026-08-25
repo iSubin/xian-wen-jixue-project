@@ -70,7 +70,14 @@ def resolve_xiaoet_video(video_url: str, cookie_header: str | None = None) -> Xi
 
 
 def _is_supported_xiaoet_host(host: str) -> bool:
-    return host.endswith(".h5.xiaoeknow.com") or host.endswith(".xet.citv.cn")
+    return any(
+        host.endswith(suffix)
+        for suffix in (
+            ".h5.xiaoeknow.com",
+            ".xet.citv.cn",
+            ".h5.xet.pomoho.com",
+        )
+    )
 
 
 def _extract_app_id(host: str) -> str:
@@ -78,6 +85,8 @@ def _extract_app_id(host: str) -> str:
         return host[: -len(".h5.xiaoeknow.com")]
     if host.endswith(".xet.citv.cn"):
         return host[: -len(".xet.citv.cn")]
+    if host.endswith(".h5.xet.pomoho.com"):
+        return host[: -len(".h5.xet.pomoho.com")]
     return ""
 
 

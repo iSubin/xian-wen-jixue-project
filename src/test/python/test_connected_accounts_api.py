@@ -166,7 +166,7 @@ class TestConnectedAccountsApi(unittest.TestCase):
                 headers={"X-XianWen-User-Id": "user-a"},
                 json={
                     "source_url": (
-                        "https://appexpqpqic7617.h5.xiaoeknow.com/p/course/video/v_abc"
+                        "https://appexpqpqic7617.h5.xet.pomoho.com/p/course/video/v_abc"
                         "?product_id=course_1"
                     ),
                 },
@@ -176,12 +176,12 @@ class TestConnectedAccountsApi(unittest.TestCase):
         result = response.json()
         account = result["account"]
         self.assertEqual(account["provider"], "xiaoetong")
-        self.assertEqual(account["domain_scope"], "appexpqpqic7617.h5.xiaoeknow.com")
+        self.assertEqual(account["domain_scope"], "appexpqpqic7617.h5.xet.pomoho.com")
         self.assertEqual(
             api_module.db.get_connected_account_secret("user-a", account["id"]),
             {
                 "cookie_header": "xiaoet_session=browser-cookie",
-                "host_scope": "appexpqpqic7617.h5.xiaoeknow.com",
+                "host_scope": "appexpqpqic7617.h5.xet.pomoho.com",
             },
         )
 
@@ -318,7 +318,7 @@ class TestConnectedAccountsApi(unittest.TestCase):
                 "credential_type": "cookie_header",
                 "payload": {"cookie_header": "xiaoet_session=user-a-cookie"},
                 "display_name": "小鹅通",
-                "domain_scope": "appexpqpqic7617.h5.xiaoeknow.com",
+                "domain_scope": "appexpqpqic7617.h5.xet.pomoho.com",
             },
         )
 
@@ -330,7 +330,7 @@ class TestConnectedAccountsApi(unittest.TestCase):
                 headers={"X-XianWen-User-Id": "user-a"},
                 json={
                     "video_url": (
-                        "https://appexpqpqic7617.h5.xiaoeknow.com/p/course/video/v_abc"
+                        "https://appexpqpqic7617.h5.xet.pomoho.com/p/course/video/v_abc"
                         "?product_id=course_1"
                     ),
                     "quality": "best",

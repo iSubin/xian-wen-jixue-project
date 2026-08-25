@@ -15,6 +15,7 @@ const props = defineProps<{
   documents: Task[]
   selectedTask: Task | null
   depth: number
+  searchActive: boolean
 }>()
 
 const emit = defineEmits<{
@@ -22,7 +23,8 @@ const emit = defineEmits<{
   edit: [task: Task]
 }>()
 
-const expanded = ref(true)
+const expanded = ref(props.depth < 3)
+const isOpen = computed(() => expanded.value || props.searchActive)
 const directDocuments = computed(() =>
   props.documents
     .filter(document => document.folder_id === props.node.id)
@@ -55,13 +57,13 @@ const displayDocumentTitle = (document: Task) => {
       :style="{ paddingLeft: `${8 + depth * 15}px` }"
       @click="expanded = !expanded"
     >
-      <component :is="expanded ? PhCaretDown : PhCaretRight" :size="12" class="caret" />
-      <component :is="expanded ? PhFolderNotchOpen : PhFolderNotch" :size="17" weight="duotone" class="folder-icon" />
+      <component :is="isOpen ? PhCaretDown : PhCaretRight" :size="12" class="caret" />
+      <component :is="isOpen ? PhFolderNotchOpen : PhFolderNotch" :size="17" weight="duotone" class="folder-icon" />
       <span class="folder-name">{{ node.name }}</span>
       <span class="folder-count">{{ documentCount }}</span>
     </button>
 
-    <div v-if="expanded" class="folder-children">
+    <div v-if="isOpen" class="folder-children">
       <div
         v-for="document in directDocuments"
         :key="document.id"
@@ -87,6 +89,7 @@ const displayDocumentTitle = (document: Task) => {
         :documents="documents"
         :selectedTask="selectedTask"
         :depth="depth + 1"
+        :searchActive="searchActive"
         @select="emit('select', $event)"
         @edit="emit('edit', $event)"
       />

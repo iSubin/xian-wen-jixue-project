@@ -380,6 +380,28 @@ export type SettingsModalTab = 'llm' | 'transcription' | 'accounts' | 'summariza
 
 export type ContentSubscriptionStatus = 'ACTIVE' | 'PAUSED' | 'AUTH_REQUIRED' | 'DEGRADED' | 'ERROR';
 export type ContentSubscriptionInitialSyncMode = 'from_now' | 'today' | 'last_7_days';
+export type SubscriptionBackfillStatus = 'QUEUED' | 'RUNNING' | 'PAUSED' | 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
+
+export interface SubscriptionBackfill {
+  id: string;
+  subscription_id: string;
+  start_date: string;
+  end_date: string;
+  status: SubscriptionBackfillStatus;
+  cursor?: string | null;
+  processed_pages: number;
+  discovered_count: number;
+  captured_count: number;
+  updated_count: number;
+  locked_count: number;
+  failed_count: number;
+  coverage_start_date?: string | null;
+  coverage_end_date?: string | null;
+  source_exhausted_before_start?: boolean;
+  last_error?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+}
 
 export interface ContentSubscriptionPreview {
   provider: 'homeway';
@@ -423,6 +445,7 @@ export interface ContentSubscription {
   today_item_count: number;
   locked_item_count: number;
   captured_item_count: number;
+  latest_backfill?: SubscriptionBackfill | null;
   created_at?: string | null;
   updated_at?: string | null;
 }

@@ -53,7 +53,7 @@ const providerMeta: Record<string, {
     secretKey: 'cookie_header',
     placeholder: '粘贴小鹅通 Cookie Header',
     domainLabel: '视频链接或店铺域名',
-    domainPlaceholder: '粘贴小鹅通视频链接或 appexpqpqic7617.h5.xiaoeknow.com',
+    domainPlaceholder: '粘贴小鹅通视频链接，支持 xiaoeknow.com / xet.pomoho.com',
     browserHint: '先粘贴小鹅通视频链接或店铺域名，再读取浏览器登录态。',
   },
   homeway: {

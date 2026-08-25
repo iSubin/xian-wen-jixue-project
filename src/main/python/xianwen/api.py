@@ -11,8 +11,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, HttpUrl
 from typing import Any, Dict, List, Optional
 import uuid
-from datetime import datetime
+from datetime import date, datetime, time
 from urllib.parse import unquote, urlparse
+from zoneinfo import ZoneInfo
 from .db import db, TaskStatus
 from .utils.logger import logger
 from .config.settings import config, get_config_manager
@@ -136,7 +137,21 @@ def _normalize_import_host(source: str | None) -> str:
 
 
 def _is_supported_xiaoet_host(host: str) -> bool:
-    return host.endswith(".h5.xiaoeknow.com") or host.endswith(".xet.citv.cn")
+    return any(
+        host.endswith(suffix)
+        for suffix in (
+            ".h5.xiaoeknow.com",
+            ".xet.citv.cn",
+            ".h5.xet.pomoho.com",
+        )
+    )
+
+
+def _is_xiaoet_source_url(source_url: str) -> bool:
+    try:
+        return _is_supported_xiaoet_host((urlparse(str(source_url or "")).hostname or "").lower())
+    except Exception:
+        return False
 
 
 def _find_connected_account_secret(
@@ -344,6 +359,11 @@ class ContentSubscriptionUpdateRequest(BaseModel):
 class SubscriptionPollRequest(BaseModel):
     reconciliation: bool = False
     build_digest: bool = True
+
+
+class SubscriptionBackfillCreateRequest(BaseModel):
+    start_date: date
+    end_date: Optional[date] = None
 
 
 class LibraryDocumentView(BaseModel):
@@ -711,6 +731,7 @@ def _mark_and_schedule_git_library(user_id: str = DEFAULT_LOCAL_USER_ID) -> None
 _subscription_poll_locks: Dict[str, asyncio.Lock] = {}
 _subscription_scheduler_task: asyncio.Task | None = None
 _subscription_scheduler_owner = f"{os.getpid()}-{uuid.uuid4().hex[:10]}"
+_subscription_backfill_tasks: Dict[str, asyncio.Task] = {}
 
 
 def get_subscription_service() -> SubscriptionService:
@@ -749,6 +770,10 @@ async def _run_subscription_poll(
     trigger: str,
     reconciliation: bool,
     build_digest: bool,
+    backfill_from: datetime | None = None,
+    backfill_to: datetime | None = None,
+    start_cursor: str | None = None,
+    page_limit: int = 50,
 ) -> Dict[str, Any]:
     lock = _subscription_poll_locks.setdefault(subscription_id, asyncio.Lock())
     async with lock:
@@ -763,6 +788,10 @@ async def _run_subscription_poll(
                 trigger=trigger,
                 reconciliation=reconciliation,
                 build_digest=build_digest,
+                backfill_from=backfill_from,
+                backfill_to=backfill_to,
+                start_cursor=start_cursor,
+                page_limit=page_limit,
             )
         except Exception:
             await _broadcast_subscription_update(user_id, subscription_id)
@@ -771,6 +800,150 @@ async def _run_subscription_poll(
             await notify_task_update(str(task_id))
         await _broadcast_subscription_update(user_id, subscription_id, result=result)
         return result
+
+
+def _backfill_datetime_bounds(
+    subscription: Dict[str, Any],
+    job: Dict[str, Any],
+) -> tuple[datetime, datetime]:
+    timezone_value = ZoneInfo(str(subscription.get("timezone") or "Asia/Shanghai"))
+    start = datetime.combine(date.fromisoformat(str(job["start_date"])), time.min, timezone_value)
+    end = datetime.combine(date.fromisoformat(str(job["end_date"])), time.max, timezone_value)
+    return start, end
+
+
+async def _drain_subscription_backfill(job_id: str, user_id: str) -> None:
+    try:
+        while True:
+            job = await asyncio.to_thread(db.get_subscription_backfill, job_id)
+            if not job or str(job.get("status")) not in {"QUEUED", "RUNNING"}:
+                return
+            subscription = await asyncio.to_thread(
+                db.get_content_subscription,
+                str(job["subscription_id"]),
+                user_id=user_id,
+            )
+            if not subscription:
+                await asyncio.to_thread(
+                    db.update_subscription_backfill,
+                    job_id,
+                    {
+                        "status": "FAILED",
+                        "last_error": "订阅不存在或已取消",
+                        "finished_at": datetime.utcnow(),
+                    },
+                )
+                return
+
+            running_updates: Dict[str, Any] = {"status": "RUNNING", "last_error": None}
+            if not job.get("started_at"):
+                running_updates["started_at"] = datetime.utcnow()
+            await asyncio.to_thread(
+                db.update_subscription_backfill,
+                job_id,
+                running_updates,
+            )
+            backfill_from, backfill_to = _backfill_datetime_bounds(subscription, job)
+            result = await _run_subscription_poll(
+                user_id,
+                str(subscription["id"]),
+                trigger="backfill",
+                reconciliation=False,
+                build_digest=True,
+                backfill_from=backfill_from,
+                backfill_to=backfill_to,
+                start_cursor=str(job.get("cursor") or "") or None,
+                page_limit=1,
+            )
+            counts = await asyncio.to_thread(
+                db.subscription_item_counts_between,
+                str(subscription["id"]),
+                str(job["start_date"]),
+                str(job["end_date"]),
+            )
+            run = result.get("run") or {}
+            latest_job = await asyncio.to_thread(db.get_subscription_backfill, job_id) or job
+            externally_stopped = str(latest_job.get("status")) in {"PAUSED", "CANCELLED"}
+            updates: Dict[str, Any] = {
+                **counts,
+                "processed_pages": int(job.get("processed_pages") or 0)
+                + int(result.get("pages_processed") or 0),
+                "updated_count": int(job.get("updated_count") or 0)
+                + int(run.get("updated_count") or 0),
+                "last_run_id": run.get("id"),
+                "cursor": result.get("next_cursor"),
+            }
+            if externally_stopped:
+                updates["status"] = str(latest_job["status"])
+            elif result.get("scan_complete"):
+                updates.update(
+                    {
+                        "status": "PARTIAL" if counts.get("failed_count") else "SUCCESS",
+                        "cursor": None,
+                        "finished_at": datetime.utcnow(),
+                    }
+                )
+            else:
+                updates["status"] = "QUEUED"
+            await asyncio.to_thread(db.update_subscription_backfill, job_id, updates)
+            await _broadcast_subscription_update(user_id, str(subscription["id"]), result=result)
+            if externally_stopped:
+                return
+            if result.get("scan_complete"):
+                _mark_and_schedule_git_library(user_id)
+                return
+            await asyncio.sleep(0)
+    except asyncio.CancelledError:
+        job = await asyncio.to_thread(db.get_subscription_backfill, job_id)
+        if job and str(job.get("status")) == "RUNNING":
+            await asyncio.to_thread(
+                db.update_subscription_backfill,
+                job_id,
+                {"status": "QUEUED"},
+            )
+        raise
+    except Exception as exc:
+        job = await asyncio.to_thread(db.get_subscription_backfill, job_id)
+        if job and str(job.get("status")) not in {"PAUSED", "CANCELLED"}:
+            await asyncio.to_thread(
+                db.update_subscription_backfill,
+                job_id,
+                {
+                    "status": "FAILED",
+                    "last_error": SubscriptionService._safe_error(exc),
+                    "finished_at": datetime.utcnow(),
+                },
+            )
+            await _broadcast_subscription_update(user_id, str(job["subscription_id"]))
+        logger.warning(
+            f"[SubscriptionBackfill] 历史补采失败: job={job_id}, "
+            f"detail={SubscriptionService._safe_error(exc)}"
+        )
+    finally:
+        _subscription_backfill_tasks.pop(job_id, None)
+
+
+def _schedule_subscription_backfill(job_id: str, user_id: str) -> None:
+    task = _subscription_backfill_tasks.get(job_id)
+    if task is None or task.done():
+        _subscription_backfill_tasks[job_id] = asyncio.create_task(
+            _drain_subscription_backfill(job_id, user_id)
+        )
+
+
+async def _resume_subscription_backfills_once() -> int:
+    jobs = await asyncio.to_thread(db.list_runnable_subscription_backfills, limit=5)
+    scheduled = 0
+    for job in jobs:
+        subscription = await asyncio.to_thread(
+            db.get_content_subscription,
+            str(job["subscription_id"]),
+        )
+        if not subscription:
+            continue
+        _schedule_subscription_backfill(str(job["id"]), str(subscription["user_id"]))
+        scheduled += 1
+    return scheduled
 
 
 async def _run_due_subscriptions_once() -> int:
@@ -813,6 +986,7 @@ async def _run_due_subscriptions_once() -> int:
 async def _subscription_scheduler_loop() -> None:
     while True:
         try:
+            await _resume_subscription_backfills_once()
             await _run_due_subscriptions_once()
         except asyncio.CancelledError:
             raise
@@ -837,13 +1011,18 @@ async def stop_subscription_scheduler() -> None:
     global _subscription_scheduler_task
     task = _subscription_scheduler_task
     _subscription_scheduler_task = None
-    if not task:
-        return
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
+    if task:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+    backfill_tasks = list(_subscription_backfill_tasks.values())
+    for backfill_task in backfill_tasks:
+        backfill_task.cancel()
+    if backfill_tasks:
+        await asyncio.gather(*backfill_tasks, return_exceptions=True)
+    _subscription_backfill_tasks.clear()
     logger.info("[SubscriptionScheduler] 内容订阅调度器已停止")
 
 
@@ -1970,6 +2149,18 @@ def _build_url_list_collection_preview(source: str, title: str | None = None) ->
     if not urls:
         raise HTTPException(status_code=400, detail="未找到可用的链接")
 
+    unsupported_xiaoet_urls = [
+        url for url in urls if _is_xiaoet_source_url(url) and not is_xiaoet_video_url(url)
+    ]
+    if unsupported_xiaoet_urls:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "检测到小鹅通课程或专栏主页，但当前链接未包含具体课时信息。"
+                "请先粘贴具体视频课时链接（可一次粘贴多条）；课程主页自动展开需要该课程的实际链接样本。"
+            ),
+        )
+
     provider = _guess_collection_provider(urls)
     items = []
     for index, url in enumerate(urls):
@@ -1986,10 +2177,12 @@ def _build_url_list_collection_preview(source: str, title: str | None = None) ->
     default_title = f"合集任务（{len(items)} 个视频）"
     if provider == "wechat":
         default_title = f"公众号文章合集（{len(items)} 篇）"
+    elif provider == "xiaoetong":
+        default_title = f"小鹅通课程合集（{len(items)} 节）"
 
     return {
         "provider": provider,
-        "source_type": "url_list",
+        "source_type": "xiaoet_video_list" if provider == "xiaoetong" else "url_list",
         "source_url": urls[0] if len(urls) == 1 else None,
         "title": (title or default_title).strip(),
         "total_items": len(items),
@@ -3194,7 +3387,10 @@ async def import_connected_account_from_browser(
         if not host or not _is_supported_xiaoet_host(host):
             raise HTTPException(
                 status_code=400,
-                detail="请先填写小鹅通视频链接或店铺域名，例如 appexpqpqic7617.h5.xiaoeknow.com。",
+                detail=(
+                    "请先填写小鹅通视频链接或店铺域名，例如 "
+                    "appexpqpqic7617.h5.xiaoeknow.com 或 appexpqpqic7617.h5.xet.pomoho.com。"
+                ),
             )
 
         cookie_header, source_browser = _read_xiaoet_cookie_from_browser_cookie3(host)
@@ -3406,6 +3602,123 @@ async def list_content_subscription_runs(subscription_id: str, request: Request,
     if not db.get_content_subscription(subscription_id, user_id=_current_user_id(request)):
         raise HTTPException(status_code=404, detail="订阅不存在")
     return db.list_subscription_runs(subscription_id, limit=limit)
+
+
+def _owned_subscription_backfill(
+    subscription_id: str,
+    job_id: str,
+    user_id: str,
+) -> tuple[Dict[str, Any], Dict[str, Any]]:
+    subscription = db.get_content_subscription(subscription_id, user_id=user_id)
+    if not subscription:
+        raise HTTPException(status_code=404, detail="订阅不存在")
+    job = db.get_subscription_backfill(job_id)
+    if not job or str(job.get("subscription_id")) != subscription_id:
+        raise HTTPException(status_code=404, detail="历史补采任务不存在")
+    return subscription, job
+
+
+@app.post("/subscriptions/{subscription_id}/backfills", status_code=202)
+async def create_content_subscription_backfill(
+    subscription_id: str,
+    payload: SubscriptionBackfillCreateRequest,
+    request: Request,
+):
+    user_id = _current_user_id(request)
+    subscription = db.get_content_subscription(subscription_id, user_id=user_id)
+    if not subscription:
+        raise HTTPException(status_code=404, detail="订阅不存在")
+    timezone_value = ZoneInfo(str(subscription.get("timezone") or "Asia/Shanghai"))
+    end_date = payload.end_date or datetime.now(timezone_value).date()
+    today = datetime.now(timezone_value).date()
+    if payload.start_date > end_date:
+        raise HTTPException(status_code=400, detail="开始日期不能晚于结束日期")
+    if end_date > today:
+        raise HTTPException(status_code=400, detail="结束日期不能晚于今天")
+    job = await asyncio.to_thread(
+        db.create_subscription_backfill,
+        subscription_id,
+        payload.start_date.isoformat(),
+        end_date.isoformat(),
+    )
+    _schedule_subscription_backfill(str(job["id"]), user_id)
+    await _broadcast_subscription_update(user_id, subscription_id)
+    return job
+
+
+@app.get("/subscriptions/{subscription_id}/backfills")
+async def list_content_subscription_backfills(
+    subscription_id: str,
+    request: Request,
+    limit: int = 20,
+):
+    if not db.get_content_subscription(subscription_id, user_id=_current_user_id(request)):
+        raise HTTPException(status_code=404, detail="订阅不存在")
+    jobs = await asyncio.to_thread(
+        db.list_subscription_backfills,
+        subscription_id,
+        limit=limit,
+    )
+    service = get_subscription_service()
+    return [service.backfill_view(job) for job in jobs]
+
+
+@app.post("/subscriptions/{subscription_id}/backfills/{job_id}/pause")
+async def pause_content_subscription_backfill(
+    subscription_id: str,
+    job_id: str,
+    request: Request,
+):
+    user_id = _current_user_id(request)
+    _, job = _owned_subscription_backfill(subscription_id, job_id, user_id)
+    if str(job.get("status")) not in {"QUEUED", "RUNNING"}:
+        raise HTTPException(status_code=409, detail="当前补采任务不能暂停")
+    updated = await asyncio.to_thread(
+        db.update_subscription_backfill,
+        job_id,
+        {"status": "PAUSED"},
+    )
+    await _broadcast_subscription_update(user_id, subscription_id)
+    return updated
+
+
+@app.post("/subscriptions/{subscription_id}/backfills/{job_id}/resume")
+async def resume_content_subscription_backfill(
+    subscription_id: str,
+    job_id: str,
+    request: Request,
+):
+    user_id = _current_user_id(request)
+    _, job = _owned_subscription_backfill(subscription_id, job_id, user_id)
+    if str(job.get("status")) not in {"PAUSED", "FAILED"}:
+        raise HTTPException(status_code=409, detail="当前补采任务不能继续")
+    updated = await asyncio.to_thread(
+        db.update_subscription_backfill,
+        job_id,
+        {"status": "QUEUED", "last_error": None, "finished_at": None},
+    )
+    _schedule_subscription_backfill(job_id, user_id)
+    await _broadcast_subscription_update(user_id, subscription_id)
+    return updated
+
+
+@app.post("/subscriptions/{subscription_id}/backfills/{job_id}/cancel")
+async def cancel_content_subscription_backfill(
+    subscription_id: str,
+    job_id: str,
+    request: Request,
+):
+    user_id = _current_user_id(request)
+    _, job = _owned_subscription_backfill(subscription_id, job_id, user_id)
+    if str(job.get("status")) not in {"QUEUED", "RUNNING", "PAUSED"}:
+        raise HTTPException(status_code=409, detail="当前补采任务不能取消")
+    updated = await asyncio.to_thread(
+        db.update_subscription_backfill,
+        job_id,
+        {"status": "CANCELLED", "finished_at": datetime.utcnow()},
+    )
+    await _broadcast_subscription_update(user_id, subscription_id)
+    return updated
 
 
 @app.post("/bilibili/video-info", response_model=BilibiliVideoInfo)

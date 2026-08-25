@@ -179,12 +179,12 @@ class SubscriptionServiceTest(unittest.TestCase):
         self.assertIn("公开正文", task["transcript"])
         self.assertNotIn("需要会员的内容", task["transcript"])
         date_folder = self.store.get_folder(task["folder_id"])
-        self.assertEqual(date_folder["name"], "2026-08-14")
-        self.assertEqual(date_folder["parent_id"], subscription["folder_id"])
-        self.assertEqual(
-            [folder["name"] for folder in self.store.list_folders()],
-            ["2026-08-14", "订阅", "投研大师", "枪大侠"],
-        )
+        month_folder = self.store.get_folder(date_folder["parent_id"])
+        year_folder = self.store.get_folder(month_folder["parent_id"])
+        self.assertEqual(date_folder["name"], "14日")
+        self.assertEqual(month_folder["name"], "08月")
+        self.assertEqual(year_folder["name"], "2026")
+        self.assertEqual(year_folder["parent_id"], subscription["folder_id"])
 
         generated, document_count = build_library_files(self.store, project_root=self.root)
         content_dir = "内容/2026-08-14 09-20｜【短线】公开市场观察"
@@ -198,7 +198,7 @@ class SubscriptionServiceTest(unittest.TestCase):
         self.assertNotIn("/task-assets/", main)
         self.assertNotIn("assets/homeway/public-1/image_01.png", main)
         self.assertNotIn(str(self.root), main)
-        daily_index = "藏经阁/订阅/投研大师/枪大侠/2026-08-14/_目录.md"
+        daily_index = "藏经阁/订阅/投研大师/枪大侠/2026/08月/14日/_目录.md"
         self.assertIn(daily_index, generated)
         self.assertIn("公开市场观察", generated[daily_index].content.decode("utf-8"))
 
@@ -465,6 +465,98 @@ class SubscriptionServiceTest(unittest.TestCase):
         self.store.release_content_subscription_lease(subscription["id"], "owner-a")
         third = self.store.claim_due_content_subscriptions("owner-b", now_naive)
         self.assertEqual([item["id"] for item in third], [subscription["id"]])
+
+    def test_backfill_resumes_from_cursor_and_stops_at_requested_start_date(self):
+        subscription = self.create_subscription()
+
+        def item(day):
+            published_at_text = f"2026-08-{day:02d} 09:00:00"
+            return HomewayListItem(
+                external_item_id=f"history-{day}",
+                lecturer_id="1669029704",
+                lecturer_name="枪大侠",
+                published_at=parse_homeway_datetime(published_at_text),
+                published_at_text=published_at_text,
+                preview_text=f"{day} 日历史内容",
+                image_urls=[],
+                is_charge=False,
+            )
+
+        pages = {
+            None: [item(14)],
+            "2026-08-14 09:00:00": [item(13), item(1)],
+        }
+
+        class BackfillAdapter(FakeHomewayAdapter):
+            def __init__(adapter_self):
+                adapter_self.cursors = []
+
+            def list_items(adapter_self, lecturer_id, *, cursor=None, token=None):
+                adapter_self.cursors.append(cursor)
+                return pages.get(cursor, [])
+
+            def capture_item(adapter_self, list_item, *, token=None):
+                return HomewayCapturedItem(
+                    external_item_id=list_item.external_item_id,
+                    capture_status="CAPTURED",
+                    access_scope="public",
+                    raw_html=f"<p>{list_item.preview_text}</p>",
+                    source_meta={"published_at_source": list_item.published_at_text},
+                )
+
+        adapter = BackfillAdapter()
+        self.service.adapter_factory = lambda: adapter
+        first = self.service.poll_subscription(
+            subscription["id"],
+            trigger="backfill",
+            build_digest=True,
+            backfill_from=datetime(2026, 8, 2, tzinfo=timezone.utc),
+            backfill_to=datetime(2026, 8, 14, 23, 59, tzinfo=timezone.utc),
+            page_limit=1,
+        )
+        self.assertFalse(first["scan_complete"])
+        self.assertEqual(first["next_cursor"], "2026-08-14 09:00:00")
+
+        second = self.service.poll_subscription(
+            subscription["id"],
+            trigger="backfill",
+            build_digest=True,
+            backfill_from=datetime(2026, 8, 2, tzinfo=timezone.utc),
+            backfill_to=datetime(2026, 8, 14, 23, 59, tzinfo=timezone.utc),
+            start_cursor=first["next_cursor"],
+            page_limit=1,
+        )
+        self.assertTrue(second["scan_complete"])
+        self.assertIsNone(second["next_cursor"])
+        self.assertEqual(adapter.cursors, [None, "2026-08-14 09:00:00"])
+        self.assertEqual(
+            {entry["external_item_id"] for entry in self.store.list_subscription_items(subscription["id"])},
+            {"history-13", "history-14"},
+        )
+        coverage = self.service.backfill_view(
+            {
+                "id": "history-job",
+                "subscription_id": subscription["id"],
+                "start_date": "2026-01-01",
+                "end_date": "2026-08-14",
+                "status": "SUCCESS",
+            }
+        )
+        self.assertEqual(coverage["coverage_start_date"], "2026-08-13")
+        self.assertEqual(coverage["coverage_end_date"], "2026-08-14")
+        self.assertTrue(coverage["source_exhausted_before_start"])
+
+    def test_backfill_job_state_is_durable_and_only_one_active_job_is_created(self):
+        subscription = self.create_subscription()
+        first = self.store.create_subscription_backfill(subscription["id"], "2026-01-01", "2026-08-14")
+        duplicate = self.store.create_subscription_backfill(subscription["id"], "2025-01-01", "2025-12-31")
+        self.assertEqual(first["id"], duplicate["id"])
+        updated = self.store.update_subscription_backfill(
+            first["id"],
+            {"status": "PAUSED", "cursor": "2026-07-01 00:00:00", "processed_pages": 3},
+        )
+        self.assertEqual(updated["status"], "PAUSED")
+        self.assertEqual(self.store.latest_subscription_backfill(subscription["id"])["processed_pages"], 3)
 
     def test_cancel_stops_future_runs_but_preserves_content(self):
         subscription = self.create_subscription()

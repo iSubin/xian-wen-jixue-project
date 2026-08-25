@@ -23,6 +23,7 @@ export function useSubscriptions() {
   const isPreviewing = ref(false)
   const isCreating = ref(false)
   const activePollingId = ref('')
+  const activeBackfillId = ref('')
   const error = ref('')
 
   const fetchSubscriptions = async () => {
@@ -115,6 +116,46 @@ export function useSubscriptions() {
     }
   }
 
+  const createBackfill = async (subscriptionId: string, startDate: string, endDate: string) => {
+    activeBackfillId.value = subscriptionId
+    error.value = ''
+    try {
+      const response = await axios.post(`${apiBaseUrl}/subscriptions/${subscriptionId}/backfills`, {
+        start_date: startDate,
+        end_date: endDate,
+      })
+      await fetchSubscriptions()
+      return response.data
+    } catch (err) {
+      error.value = errorMessage(err, '创建历史补采失败')
+      return null
+    } finally {
+      activeBackfillId.value = ''
+    }
+  }
+
+  const updateBackfill = async (
+    subscriptionId: string,
+    jobId: string,
+    action: 'pause' | 'resume' | 'cancel',
+  ) => {
+    activeBackfillId.value = subscriptionId
+    error.value = ''
+    try {
+      const response = await axios.post(
+        `${apiBaseUrl}/subscriptions/${subscriptionId}/backfills/${jobId}/${action}`,
+      )
+      await fetchSubscriptions()
+      return response.data
+    } catch (err) {
+      const labels = { pause: '暂停', resume: '继续', cancel: '取消' }
+      error.value = errorMessage(err, `${labels[action]}历史补采失败`)
+      return null
+    } finally {
+      activeBackfillId.value = ''
+    }
+  }
+
   const clearPreview = () => {
     preview.value = null
     error.value = ''
@@ -139,6 +180,7 @@ export function useSubscriptions() {
     isPreviewing,
     isCreating,
     activePollingId,
+    activeBackfillId,
     error,
     fetchSubscriptions,
     previewSubscription,
@@ -146,6 +188,8 @@ export function useSubscriptions() {
     pollSubscription,
     setSubscriptionStatus,
     deleteSubscription,
+    createBackfill,
+    updateBackfill,
     clearPreview,
   }
 }

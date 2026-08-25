@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import {
+  PhBooks,
   PhCheckCircle,
   PhClock,
   PhLink,
@@ -26,6 +27,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   changed: []
   openSettings: [tab: SettingsModalTab]
+  openCollectionCapture: []
 }>()
 
 const {
@@ -35,12 +37,15 @@ const {
   isPreviewing,
   isCreating,
   activePollingId,
+  activeBackfillId,
   error,
   previewSubscription,
   createSubscription,
   pollSubscription,
   setSubscriptionStatus,
   deleteSubscription,
+  createBackfill,
+  updateBackfill,
   clearPreview,
 } = useSubscriptions()
 
@@ -49,11 +54,21 @@ const isInitialSyncing = ref(false)
 const sourceUrl = ref('')
 const initialSyncMode = ref<ContentSubscriptionInitialSyncMode>('from_now')
 const digestTime = ref('20:30')
+const localToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date())
+const backfillFormId = ref('')
+const backfillStartDate = ref(`${localToday.slice(0, 4)}-01-01`)
+const backfillEndDate = ref(localToday)
 
 const homewayAccount = computed(() =>
   [...props.connectedAccounts]
     .reverse()
     .find(account => account.provider === 'homeway' && account.credential_type === 'web_qtstr') || null,
+)
+
+const xiaoetAccount = computed(() =>
+  [...props.connectedAccounts]
+    .reverse()
+    .find(account => account.provider === 'xiaoetong' && account.credential_type === 'cookie_header') || null,
 )
 
 const statusInfo = (subscription: ContentSubscription) => {
@@ -123,6 +138,38 @@ const removeSubscription = async (subscription: ContentSubscription) => {
   if (!window.confirm(`取消订阅“${subscription.display_name}”？历史内容和 Git 文库不会删除。`)) return
   if (await deleteSubscription(subscription.id)) emit('changed')
 }
+
+const backfillStatusLabel = (status?: string) => ({
+  QUEUED: '等待补采',
+  RUNNING: '正在补采',
+  PAUSED: '补采已暂停',
+  SUCCESS: '补采完成',
+  PARTIAL: '补采部分完成',
+  FAILED: '补采失败',
+  CANCELLED: '补采已取消',
+}[status || ''] || status || '')
+
+const openBackfill = (subscription: ContentSubscription) => {
+  backfillFormId.value = backfillFormId.value === subscription.id ? '' : subscription.id
+}
+
+const handleCreateBackfill = async (subscription: ContentSubscription) => {
+  if (!backfillStartDate.value || !backfillEndDate.value) return
+  if (await createBackfill(subscription.id, backfillStartDate.value, backfillEndDate.value)) {
+    backfillFormId.value = ''
+    emit('changed')
+  }
+}
+
+const handleBackfillAction = async (
+  subscription: ContentSubscription,
+  action: 'pause' | 'resume' | 'cancel',
+) => {
+  const job = subscription.latest_backfill
+  if (!job) return
+  if (action === 'cancel' && !window.confirm('取消这次历史补采？已经采集的帖子会保留。')) return
+  if (await updateBackfill(subscription.id, job.id, action)) emit('changed')
+}
 </script>
 
 <template>
@@ -130,8 +177,8 @@ const removeSubscription = async (subscription: ContentSubscription) => {
     <div class="px-4 py-3 border-b border-slate-100 bg-white">
       <div class="flex items-center justify-between gap-3">
         <div>
-          <h2 class="text-sm font-semibold text-slate-800">内容订阅</h2>
-          <p class="mt-0.5 text-[11px] text-slate-400">持续来源，按日期归档每一篇独立帖子</p>
+          <h2 class="text-sm font-semibold text-slate-800">内容来源</h2>
+          <p class="mt-0.5 text-[11px] text-slate-400">持续订阅与批量采集，统一进入藏经阁</p>
         </div>
         <button
           type="button"
@@ -150,6 +197,41 @@ const removeSubscription = async (subscription: ContentSubscription) => {
         v-if="isAdding"
         class="rounded-2xl border border-blue-100 bg-white p-3 shadow-sm space-y-3"
       >
+        <div class="rounded-xl border border-violet-100 bg-violet-50/70 p-3">
+          <div class="flex items-start gap-2.5">
+            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-violet-600 shadow-sm">
+              <PhBooks :size="17" weight="fill" />
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="text-xs font-semibold text-slate-800">小鹅通批量采集</p>
+              <p class="mt-1 text-[11px] leading-5 text-slate-500">粘贴一条或多条已购课时链接；每个课时独立采集，并归入同一个文件夹。</p>
+              <p v-if="xiaoetAccount" class="mt-1 text-[10px] text-emerald-600">
+                已连接 {{ xiaoetAccount.display_name || '小鹅通账号' }}
+              </p>
+              <p v-else class="mt-1 text-[10px] text-amber-600">采集登录后内容前，请先连接小鹅通账号。</p>
+            </div>
+          </div>
+          <div class="mt-2.5 flex gap-2">
+            <button
+              type="button"
+              class="flex-1 rounded-lg bg-violet-600 py-2 text-[11px] font-semibold text-white transition hover:bg-violet-700"
+              @click="emit('openCollectionCapture')"
+            >批量采集小鹅通</button>
+            <button
+              v-if="!xiaoetAccount"
+              type="button"
+              class="rounded-lg border border-violet-200 bg-white px-2.5 py-2 text-[11px] font-semibold text-violet-700"
+              @click="emit('openSettings', 'accounts')"
+            >连接账号</button>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 text-[10px] font-semibold text-slate-400">
+          <span class="h-px flex-1 bg-slate-100"></span>
+          持续订阅：投研大师作者
+          <span class="h-px flex-1 bg-slate-100"></span>
+        </div>
+
         <div>
           <label class="text-[11px] font-semibold text-slate-500">讲师主页</label>
           <div class="relative mt-1.5">
@@ -256,8 +338,8 @@ const removeSubscription = async (subscription: ContentSubscription) => {
         class="rounded-2xl border border-dashed border-slate-200 bg-white px-5 py-12 text-center"
       >
         <PhClock :size="28" class="mx-auto text-slate-300" />
-        <p class="mt-3 text-sm font-semibold text-slate-600">还没有内容订阅</p>
-        <p class="mt-1 text-xs leading-5 text-slate-400">添加持续更新的作者主页，先闻继学会按日期整理每一篇独立帖子。</p>
+        <p class="mt-3 text-sm font-semibold text-slate-600">还没有内容来源</p>
+        <p class="mt-1 text-xs leading-5 text-slate-400">可以订阅持续更新的作者，也可以批量采集小鹅通课时。</p>
       </div>
 
       <article
@@ -310,7 +392,77 @@ const removeSubscription = async (subscription: ContentSubscription) => {
           {{ subscription.last_error }}
         </p>
 
-        <div class="mt-3 flex items-center gap-2">
+        <div
+          v-if="subscription.latest_backfill"
+          class="mt-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 text-[11px]"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-semibold text-slate-700">{{ backfillStatusLabel(subscription.latest_backfill.status) }}</span>
+            <span class="text-slate-400">{{ subscription.latest_backfill.start_date }} 至 {{ subscription.latest_backfill.end_date }}</span>
+          </div>
+          <div class="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-slate-500">
+            <span>{{ subscription.latest_backfill.processed_pages }} 页</span>
+            <span>{{ subscription.latest_backfill.discovered_count }} 条发现</span>
+            <span>{{ subscription.latest_backfill.captured_count }} 条已采集</span>
+            <span v-if="subscription.latest_backfill.locked_count" class="text-amber-600">{{ subscription.latest_backfill.locked_count }} 条受限</span>
+          </div>
+          <p
+            v-if="subscription.latest_backfill.source_exhausted_before_start"
+            class="mt-1.5 rounded-lg bg-amber-50 px-2 py-1.5 text-amber-700"
+          >
+            来源当前可见内容始于 {{ subscription.latest_backfill.coverage_start_date || '该范围之后' }}，已扫描到来源边界。
+          </p>
+          <p v-if="subscription.latest_backfill.last_error" class="mt-1.5 text-red-600">
+            {{ subscription.latest_backfill.last_error }}
+          </p>
+          <div
+            v-if="['QUEUED', 'RUNNING', 'PAUSED', 'FAILED'].includes(subscription.latest_backfill.status)"
+            class="mt-2 flex gap-2"
+          >
+            <button
+              v-if="['QUEUED', 'RUNNING'].includes(subscription.latest_backfill.status)"
+              type="button"
+              class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-600"
+              :disabled="activeBackfillId === subscription.id"
+              @click="handleBackfillAction(subscription, 'pause')"
+            >暂停补采</button>
+            <button
+              v-else
+              type="button"
+              class="rounded-lg border border-blue-100 bg-white px-2.5 py-1.5 font-semibold text-blue-700"
+              :disabled="activeBackfillId === subscription.id"
+              @click="handleBackfillAction(subscription, 'resume')"
+            >继续补采</button>
+            <button
+              v-if="['QUEUED', 'RUNNING', 'PAUSED'].includes(subscription.latest_backfill.status)"
+              type="button"
+              class="rounded-lg border border-red-100 bg-white px-2.5 py-1.5 font-semibold text-red-500"
+              :disabled="activeBackfillId === subscription.id"
+              @click="handleBackfillAction(subscription, 'cancel')"
+            >取消</button>
+          </div>
+        </div>
+
+        <div v-if="backfillFormId === subscription.id" class="mt-3 rounded-xl border border-blue-100 bg-blue-50/60 p-3">
+          <p class="text-[11px] font-semibold text-slate-700">补采一段历史</p>
+          <p class="mt-1 text-[10px] leading-4 text-slate-500">按时间范围逐页采集；关闭程序后，下次启动会从上次位置继续。</p>
+          <div class="mt-2 grid grid-cols-2 gap-2">
+            <label class="text-[10px] font-semibold text-slate-500">开始日期
+              <input v-model="backfillStartDate" type="date" :max="backfillEndDate" class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-normal text-slate-700">
+            </label>
+            <label class="text-[10px] font-semibold text-slate-500">结束日期
+              <input v-model="backfillEndDate" type="date" :min="backfillStartDate" :max="localToday" class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-normal text-slate-700">
+            </label>
+          </div>
+          <button
+            type="button"
+            class="mt-2.5 w-full rounded-lg bg-blue-600 py-2 text-[11px] font-semibold text-white disabled:opacity-50"
+            :disabled="activeBackfillId === subscription.id || !backfillStartDate || !backfillEndDate"
+            @click="handleCreateBackfill(subscription)"
+          >{{ activeBackfillId === subscription.id ? '正在创建' : '开始补采' }}</button>
+        </div>
+
+        <div class="mt-3 flex flex-wrap items-center gap-2">
           <button
             type="button"
             :disabled="activePollingId === subscription.id"
@@ -321,6 +473,12 @@ const removeSubscription = async (subscription: ContentSubscription) => {
             <PhPlayCircle v-else :size="13" class="mr-1 inline" />
             {{ activePollingId === subscription.id ? '检查中' : '立即检查' }}
           </button>
+          <button
+            type="button"
+            :disabled="Boolean(subscription.latest_backfill && ['QUEUED', 'RUNNING', 'PAUSED'].includes(subscription.latest_backfill.status))"
+            class="rounded-lg border border-blue-100 px-2.5 py-2 text-[11px] font-semibold text-blue-600 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40"
+            @click="openBackfill(subscription)"
+          >历史补采</button>
           <button
             type="button"
             class="rounded-lg border border-slate-200 px-2.5 py-2 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-50"

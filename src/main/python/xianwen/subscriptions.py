@@ -262,6 +262,32 @@ class SubscriptionService:
             str(result["id"]),
             capture_statuses=sorted(CAPTURED_ITEM_STATUSES),
         )
+        latest_backfill = getattr(self.db, "latest_subscription_backfill", None)
+        result["latest_backfill"] = (
+            self.backfill_view(latest_backfill(str(result["id"])))
+            if callable(latest_backfill)
+            else None
+        )
+        return result
+
+    def backfill_view(self, job: Dict[str, Any] | None) -> Dict[str, Any] | None:
+        if not job:
+            return None
+        result = dict(job)
+        item_stats = getattr(self.db, "subscription_item_counts_between", None)
+        if callable(item_stats):
+            stats = item_stats(
+                str(result["subscription_id"]),
+                str(result["start_date"]),
+                str(result["end_date"]),
+            )
+            result["coverage_start_date"] = stats.get("coverage_start_date")
+            result["coverage_end_date"] = stats.get("coverage_end_date")
+        terminal = str(result.get("status")) in {"SUCCESS", "PARTIAL"}
+        coverage_start = str(result.get("coverage_start_date") or "")
+        result["source_exhausted_before_start"] = terminal and (
+            not coverage_start or coverage_start > str(result.get("start_date") or "")
+        )
         return result
 
     def list_subscriptions(self, user_id: str) -> list[Dict[str, Any]]:
@@ -300,11 +326,14 @@ class SubscriptionService:
         reconciliation: bool = False,
         build_digest: bool = True,
         backfill_from: datetime | None = None,
+        backfill_to: datetime | None = None,
+        start_cursor: str | None = None,
+        page_limit: int = 50,
     ) -> Dict[str, Any]:
         subscription = self.db.get_content_subscription(subscription_id)
         if not subscription:
             raise ValueError("订阅不存在")
-        if subscription.get("status") == "PAUSED" and trigger != "manual":
+        if subscription.get("status") == "PAUSED" and trigger not in {"manual", "backfill"}:
             raise ValueError("订阅已暂停")
 
         run = self.db.create_subscription_run(
@@ -324,6 +353,9 @@ class SubscriptionService:
         content_task_ids: list[str] = []
         partial = False
         newest_cursor = str(subscription.get("last_cursor") or "")
+        scan_complete = False
+        continuation_cursor = start_cursor
+        pages_processed = 0
 
         try:
             account, token = self._resolve_homeway_account(
@@ -333,21 +365,25 @@ class SubscriptionService:
             )
             adapter = self.adapter_factory()
             lower_bound = self._poll_lower_bound(subscription, backfill_from=backfill_from)
+            upper_bound = _stored_datetime(backfill_to) if backfill_to is not None else None
             prior_cursor = str(subscription.get("last_cursor") or "").strip()
             cursor_watermark = prior_cursor if lower_bound is None else ""
             reconciliation_lower_bound = self.now() - timedelta(days=2) if reconciliation else None
-            cursor: str | None = None
+            cursor: str | None = start_cursor
             cursor_history: set[str] = set()
             seen_external_ids: set[str] = set()
 
-            for _page_index in range(50):
+            for _page_index in range(max(1, min(int(page_limit), 50))):
                 page = adapter.list_items(
                     str(subscription["external_source_id"]),
                     cursor=cursor,
                     token=token,
                 )
                 if not page:
+                    scan_complete = True
+                    continuation_cursor = None
                     break
+                pages_processed += 1
 
                 page_existing_overlap = False
                 page_has_older = False
@@ -356,18 +392,20 @@ class SubscriptionService:
                     if list_item.external_item_id in seen_external_ids:
                         continue
                     seen_external_ids.add(list_item.external_item_id)
-                    counts["discovered_count"] += 1
-                    if not newest_cursor or list_item.published_at_text > newest_cursor:
-                        newest_cursor = list_item.published_at_text
                     if (
                         cursor_watermark
                         and not list_item.top
                         and list_item.published_at_text <= cursor_watermark
                     ):
                         page_reached_watermark = True
-                    if lower_bound and list_item.published_at < lower_bound:
+                    if lower_bound and not list_item.top and list_item.published_at < lower_bound:
                         page_has_older = True
                         continue
+                    if upper_bound and list_item.published_at > upper_bound:
+                        continue
+                    counts["discovered_count"] += 1
+                    if not newest_cursor or list_item.published_at_text > newest_cursor:
+                        newest_cursor = list_item.published_at_text
 
                     digest_date = self._digest_date(subscription, list_item.published_at)
                     existing = self.db.get_subscription_item(
@@ -442,16 +480,25 @@ class SubscriptionService:
                         )
 
                 if lower_bound and page_has_older:
+                    scan_complete = True
+                    continuation_cursor = None
                     break
                 if cursor_watermark and page_reached_watermark:
+                    scan_complete = True
+                    continuation_cursor = None
                     break
                 if lower_bound is None and not cursor_watermark and page_existing_overlap:
+                    scan_complete = True
+                    continuation_cursor = None
                     break
                 next_cursor = oldest_homeway_cursor(page)
                 if not next_cursor or next_cursor == cursor or next_cursor in cursor_history:
+                    scan_complete = True
+                    continuation_cursor = None
                     break
                 cursor_history.add(next_cursor)
                 cursor = next_cursor
+                continuation_cursor = next_cursor
 
             timezone_value = ZoneInfo(str(subscription.get("timezone") or "Asia/Shanghai"))
             local_now = self.now().astimezone(timezone_value)
@@ -488,7 +535,7 @@ class SubscriptionService:
                 last_digest_date = local_today
                 last_digest_at = now
             updates = {
-                "status": "ACTIVE",
+                "status": subscription.get("status") if subscription.get("status") == "PAUSED" else "ACTIVE",
                 "last_cursor": newest_cursor or None,
                 "last_polled_at": _naive_utc(now),
                 "last_success_at": _naive_utc(now),
@@ -514,7 +561,7 @@ class SubscriptionService:
                 {
                     "status": run_status,
                     "finished_at": _naive_utc(now),
-                    "cursor_after": newest_cursor or None,
+                    "cursor_after": continuation_cursor if trigger == "backfill" else newest_cursor or None,
                     **counts,
                 },
             )
@@ -525,6 +572,9 @@ class SubscriptionService:
                 "content_task_ids": content_task_ids,
                 # 兼容旧客户端；值已经是一帖一文稿的任务，而不是每日合并稿。
                 "digest_task_ids": content_task_ids,
+                "scan_complete": scan_complete,
+                "next_cursor": continuation_cursor,
+                "pages_processed": pages_processed,
             }
         except HomewayAuthenticationError as exc:
             self._record_poll_failure(subscription, run_id, exc, auth_required=True, counts=counts)
@@ -596,13 +646,10 @@ class SubscriptionService:
                 or ""
             )
             self.db.update_content_subscription(subscription_id, {"folder_id": parent_folder_id})
-        sort_order = -int(re.sub(r"\D", "", digest_date) or "0")
-        date_folder_id = self.db.ensure_child_folder(
+        date_folder_id = self._ensure_subscription_date_folder(
             parent_folder_id,
             digest_date,
-            folder_type="auto",
             source_url=source_url,
-            sort_order=sort_order,
         )
 
         task_ids: list[str] = []
@@ -739,6 +786,78 @@ class SubscriptionService:
             "created_count": created_count,
             "updated_count": updated_count,
         }
+
+    def _ensure_subscription_date_folder(
+        self,
+        parent_folder_id: str,
+        digest_date: str,
+        *,
+        source_url: str,
+    ) -> str:
+        """创建作者/年/月/日目录，并就地迁移旧的 YYYY-MM-DD 目录。"""
+        try:
+            local_date = datetime.strptime(digest_date, "%Y-%m-%d")
+        except ValueError as exc:
+            raise ValueError(f"归档日期格式不正确: {digest_date}") from exc
+
+        year_folder_id = self.db.ensure_child_folder(
+            parent_folder_id,
+            local_date.strftime("%Y"),
+            folder_type="auto",
+            source_url=source_url,
+            sort_order=-local_date.year,
+        )
+        month_folder_id = self.db.ensure_child_folder(
+            year_folder_id,
+            local_date.strftime("%m月"),
+            folder_type="auto",
+            source_url=source_url,
+            sort_order=-local_date.month,
+        )
+        day_name = local_date.strftime("%d日")
+        folders = self.db.list_folders()
+        target = next(
+            (
+                folder
+                for folder in folders
+                if folder.get("parent_id") == month_folder_id and folder.get("name") == day_name
+            ),
+            None,
+        )
+        legacy = next(
+            (
+                folder
+                for folder in folders
+                if folder.get("parent_id") == parent_folder_id and folder.get("name") == digest_date
+            ),
+            None,
+        )
+
+        if legacy and not target:
+            migrated = self.db.update_folder(
+                str(legacy["id"]),
+                {
+                    "parent_id": month_folder_id,
+                    "name": day_name,
+                    "sort_order": -local_date.day,
+                    "source_video_url": source_url,
+                },
+            )
+            if migrated:
+                return str(migrated["id"])
+
+        date_folder_id = str(target["id"]) if target else self.db.ensure_child_folder(
+            month_folder_id,
+            day_name,
+            folder_type="auto",
+            source_url=source_url,
+            sort_order=-local_date.day,
+        )
+        if legacy and str(legacy["id"]) != date_folder_id:
+            for task in self.db.list_tasks_in_folder(str(legacy["id"])):
+                self.db.assign_task_to_folder(str(task["id"]), date_folder_id)
+            self.db.delete_folder(str(legacy["id"]))
+        return date_folder_id
 
     def _remove_legacy_digest(self, legacy_task_id: str) -> None:
         """在一帖一文稿迁移完整后，清除旧日报及其重复图片副本。"""

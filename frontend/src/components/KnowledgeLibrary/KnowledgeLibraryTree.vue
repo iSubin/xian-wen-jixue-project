@@ -69,6 +69,13 @@ const rootDocuments = computed(() =>
     .sort((a, b) => (a.title || '').localeCompare(b.title || '', 'zh-CN')),
 )
 
+const latestSubscriptionDocuments = computed(() =>
+  documents.value
+    .filter(document => document.source_type === 'homeway_post')
+    .sort((a, b) => (b.title || '').localeCompare(a.title || '', 'zh-CN'))
+    .slice(0, 30),
+)
+
 const rootFolderCount = computed(() => props.folderTree.length)
 const pendingSync = computed(() => props.gitStatus === 'pending_sync')
 const syncingGit = computed(() => props.isSyncingGit || props.gitStatus === 'syncing')
@@ -150,6 +157,27 @@ const removeCurrentDocument = async () => {
         <small>悬停文档可编辑</small>
       </div>
 
+      <section v-if="!keyword && latestSubscriptionDocuments.length" class="latest-posts">
+        <div class="unfiled-title">
+          <PhArticle :size="14" />
+          <span>最新帖子</span>
+          <b>{{ latestSubscriptionDocuments.length }}</b>
+        </div>
+        <div
+          v-for="document in latestSubscriptionDocuments"
+          :key="`latest-${document.id}`"
+          :class="['root-document', selectedTask?.id === document.id ? 'selected' : '']"
+        >
+          <button type="button" class="document-main" @click="emit('selectTask', document)">
+            <PhArticle :size="14" weight="duotone" />
+            <span>{{ document.title || document.topic || '未命名文档' }}</span>
+          </button>
+          <button type="button" class="edit-button" title="编辑文档" @click="openEdit(document)">
+            <PhPencilSimple :size="13" />
+          </button>
+        </div>
+      </section>
+
       <KnowledgeTreeNode
         v-for="node in folderTree"
         :key="node.id"
@@ -157,6 +185,7 @@ const removeCurrentDocument = async () => {
         :documents="filteredDocuments"
         :selectedTask="selectedTask"
         :depth="0"
+        :searchActive="Boolean(keyword)"
         @select="emit('selectTask', $event)"
         @edit="openEdit"
       />
@@ -229,6 +258,7 @@ const removeCurrentDocument = async () => {
 .library-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 7px 18px; }
 .tree-caption { display: flex; align-items: center; padding: 6px 8px 9px; color: var(--xw-ink-soft); font-size: 10px; font-weight: 700; }
 .tree-caption small { margin-left: auto; color: var(--xw-ink-faint); font-size: 9px; font-weight: 400; }
+.latest-posts { margin-bottom: 8px; padding-bottom: 7px; border-bottom: 1px solid var(--xw-border); }
 .unfiled { margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--xw-border); }
 .unfiled-title { display: flex; align-items: center; gap: 6px; padding: 6px 8px; color: var(--xw-ink-soft); font-size: 11px; }
 .unfiled-title b { margin-left: auto; color: var(--xw-ink-faint); font: 500 10px/1 ui-monospace, monospace; }

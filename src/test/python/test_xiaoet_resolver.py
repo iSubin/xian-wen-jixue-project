@@ -23,6 +23,14 @@ XIAOET_URL = (
     "&sub_course_id=subcourse_39BgZkJNNvVbnSctrBRrXK1WRN8"
 )
 
+POMOHO_XIAOET_URL = (
+    "https://appexpqpqic7617.h5.xet.pomoho.com/p/course/video/"
+    "v_69e1a576e4b0694c5bb154cb"
+    "?product_id=course_399CpkSHAX4hucHg2pKn8vy2OWb"
+    "&course_id=course_399CpkSHAX4hucHg2pKn8vy2OWb"
+    "&sub_course_id=subcourse_39BgZkJNNvVbnSctrBRrXK1WRN8"
+)
+
 
 class FakeXiaoetResolver(XiaoetVideoResolver):
     def __init__(self):
@@ -91,7 +99,18 @@ class FakeXiaoetResolver(XiaoetVideoResolver):
 class TestXiaoetResolver(unittest.TestCase):
     def test_detects_xiaoet_video_url(self):
         self.assertTrue(is_xiaoet_video_url(XIAOET_URL))
+        self.assertTrue(is_xiaoet_video_url(POMOHO_XIAOET_URL))
         self.assertFalse(is_xiaoet_video_url("https://www.bilibili.com/video/BV123"))
+
+    def test_extracts_pomoho_shop_app_id_and_video_params(self):
+        params = XiaoetVideoResolver(cookie_provider=lambda host: "cookie=ready")._extract_params(
+            POMOHO_XIAOET_URL
+        )
+
+        self.assertEqual(params.app_id, "appexpqpqic7617")
+        self.assertEqual(params.host, "appexpqpqic7617.h5.xet.pomoho.com")
+        self.assertEqual(params.resource_id, "v_69e1a576e4b0694c5bb154cb")
+        self.assertEqual(params.product_id, "course_399CpkSHAX4hucHg2pKn8vy2OWb")
 
     def test_resolves_xiaoet_page_to_best_hls_play_url(self):
         resolver = FakeXiaoetResolver()

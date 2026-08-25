@@ -166,6 +166,36 @@ class SubscriptionApiTest(unittest.TestCase):
         self.assertEqual(runs.status_code, 200)
         self.assertEqual([run["trigger"] for run in runs.json()], ["manual", "scheduled"])
 
+        with patch.object(api_module, "_schedule_subscription_backfill") as schedule_backfill:
+            backfill = self.client.post(
+                f"/subscriptions/{subscription_id}/backfills",
+                json={"start_date": "2026-01-01", "end_date": "2026-08-14"},
+            )
+            self.assertEqual(backfill.status_code, 202)
+            job_id = backfill.json()["id"]
+            schedule_backfill.assert_called_once_with(job_id, "local-user")
+
+            jobs = self.client.get(f"/subscriptions/{subscription_id}/backfills")
+            self.assertEqual(jobs.status_code, 200)
+            self.assertEqual(jobs.json()[0]["start_date"], "2026-01-01")
+            self.assertEqual(
+                self.client.get(f"/subscriptions/{subscription_id}").json()["latest_backfill"]["id"],
+                job_id,
+            )
+
+            paused_backfill = self.client.post(
+                f"/subscriptions/{subscription_id}/backfills/{job_id}/pause"
+            )
+            self.assertEqual(paused_backfill.json()["status"], "PAUSED")
+            resumed_backfill = self.client.post(
+                f"/subscriptions/{subscription_id}/backfills/{job_id}/resume"
+            )
+            self.assertEqual(resumed_backfill.json()["status"], "QUEUED")
+            cancelled_backfill = self.client.post(
+                f"/subscriptions/{subscription_id}/backfills/{job_id}/cancel"
+            )
+            self.assertEqual(cancelled_backfill.json()["status"], "CANCELLED")
+
         denied = self.client.get(
             f"/subscriptions/{subscription_id}",
             headers={"X-XianWen-User-Id": "another-user"},

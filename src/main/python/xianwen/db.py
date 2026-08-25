@@ -463,6 +463,53 @@ class SubscriptionRunModel(Base):
         }
 
 
+class SubscriptionBackfillModel(Base):
+    """可暂停、可恢复的订阅历史补采任务。"""
+
+    __tablename__ = "subscription_backfills"
+
+    id = Column(String, primary_key=True)
+    subscription_id = Column(String, nullable=False, index=True)
+    start_date = Column(String, nullable=False)
+    end_date = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="QUEUED", index=True)
+    cursor = Column(Text, nullable=True)
+    processed_pages = Column(Integer, nullable=False, default=0)
+    discovered_count = Column(Integer, nullable=False, default=0)
+    captured_count = Column(Integer, nullable=False, default=0)
+    updated_count = Column(Integer, nullable=False, default=0)
+    locked_count = Column(Integer, nullable=False, default=0)
+    failed_count = Column(Integer, nullable=False, default=0)
+    last_run_id = Column(String, nullable=True)
+    last_error = Column(Text, nullable=True)
+    started_at = Column(DateTime, nullable=True)
+    finished_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "subscription_id": self.subscription_id,
+            "start_date": self.start_date,
+            "end_date": self.end_date,
+            "status": self.status,
+            "cursor": self.cursor,
+            "processed_pages": self.processed_pages or 0,
+            "discovered_count": self.discovered_count or 0,
+            "captured_count": self.captured_count or 0,
+            "updated_count": self.updated_count or 0,
+            "locked_count": self.locked_count or 0,
+            "failed_count": self.failed_count or 0,
+            "last_run_id": self.last_run_id,
+            "last_error": self.last_error,
+            "started_at": self.started_at.isoformat() + "Z" if self.started_at else None,
+            "finished_at": self.finished_at.isoformat() + "Z" if self.finished_at else None,
+            "created_at": self.created_at.isoformat() + "Z" if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() + "Z" if self.updated_at else None,
+        }
+
+
 def _credential_key() -> bytes:
     raw = os.getenv("XIANWEN_CREDENTIAL_SECRET")
     if not raw:
@@ -1600,6 +1647,43 @@ class TaskDB:
         finally:
             session.close()
 
+    def subscription_item_counts_between(
+        self,
+        subscription_id: str,
+        start_date: str,
+        end_date: str,
+    ) -> Dict[str, Any]:
+        """按订阅本地归档日期统计补采范围内的唯一条目。"""
+        session: Session = self.SessionLocal()
+        try:
+            query = session.query(SubscriptionItemModel).filter(
+                SubscriptionItemModel.subscription_id == subscription_id,
+                SubscriptionItemModel.digest_date >= start_date,
+                SubscriptionItemModel.digest_date <= end_date,
+            )
+            rows = query.with_entities(SubscriptionItemModel.capture_status).all()
+            statuses = [str(status or "") for (status,) in rows]
+            first_date = (
+                query.order_by(SubscriptionItemModel.digest_date.asc())
+                .with_entities(SubscriptionItemModel.digest_date)
+                .first()
+            )
+            last_date = (
+                query.order_by(SubscriptionItemModel.digest_date.desc())
+                .with_entities(SubscriptionItemModel.digest_date)
+                .first()
+            )
+            return {
+                "discovered_count": len(statuses),
+                "captured_count": sum(status in {"CAPTURED", "CAPTURED_UPDATED"} for status in statuses),
+                "locked_count": statuses.count("LOCKED"),
+                "failed_count": statuses.count("FAILED"),
+                "coverage_start_date": first_date[0] if first_date else None,
+                "coverage_end_date": last_date[0] if last_date else None,
+            }
+        finally:
+            session.close()
+
     def mark_subscription_items_digested(
         self,
         subscription_id: str,
@@ -1676,6 +1760,115 @@ class TaskDB:
                 .all()
             )
             return [run.to_dict() for run in runs]
+        finally:
+            session.close()
+
+    def create_subscription_backfill(
+        self,
+        subscription_id: str,
+        start_date: str,
+        end_date: str,
+    ) -> Dict[str, Any]:
+        session: Session = self.SessionLocal()
+        try:
+            active = (
+                session.query(SubscriptionBackfillModel)
+                .filter(
+                    SubscriptionBackfillModel.subscription_id == subscription_id,
+                    SubscriptionBackfillModel.status.in_(["QUEUED", "RUNNING", "PAUSED"]),
+                )
+                .order_by(SubscriptionBackfillModel.created_at.desc())
+                .first()
+            )
+            if active:
+                return active.to_dict()
+            now = datetime.utcnow()
+            job = SubscriptionBackfillModel(
+                id=uuid.uuid4().hex,
+                subscription_id=subscription_id,
+                start_date=start_date,
+                end_date=end_date,
+                status="QUEUED",
+                created_at=now,
+                updated_at=now,
+            )
+            session.add(job)
+            session.commit()
+            session.refresh(job)
+            return job.to_dict()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def get_subscription_backfill(self, job_id: str) -> Optional[Dict[str, Any]]:
+        session: Session = self.SessionLocal()
+        try:
+            job = session.query(SubscriptionBackfillModel).filter(SubscriptionBackfillModel.id == job_id).first()
+            return job.to_dict() if job else None
+        finally:
+            session.close()
+
+    def update_subscription_backfill(
+        self,
+        job_id: str,
+        updates: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        session: Session = self.SessionLocal()
+        try:
+            job = session.query(SubscriptionBackfillModel).filter(SubscriptionBackfillModel.id == job_id).first()
+            if not job:
+                return None
+            protected = {"id", "subscription_id", "created_at"}
+            for key, value in updates.items():
+                if key not in protected and hasattr(job, key):
+                    setattr(job, key, value)
+            job.updated_at = datetime.utcnow()
+            session.commit()
+            session.refresh(job)
+            return job.to_dict()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def list_subscription_backfills(
+        self,
+        subscription_id: str,
+        *,
+        limit: int = 20,
+    ) -> List[Dict[str, Any]]:
+        session: Session = self.SessionLocal()
+        try:
+            jobs = (
+                session.query(SubscriptionBackfillModel)
+                .filter(SubscriptionBackfillModel.subscription_id == subscription_id)
+                .order_by(SubscriptionBackfillModel.created_at.desc())
+                .limit(max(1, min(int(limit), 100)))
+                .all()
+            )
+            return [job.to_dict() for job in jobs]
+        finally:
+            session.close()
+
+    def latest_subscription_backfill(self, subscription_id: str) -> Optional[Dict[str, Any]]:
+        jobs = self.list_subscription_backfills(subscription_id, limit=1)
+        return jobs[0] if jobs else None
+
+    def list_runnable_subscription_backfills(self, *, limit: int = 5) -> List[Dict[str, Any]]:
+        """返回等待执行及上次进程中断后遗留的补采任务。"""
+        session: Session = self.SessionLocal()
+        try:
+            jobs = (
+                session.query(SubscriptionBackfillModel)
+                .filter(SubscriptionBackfillModel.status.in_(["QUEUED", "RUNNING"]))
+                .order_by(SubscriptionBackfillModel.updated_at.asc())
+                .limit(max(1, min(int(limit), 20)))
+                .all()
+            )
+            return [job.to_dict() for job in jobs]
         finally:
             session.close()
 

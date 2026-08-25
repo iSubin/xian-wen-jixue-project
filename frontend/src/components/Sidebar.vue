@@ -698,7 +698,7 @@ watch(() => props.summarizationSettings, (settings) => {
         </button>
 
         <button
-          aria-label="打开内容订阅"
+          aria-label="打开内容来源"
           @click="sidebarTab = 'subscriptions'"
           :class="[
             'w-10 h-10 rounded-xl flex items-center justify-center transition-colors',
@@ -706,7 +706,7 @@ watch(() => props.summarizationSettings, (settings) => {
               ? 'bg-blue-50 text-primary'
               : 'text-slate-400 hover:bg-gray-100 hover:text-slate-600'
           ]"
-          title="内容订阅"
+          title="内容来源"
         >
           <PhClock :size="20" weight="duotone" />
         </button>
@@ -1440,6 +1440,7 @@ watch(() => props.summarizationSettings, (settings) => {
             :connectedAccounts="connectedAccounts"
             @changed="emit('libraryChanged')"
             @openSettings="emit('openSettings', $event)"
+            @openCollectionCapture="emit('openCollectionCapture')"
           />
         </template>
 
