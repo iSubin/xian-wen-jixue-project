@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick, onBeforeUnmount, watch } from 'vue'
 import { PhFolder, PhFolderOpen, PhCaretRight, PhCaretDown, PhDotsThree, PhTrash, PhPencilSimple, PhCheck, PhX, PhCheckSquare, PhSquare } from '@phosphor-icons/vue'
 import type { FolderNode, Task } from '../../types'
 import TaskCard from './TaskCard.vue'
@@ -45,6 +45,59 @@ const handleFolderClick = () => {
 const showMenu = ref(false)
 const isRenaming = ref(false)
 const renameValue = ref('')
+const menuButtonRef = ref<HTMLElement | null>(null)
+const menuRef = ref<HTMLElement | null>(null)
+
+const closeMenu = () => {
+  showMenu.value = false
+}
+
+const isMenuEventTarget = (target: EventTarget | null) => {
+  if (!(target instanceof Node)) return false
+  return Boolean(
+    menuButtonRef.value?.contains(target)
+    || menuRef.value?.contains(target)
+  )
+}
+
+const handleOutsideInteraction = (event: Event) => {
+  if (!isMenuEventTarget(event.target)) closeMenu()
+}
+
+const handleMenuKeydown = (event: KeyboardEvent) => {
+  if (event.key !== 'Escape') return
+  closeMenu()
+  nextTick(() => menuButtonRef.value?.focus())
+}
+
+const handleVisibilityChange = () => {
+  if (document.hidden) closeMenu()
+}
+
+const addMenuDismissListeners = () => {
+  document.addEventListener('pointerdown', handleOutsideInteraction, true)
+  document.addEventListener('focusin', handleOutsideInteraction, true)
+  document.addEventListener('keydown', handleMenuKeydown, true)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  window.addEventListener('blur', closeMenu)
+}
+
+const removeMenuDismissListeners = () => {
+  document.removeEventListener('pointerdown', handleOutsideInteraction, true)
+  document.removeEventListener('focusin', handleOutsideInteraction, true)
+  document.removeEventListener('keydown', handleMenuKeydown, true)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  window.removeEventListener('blur', closeMenu)
+}
+
+watch(showMenu, async (isOpen) => {
+  removeMenuDismissListeners()
+  if (!isOpen) return
+  await nextTick()
+  if (showMenu.value) addMenuDismissListeners()
+})
+
+onBeforeUnmount(removeMenuDismissListeners)
 
 const startRename = () => {
   renameValue.value = props.folder.name
@@ -117,13 +170,26 @@ const handleDrop = (e: DragEvent) => {
         <button @click.stop="cancelRename" class="text-slate-400 hover:text-red-500 p-0.5 rounded"><PhX :size="14" /></button>
       </div>
       <span v-if="taskCount > 0" class="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full shrink-0">{{ taskCount }}</span>
-      <button @click.stop="showMenu = !showMenu" class="text-slate-400 hover:text-slate-600 p-0.5 shrink-0 md:opacity-0 md:group-hover:opacity-100 md:transition-opacity">
+      <button
+        ref="menuButtonRef"
+        type="button"
+        aria-label="文件夹操作"
+        :aria-expanded="showMenu"
+        @click.stop="showMenu = !showMenu"
+        class="text-slate-400 hover:text-slate-600 p-0.5 shrink-0 md:opacity-0 md:group-hover:opacity-100 md:transition-opacity"
+      >
         <PhDotsThree :size="14" />
       </button>
     </div>
 
     <!-- Context menu -->
-    <div v-if="showMenu" class="absolute right-4 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[120px]" @click="showMenu = false">
+    <div
+      v-if="showMenu"
+      ref="menuRef"
+      role="menu"
+      class="absolute right-4 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[120px]"
+      @click="closeMenu"
+    >
       <button @click="startRename" class="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center gap-2"><PhPencilSimple :size="14" /> 重命名</button>
       <button @click="emit('delete', folder.id)" class="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 text-red-600 flex items-center gap-2"><PhTrash :size="14" /> 删除文件夹</button>
     </div>
