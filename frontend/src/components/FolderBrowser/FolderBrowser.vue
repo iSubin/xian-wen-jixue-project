@@ -62,13 +62,6 @@ const toggleExpand = (folderId: string) => {
   expandedMap.value[folderId] = !expandedMap.value[folderId]
 }
 
-// Auto-expand auto-created folders on mount
-for (const folder of props.folders) {
-  if (folder.folder_type === 'auto') {
-    expandedMap.value[folder.id] = true
-  }
-}
-
 const handleTaskDragstart = (e: DragEvent, taskId: string) => {
   e.dataTransfer?.setData('text/plain', JSON.stringify({ type: 'task', id: taskId }))
 }

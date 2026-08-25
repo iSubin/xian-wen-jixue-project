@@ -23,7 +23,7 @@ const emit = defineEmits<{
   edit: [task: Task]
 }>()
 
-const expanded = ref(props.depth < 3)
+const expanded = ref(false)
 const isOpen = computed(() => expanded.value || props.searchActive)
 const directDocuments = computed(() =>
   props.documents
