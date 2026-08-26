@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Codex Hooks Config",
+  "description": "Local development contract for .codex/hooks.json. Do not add $schema or comments to hooks.json because the Codex runtime parser accepts only the top-level hooks field.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["hooks"],
+  "properties": {
+    "hooks": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["hooks"],
+          "properties": {
+            "matcher": {
+              "type": "string"
+            },
+            "hooks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["type", "command"],
+                "properties": {
+                  "type": {
+                    "const": "command"
+                  },
+                  "command": {
+                    "type": "string"
+                  },
+                  "statusMessage": {
+                    "type": "string"
+                  },
+                  "timeout": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

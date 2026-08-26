@@ -1,0 +1,1334 @@
+{
+  "version": 1,
+  "sourceRoot": "<harness-pack-source>",
+  "sourceSnapshot": {
+    "manifestPath": "manifest.yaml",
+    "manifestName": "xian-harness-pack",
+    "manifestVersion": 1,
+    "fileCount": 133,
+    "contentHash": "787bf18865005e38b32d4e435d14a2eacfda24a3657276b1e7c055ac992f7eec"
+  },
+  "updatedAt": "2026-08-26T20:38:57+08:00",
+  "files": [
+    {
+      "path": ".claude/commands/README.md",
+      "sourcePath": "base/.claude/commands/README.md",
+      "sourceHash": "0d3695046c27b6413595d0faf1aa1de2811f822d03dc6a4f8b98af333aad98f7",
+      "targetHash": "0d3695046c27b6413595d0faf1aa1de2811f822d03dc6a4f8b98af333aad98f7",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".claude/commands/xian-archive.md",
+      "sourcePath": "base/.claude/commands/xian-archive.md",
+      "sourceHash": "d80289458d45a7657fb0598a0b65033455b47e3e19e051c45232751e211b68fc",
+      "targetHash": "d80289458d45a7657fb0598a0b65033455b47e3e19e051c45232751e211b68fc",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".claude/commands/xian-build.md",
+      "sourcePath": "base/.claude/commands/xian-build.md",
+      "sourceHash": "7c5062c439d9717635ade54612dce790091bc1d09b464f47a112e91d1a83fc47",
+      "targetHash": "7c5062c439d9717635ade54612dce790091bc1d09b464f47a112e91d1a83fc47",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".claude/commands/xian-design.md",
+      "sourcePath": "base/.claude/commands/xian-design.md",
+      "sourceHash": "0ece37a0952311afa0ad181ce3c8064403394f3e1c00f17a623ff334100cc41e",
+      "targetHash": "0ece37a0952311afa0ad181ce3c8064403394f3e1c00f17a623ff334100cc41e",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".claude/commands/xian-gate.md",
+      "sourcePath": "base/.claude/commands/xian-gate.md",
+      "sourceHash": "82c5336111ccb0aaad497b0160f1ca1971372bf8a1267f45d87ec174463405c6",
+      "targetHash": "82c5336111ccb0aaad497b0160f1ca1971372bf8a1267f45d87ec174463405c6",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".claude/commands/xian-next.md",
+      "sourcePath": "base/.claude/commands/xian-next.md",
+      "sourceHash": "78e405088de05734d3291affe74b078fc9b069621536ec42db8295490b64d64e",
+      "targetHash": "78e405088de05734d3291affe74b078fc9b069621536ec42db8295490b64d64e",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".claude/commands/xian-plan.md",
+      "sourcePath": "base/.claude/commands/xian-plan.md",
+      "sourceHash": "c545e9a1189c8548a2b4a7cc97199bbc10110a0d707ea49529b4d2cef3a6800c",
+      "targetHash": "c545e9a1189c8548a2b4a7cc97199bbc10110a0d707ea49529b4d2cef3a6800c",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".claude/commands/xian-review.md",
+      "sourcePath": "base/.claude/commands/xian-review.md",
+      "sourceHash": "188e3de2870f6722b442c4c965ba7402743a851d8a7003953835b8de324d8f3e",
+      "targetHash": "188e3de2870f6722b442c4c965ba7402743a851d8a7003953835b8de324d8f3e",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".claude/commands/xian-spec.md",
+      "sourcePath": "base/.claude/commands/xian-spec.md",
+      "sourceHash": "25b6b96e12c66efc19546eec2e6509cc19009f17958dba362dd0373ff12d7cd4",
+      "targetHash": "25b6b96e12c66efc19546eec2e6509cc19009f17958dba362dd0373ff12d7cd4",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".claude/commands/xian-verify.md",
+      "sourcePath": "base/.claude/commands/xian-verify.md",
+      "sourceHash": "20c276437871172eeabdd1fd6d870d737a5617b9dd67bd98a9c6c33ecc15b930",
+      "targetHash": "20c276437871172eeabdd1fd6d870d737a5617b9dd67bd98a9c6c33ecc15b930",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".claude/commands/xian-workbench.md",
+      "sourcePath": "base/.claude/commands/xian-workbench.md",
+      "sourceHash": "5293324d7c534c11c6dc3db29ab332fc7318f8c33bb27b4035378334ee45d9f5",
+      "targetHash": "5293324d7c534c11c6dc3db29ab332fc7318f8c33bb27b4035378334ee45d9f5",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".claude/hooks/hook-metrics.cjs",
+      "sourcePath": "base/.claude/hooks/hook-metrics.cjs",
+      "sourceHash": "16d98dcc900e61c3e013ec5df65aba44da79bff7f7b2cd24d066425935e8803c",
+      "targetHash": "16d98dcc900e61c3e013ec5df65aba44da79bff7f7b2cd24d066425935e8803c",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".claude/hooks/pre-tool-use.cjs",
+      "sourcePath": "base/.claude/hooks/pre-tool-use.cjs",
+      "sourceHash": "5f2bdd820eddd091dc13a9387f86cf12aa9bb4d95d0d4958f63738d78a57c29a",
+      "targetHash": "5f2bdd820eddd091dc13a9387f86cf12aa9bb4d95d0d4958f63738d78a57c29a",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 493,
+      "targetMode": 493,
+      "tombstone": false
+    },
+    {
+      "path": ".claude/hooks/README.md",
+      "sourcePath": "base/.claude/hooks/README.md",
+      "sourceHash": "8f2112e664e7b7302b39763fa3b1a2c2631d43cf5d275c8e449a16c5b966353b",
+      "targetHash": "8f2112e664e7b7302b39763fa3b1a2c2631d43cf5d275c8e449a16c5b966353b",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".claude/hooks/session-start.cjs",
+      "sourcePath": "base/.claude/hooks/session-start.cjs",
+      "sourceHash": "164754831d815fa98e8898811cfb08472e9ed8186791f97bbfa0ac15ff62099d",
+      "targetHash": "164754831d815fa98e8898811cfb08472e9ed8186791f97bbfa0ac15ff62099d",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 493,
+      "targetMode": 493,
+      "tombstone": false
+    },
+    {
+      "path": ".claude/hooks/stop.cjs",
+      "sourcePath": "base/.claude/hooks/stop.cjs",
+      "sourceHash": "abd53381b52454ed0184a2080275762c331c99657f2f301f80cc91d6b8ac3e37",
+      "targetHash": "abd53381b52454ed0184a2080275762c331c99657f2f301f80cc91d6b8ac3e37",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 493,
+      "targetMode": 493,
+      "tombstone": false
+    },
+    {
+      "path": ".claude/hooks/user-prompt-submit.cjs",
+      "sourcePath": "base/.claude/hooks/user-prompt-submit.cjs",
+      "sourceHash": "42a71db23a3b2f92c745fd36a496a3eef853e1ba3065277e02f611c19a9e84e5",
+      "targetHash": "42a71db23a3b2f92c745fd36a496a3eef853e1ba3065277e02f611c19a9e84e5",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 493,
+      "targetMode": 493,
+      "tombstone": false
+    },
+    {
+      "path": ".claude/settings.json",
+      "sourcePath": "base/.claude/settings.json",
+      "sourceHash": "5c47a85cf314655a9daa660ad3695804661ffcc26d3ecb386779a00f3c4fa615",
+      "targetHash": "5c47a85cf314655a9daa660ad3695804661ffcc26d3ecb386779a00f3c4fa615",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/config.toml",
+      "sourcePath": "base/.codex/config.toml",
+      "sourceHash": "1fdfd1412e8217df66ab16c9c2c157a837f313a7a43964d1ffdf896ce4dc3d5e",
+      "targetHash": "1fdfd1412e8217df66ab16c9c2c157a837f313a7a43964d1ffdf896ce4dc3d5e",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/hooks.json",
+      "sourcePath": "base/.codex/hooks.json",
+      "sourceHash": "02fd457d8f889464ecbe907cc2f7578673a21efde2d8d49987ddb158f8aecda1",
+      "targetHash": "02fd457d8f889464ecbe907cc2f7578673a21efde2d8d49987ddb158f8aecda1",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/hooks.schema.json",
+      "sourcePath": "base/.codex/hooks.schema.json",
+      "sourceHash": "d4c8f84fa98b37ca9cf017853f8e914406f8298543dd218d7dbca4a60004b011",
+      "targetHash": "d4c8f84fa98b37ca9cf017853f8e914406f8298543dd218d7dbca4a60004b011",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/hooks/hook-metrics.cjs",
+      "sourcePath": "base/.codex/hooks/hook-metrics.cjs",
+      "sourceHash": "c8161bfbdeddc599dfd7d55e13257457f41282900c1ce646241cbb0d51fcf8a1",
+      "targetHash": "c8161bfbdeddc599dfd7d55e13257457f41282900c1ce646241cbb0d51fcf8a1",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/hooks/hook-output.cjs",
+      "sourcePath": "base/.codex/hooks/hook-output.cjs",
+      "sourceHash": "117d5b06b926a687ff6974a1c63566b91d631df4a5c3a7759cdaff5c2813b5dd",
+      "targetHash": "117d5b06b926a687ff6974a1c63566b91d631df4a5c3a7759cdaff5c2813b5dd",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/hooks/hook-routing.cjs",
+      "sourcePath": "base/.codex/hooks/hook-routing.cjs",
+      "sourceHash": "83a5e3964f1dd364509cc2a5b86a1739c0605a68facc56d08b4dae4f9a54df07",
+      "targetHash": "83a5e3964f1dd364509cc2a5b86a1739c0605a68facc56d08b4dae4f9a54df07",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/hooks/hook-skill-selection.cjs",
+      "sourcePath": "base/.codex/hooks/hook-skill-selection.cjs",
+      "sourceHash": "8aabddec8b16cd9b7be5dc153896eae69762c343c252fefcfb2a351363cfc0a8",
+      "targetHash": "8aabddec8b16cd9b7be5dc153896eae69762c343c252fefcfb2a351363cfc0a8",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/hooks/pre-tool-use.cjs",
+      "sourcePath": "base/.codex/hooks/pre-tool-use.cjs",
+      "sourceHash": "5a0284062902de387582b9d81adab73d8a8254bc88d9e17d5749ba17128ae161",
+      "targetHash": "5a0284062902de387582b9d81adab73d8a8254bc88d9e17d5749ba17128ae161",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/hooks/session-start.cjs",
+      "sourcePath": "base/.codex/hooks/session-start.cjs",
+      "sourceHash": "a7fe2ec92585831515296276b1a2eaf8115743a3894a066cc0ddc219fa285bbc",
+      "targetHash": "a7fe2ec92585831515296276b1a2eaf8115743a3894a066cc0ddc219fa285bbc",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/hooks/skill-forced-eval.cjs",
+      "sourcePath": "base/.codex/hooks/skill-forced-eval.cjs",
+      "sourceHash": "36fd5fa63d2a9a314c31baab494cbca1ccc8b25730321b29f07adabd73ef1541",
+      "targetHash": "36fd5fa63d2a9a314c31baab494cbca1ccc8b25730321b29f07adabd73ef1541",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/hooks/stop.cjs",
+      "sourcePath": "base/.codex/hooks/stop.cjs",
+      "sourceHash": "a379c44b47ec4e0f960a72d996b2cb7c1316efece94fdaec4a45c14d918bb5b4",
+      "targetHash": "a379c44b47ec4e0f960a72d996b2cb7c1316efece94fdaec4a45c14d918bb5b4",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/README.md",
+      "sourcePath": "base/.codex/skills/README.md",
+      "sourceHash": "3417935933c795f138aee77cfa71ee7a52808fb64086b5e0844f1cd4c5273a97",
+      "targetHash": "3417935933c795f138aee77cfa71ee7a52808fb64086b5e0844f1cd4c5273a97",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/using-xian-harness/SKILL.md",
+      "sourcePath": "base/.codex/skills/using-xian-harness/SKILL.md",
+      "sourceHash": "de7008532cd96528e6b6ef7610a83edd9483f80ff6ef109eb83eedcc1c018839",
+      "targetHash": "de7008532cd96528e6b6ef7610a83edd9483f80ff6ef109eb83eedcc1c018839",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-agent-governance/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-agent-governance/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-agent-governance/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-agent-governance/SKILL.md",
+      "sourceHash": "a2aa237256ff688998dd1b97d4c1627e46d5fa5b854791a9515d6dfc75d8c636",
+      "targetHash": "a2aa237256ff688998dd1b97d4c1627e46d5fa5b854791a9515d6dfc75d8c636",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-archive/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-archive/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-archive/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-archive/SKILL.md",
+      "sourceHash": "2f880e0ea0755740dd8a68766f75e3d448a07b324b150be32cc5b6e6fbed3c70",
+      "targetHash": "2f880e0ea0755740dd8a68766f75e3d448a07b324b150be32cc5b6e6fbed3c70",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-asset-governance/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-asset-governance/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-asset-governance/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-asset-governance/SKILL.md",
+      "sourceHash": "e928cb48e1a8ed126b3dd784b77737f0a6ae461c4501ade2f6167716ca42191c",
+      "targetHash": "e928cb48e1a8ed126b3dd784b77737f0a6ae461c4501ade2f6167716ca42191c",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-backlog/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-backlog/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-backlog/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-backlog/SKILL.md",
+      "sourceHash": "9514117fec92bc68ccdc9faa69a2bd997f90b1554d0d99f1dafdf3b0bf5d0f0a",
+      "targetHash": "9514117fec92bc68ccdc9faa69a2bd997f90b1554d0d99f1dafdf3b0bf5d0f0a",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-batch/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-batch/agents/openai.yaml",
+      "sourceHash": "710440e4e29d41d4c9c59fe98f3d9fb89196d7b93545d4ab9311f7e1629a7e03",
+      "targetHash": "710440e4e29d41d4c9c59fe98f3d9fb89196d7b93545d4ab9311f7e1629a7e03",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-batch/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-batch/SKILL.md",
+      "sourceHash": "5fd5dcc14bb607c5aa0974a55b4da9ce1c541f1bf37f5bbe2548c0fb5bd83c9c",
+      "targetHash": "5fd5dcc14bb607c5aa0974a55b4da9ce1c541f1bf37f5bbe2548c0fb5bd83c9c",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-build/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-build/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-build/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-build/SKILL.md",
+      "sourceHash": "46f2d7d5ef321f723c9a508b402b48bae09de3d57990120ad0290e32b70fd9f4",
+      "targetHash": "46f2d7d5ef321f723c9a508b402b48bae09de3d57990120ad0290e32b70fd9f4",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-commit/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-commit/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-cost/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-cost/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-cost/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-cost/SKILL.md",
+      "sourceHash": "074964c2c4fc998b7634f893d30185941a5dd726994d44054863b12b58a3ddb7",
+      "targetHash": "074964c2c4fc998b7634f893d30185941a5dd726994d44054863b12b58a3ddb7",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-design/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-design/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-design/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-design/SKILL.md",
+      "sourceHash": "9806f8395655a3d9e9b01cddc247d769979ecd8e064f5b1bcb49e22b01dea204",
+      "targetHash": "9806f8395655a3d9e9b01cddc247d769979ecd8e064f5b1bcb49e22b01dea204",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-diagnose/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-diagnose/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-diagnose/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-diagnose/SKILL.md",
+      "sourceHash": "a96d0ca49c6ba22b9e98c00332086ccfe00d62600ef83e0fdc42da6bd868f7cd",
+      "targetHash": "a96d0ca49c6ba22b9e98c00332086ccfe00d62600ef83e0fdc42da6bd868f7cd",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-experience/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-experience/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-experience/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-experience/SKILL.md",
+      "sourceHash": "2c717b16e5745c0c2e634ea64837200cff8b86d3ba52b8db646f78c044257a94",
+      "targetHash": "2c717b16e5745c0c2e634ea64837200cff8b86d3ba52b8db646f78c044257a94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-gate/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-gate/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-gate/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-gate/SKILL.md",
+      "sourceHash": "49c8477db754f7259d8615c6f72a22eebbabf9e6254198bd0fd594fc4eb30a52",
+      "targetHash": "49c8477db754f7259d8615c6f72a22eebbabf9e6254198bd0fd594fc4eb30a52",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-hook-governance/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-hook-governance/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-hook-governance/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-hook-governance/SKILL.md",
+      "sourceHash": "de89544fa72b2301e7bbb01e53263cce7b1956af457bee431f0d5c4a6750caa7",
+      "targetHash": "de89544fa72b2301e7bbb01e53263cce7b1956af457bee431f0d5c4a6750caa7",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-next/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-next/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-next/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-next/SKILL.md",
+      "sourceHash": "ed1b780b1e545438b4e36a713604b38ebe658a2eba9130f1c752a1b5ebb76f64",
+      "targetHash": "ed1b780b1e545438b4e36a713604b38ebe658a2eba9130f1c752a1b5ebb76f64",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-open/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-open/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-open/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-open/SKILL.md",
+      "sourceHash": "4cff090435db61df46316c90b14dcd260c2554acb72efb7f57595999063c77d4",
+      "targetHash": "4cff090435db61df46316c90b14dcd260c2554acb72efb7f57595999063c77d4",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-pack-governance/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-pack-governance/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-pack-governance/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-pack-governance/SKILL.md",
+      "sourceHash": "985546ad2704b15a7951ac827925ff1e1eafc48c7802ff134b6d1e1477e1ad73",
+      "targetHash": "985546ad2704b15a7951ac827925ff1e1eafc48c7802ff134b6d1e1477e1ad73",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-plan/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-plan/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-plan/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-plan/SKILL.md",
+      "sourceHash": "a0f37013d7db39d6eac49ccd1a3f96a7651ec11317f7da24cbfa31d3dc640511",
+      "targetHash": "a0f37013d7db39d6eac49ccd1a3f96a7651ec11317f7da24cbfa31d3dc640511",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-project-research/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-project-research/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-project-research/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-project-research/SKILL.md",
+      "sourceHash": "8f1fd2119884e9ed3213b61bef3354acca1e52081728fd4af4662f9a96173997",
+      "targetHash": "8f1fd2119884e9ed3213b61bef3354acca1e52081728fd4af4662f9a96173997",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-project-startup/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-project-startup/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-project-startup/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-project-startup/SKILL.md",
+      "sourceHash": "7229b34d80099e61ecc75fa2399e4c3d25dd28a2b59a1898a3d6d886d3111061",
+      "targetHash": "7229b34d80099e61ecc75fa2399e4c3d25dd28a2b59a1898a3d6d886d3111061",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-project-status/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-project-status/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-project-status/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-project-status/SKILL.md",
+      "sourceHash": "2b8dd41ced239e5ffd70df42b94480e668e138ea3d5ead0c85962c2f925f795b",
+      "targetHash": "2b8dd41ced239e5ffd70df42b94480e668e138ea3d5ead0c85962c2f925f795b",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-project-sync/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-project-sync/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-project-sync/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-project-sync/SKILL.md",
+      "sourceHash": "87dd7982c85692db9885e68b2fb6f046d5918b03a2b9260d4cca3d5510f56cf9",
+      "targetHash": "87dd7982c85692db9885e68b2fb6f046d5918b03a2b9260d4cca3d5510f56cf9",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-release/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-release/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-release/scripts/prepare-release.mjs",
+      "sourcePath": "base/.codex/skills/xian-release/scripts/prepare-release.mjs",
+      "sourceHash": "aada00ed8eddb08e4a41c35282ace39e82fef805921a7f0dbbc096132c7433fd",
+      "targetHash": "aada00ed8eddb08e4a41c35282ace39e82fef805921a7f0dbbc096132c7433fd",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-release/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-release/SKILL.md",
+      "sourceHash": "6a7ceebed46ccd6460f443546e5fd6ce96e360d5f310302f89a68e57eadcd5c4",
+      "targetHash": "6a7ceebed46ccd6460f443546e5fd6ce96e360d5f310302f89a68e57eadcd5c4",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-review/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-review/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-review/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-review/SKILL.md",
+      "sourceHash": "c3cd7e432c350f854c99f5862c5c33d5388edb66c49021ad6168ebef2faa923a",
+      "targetHash": "c3cd7e432c350f854c99f5862c5c33d5388edb66c49021ad6168ebef2faa923a",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-skill-governance/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-skill-governance/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-skill-governance/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-skill-governance/SKILL.md",
+      "sourceHash": "b66c2a42c5eefcc41c88791c06c77fa127cff266b61b88a2581b60d1262279d0",
+      "targetHash": "b66c2a42c5eefcc41c88791c06c77fa127cff266b61b88a2581b60d1262279d0",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-spec/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-spec/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-spec/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-spec/SKILL.md",
+      "sourceHash": "5f0ebeeae22fa0d9d60778da30b3a17b52fe64643aa9ccb10fa1876d9baf3948",
+      "targetHash": "5f0ebeeae22fa0d9d60778da30b3a17b52fe64643aa9ccb10fa1876d9baf3948",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-verify/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-verify/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-verify/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-verify/SKILL.md",
+      "sourceHash": "2af3a543b21034cbdea17e9a015b1fafcaf5e0d74ef537a5d9a997aeabaa1ee7",
+      "targetHash": "2af3a543b21034cbdea17e9a015b1fafcaf5e0d74ef537a5d9a997aeabaa1ee7",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-workbench/agents/openai.yaml",
+      "sourcePath": "base/.codex/skills/xian-workbench/agents/openai.yaml",
+      "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "targetHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".codex/skills/xian-workbench/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-workbench/SKILL.md",
+      "sourceHash": "4d70567d2100503ef70fbc725c552a1e304b0c1887043093be970ae68c68d422",
+      "targetHash": "4d70567d2100503ef70fbc725c552a1e304b0c1887043093be970ae68c68d422",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/.gitignore",
+      "sourcePath": "base/.xian-harness/.gitignore.template",
+      "sourceHash": "94b11de73183f0bbad35fe70d87825cb73bc448fe83afafccc17c307d29dab8b",
+      "targetHash": "94b11de73183f0bbad35fe70d87825cb73bc448fe83afafccc17c307d29dab8b",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/bootstrap-context.json",
+      "sourcePath": "profiles/python/.xian-harness/bootstrap-context.json",
+      "sourceHash": "8c4489f845bc976bc7ab8882136b2ba93b994e8b681c74cc579b8579527f521d",
+      "targetHash": "8c4489f845bc976bc7ab8882136b2ba93b994e8b681c74cc579b8579527f521d",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/cache/.gitignore",
+      "sourcePath": "base/.xian-harness/cache/.gitignore.template",
+      "sourceHash": "240a3e0d37d2e86b614063f5347eb02d4f99ca6c254de6b82871ff8d95532a7d",
+      "targetHash": "240a3e0d37d2e86b614063f5347eb02d4f99ca6c254de6b82871ff8d95532a7d",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/harness-pack-manifest.yaml",
+      "sourcePath": "manifest.yaml",
+      "sourceHash": "dfed1aa7227bf1643c3400eaf7ad98d60c66fb9866c74c4986d204ab3110ac51",
+      "targetHash": "dfed1aa7227bf1643c3400eaf7ad98d60c66fb9866c74c4986d204ab3110ac51",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/integrations/README.md",
+      "sourcePath": "base/.xian-harness/integrations/README.md",
+      "sourceHash": "7def6bc7f88ba5a2eba1314ee0ae9ac890ad30697f362610e557a7accff391f7",
+      "targetHash": "7def6bc7f88ba5a2eba1314ee0ae9ac890ad30697f362610e557a7accff391f7",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/interaction-policy.json",
+      "sourcePath": "base/.xian-harness/interaction-policy.json",
+      "sourceHash": "df0ab979633aedf4f06539f11274acda758e50c8001510be129f905eaa466baa",
+      "targetHash": "df0ab979633aedf4f06539f11274acda758e50c8001510be129f905eaa466baa",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/local/.gitignore",
+      "sourcePath": "base/.xian-harness/local/.gitignore.template",
+      "sourceHash": "240a3e0d37d2e86b614063f5347eb02d4f99ca6c254de6b82871ff8d95532a7d",
+      "targetHash": "240a3e0d37d2e86b614063f5347eb02d4f99ca6c254de6b82871ff8d95532a7d",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/acceptance-criteria.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/acceptance-criteria.md",
+      "sourceHash": "18663c010edf5887d0f5910b672c3cbdba8dba97af2cd2d4635af196c97fcb4f",
+      "targetHash": "18663c010edf5887d0f5910b672c3cbdba8dba97af2cd2d4635af196c97fcb4f",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/agents/agent-role-contract.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/agents/agent-role-contract.md",
+      "sourceHash": "b822d10a51718ab98b05e3ebcdf9a07f6387e7e1345b1433f46529f4a1ba4822",
+      "targetHash": "b822d10a51718ab98b05e3ebcdf9a07f6387e7e1345b1433f46529f4a1ba4822",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/change/full/acceptance-criteria.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/change/full/acceptance-criteria.md",
+      "sourceHash": "4070b2b739e89b610f477cf32eb9d03b24e8e7ddf4da7085b36c0e99515b93f8",
+      "targetHash": "4070b2b739e89b610f477cf32eb9d03b24e8e7ddf4da7085b36c0e99515b93f8",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/change/full/design.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/change/full/design.md",
+      "sourceHash": "91d74aca5a9ed6eb0682e27cfa6385fff91b7b9d8ba823c1c9e2b9f6a330f0d0",
+      "targetHash": "91d74aca5a9ed6eb0682e27cfa6385fff91b7b9d8ba823c1c9e2b9f6a330f0d0",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/change/full/proposal.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/change/full/proposal.md",
+      "sourceHash": "e3e24c9cf8b39e02c504b4c54a36ea71a8400d8563719cf5af562d8315c6d42b",
+      "targetHash": "e3e24c9cf8b39e02c504b4c54a36ea71a8400d8563719cf5af562d8315c6d42b",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/change/full/tasks.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/change/full/tasks.md",
+      "sourceHash": "75b18bfe57cc27d6bfee26d28dc56b55348d76f5fe405243d045e2e710848a89",
+      "targetHash": "75b18bfe57cc27d6bfee26d28dc56b55348d76f5fe405243d045e2e710848a89",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/change/full/verify.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/change/full/verify.md",
+      "sourceHash": "ae60cb87023c3947c51723056c1097b6d6858fa2b2d05b89f5f9b5a06f558650",
+      "targetHash": "ae60cb87023c3947c51723056c1097b6d6858fa2b2d05b89f5f9b5a06f558650",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/delivery-note.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/delivery-note.md",
+      "sourceHash": "31f71a153fc2364838b6e634e5c0d244325ae97943390861e9957d5821fedca4",
+      "targetHash": "31f71a153fc2364838b6e634e5c0d244325ae97943390861e9957d5821fedca4",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/docs/decision-record.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/docs/decision-record.md",
+      "sourceHash": "9140e65f3750383457e8d0831f024ce5a7c2a955dce8b318ea3174439cf76ab1",
+      "targetHash": "9140e65f3750383457e8d0831f024ce5a7c2a955dce8b318ea3174439cf76ab1",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/docs/doc-sync-report.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/docs/doc-sync-report.md",
+      "sourceHash": "52de7821bdce8dc4e33552d84641f24250667666af85f6ad303c01a298a4bc72",
+      "targetHash": "52de7821bdce8dc4e33552d84641f24250667666af85f6ad303c01a298a4bc72",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/docs/exemplar-catalog.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/docs/exemplar-catalog.md",
+      "sourceHash": "e6406f22fa945c939b4d9323b6cd93a25e64b5dc4a872b5ac052c4ea7a226f79",
+      "targetHash": "e6406f22fa945c939b4d9323b6cd93a25e64b5dc4a872b5ac052c4ea7a226f79",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/docs/project-baseline.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/docs/project-baseline.md",
+      "sourceHash": "3a9841c15754b45b2648cdc7c0e4cffb8cbf46f9ab059659ce14a3a6596e7e11",
+      "targetHash": "3a9841c15754b45b2648cdc7c0e4cffb8cbf46f9ab059659ce14a3a6596e7e11",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/docs/project-discipline.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/docs/project-discipline.md",
+      "sourceHash": "2cf9923b3557f236e8f62e7feb3cfbb28310219e884a532e53427e4bb33f0dc5",
+      "targetHash": "2cf9923b3557f236e8f62e7feb3cfbb28310219e884a532e53427e4bb33f0dc5",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/docs/project-status.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/docs/project-status.md",
+      "sourceHash": "6ad0f9aad0562644c146d528252d3bb9c5f645d3d6f9b56768c391210fa5a2ab",
+      "targetHash": "6ad0f9aad0562644c146d528252d3bb9c5f645d3d6f9b56768c391210fa5a2ab",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/docs/requirement.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/docs/requirement.md",
+      "sourceHash": "02719f2a9643e9168919b889254c6fdc844c44b0b62025664755c0662135b5c6",
+      "targetHash": "02719f2a9643e9168919b889254c6fdc844c44b0b62025664755c0662135b5c6",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/docs/todo-list.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/docs/todo-list.md",
+      "sourceHash": "c01152978e37ac5081209d6875aaf26b5c6b18add71cfdfa07995a3312ae5274",
+      "targetHash": "c01152978e37ac5081209d6875aaf26b5c6b18add71cfdfa07995a3312ae5274",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/evidence-samples/base-golden/acceptance-criteria.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/evidence-samples/base-golden/acceptance-criteria.md",
+      "sourceHash": "93f3d4a45c3b39624ddade03e94fc579519bf73997a5ede4e712c65a906c6652",
+      "targetHash": "93f3d4a45c3b39624ddade03e94fc579519bf73997a5ede4e712c65a906c6652",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/evidence-samples/base-golden/archive-summary.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/evidence-samples/base-golden/archive-summary.md",
+      "sourceHash": "5dca17d1b809a143b12c63d84f9182fd1127511fc11bfb2b081079e88c8c87a9",
+      "targetHash": "5dca17d1b809a143b12c63d84f9182fd1127511fc11bfb2b081079e88c8c87a9",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/evidence-samples/base-golden/experience-disposition.json",
+      "sourcePath": "base/.xian-harness/protocol/templates/evidence-samples/base-golden/experience-disposition.json",
+      "sourceHash": "948b715f37acd4d68c7809f5b51372a4028638fac77a8f5529dd5025076a4a94",
+      "targetHash": "948b715f37acd4d68c7809f5b51372a4028638fac77a8f5529dd5025076a4a94",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/evidence-samples/base-golden/gate-result.json",
+      "sourcePath": "base/.xian-harness/protocol/templates/evidence-samples/base-golden/gate-result.json",
+      "sourceHash": "b28b11a1c57c74047fbf91c324ee5d8d195d42c6c46a74858280267915f573be",
+      "targetHash": "b28b11a1c57c74047fbf91c324ee5d8d195d42c6c46a74858280267915f573be",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/evidence-samples/base-golden/README.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/evidence-samples/base-golden/README.md",
+      "sourceHash": "582b05f1189a183eb4e49d1c4fa60085410ce8bc1991d2954f750de36db97d9c",
+      "targetHash": "582b05f1189a183eb4e49d1c4fa60085410ce8bc1991d2954f750de36db97d9c",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/evidence-samples/base-golden/verify-result.json",
+      "sourcePath": "base/.xian-harness/protocol/templates/evidence-samples/base-golden/verify-result.json",
+      "sourceHash": "1142d84b28c1a9d50d805a783daf1b99e7d252beb0b402c401ce3c50931dfedf",
+      "targetHash": "1142d84b28c1a9d50d805a783daf1b99e7d252beb0b402c401ce3c50931dfedf",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/evidence-samples/base-golden/workbench-snapshot.json",
+      "sourcePath": "base/.xian-harness/protocol/templates/evidence-samples/base-golden/workbench-snapshot.json",
+      "sourceHash": "bbb5a09d2135f968b286bcff6dc2df30d03ef3ac8cd393db3731ce7ca08d9914",
+      "targetHash": "bbb5a09d2135f968b286bcff6dc2df30d03ef3ac8cd393db3731ce7ca08d9914",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/hooks/hook-contract.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/hooks/hook-contract.md",
+      "sourceHash": "8f9cd4fb79259e86519c94c985f1aaa5af31bb796fa19faf2388113946730e9b",
+      "targetHash": "8f9cd4fb79259e86519c94c985f1aaa5af31bb796fa19faf2388113946730e9b",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/project-status.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/project-status.md",
+      "sourceHash": "e8f79b410d32fbd4f5b3544eb5bb81c23f24e78499d9ec2d6ac2463fb0dac90e",
+      "targetHash": "e8f79b410d32fbd4f5b3544eb5bb81c23f24e78499d9ec2d6ac2463fb0dac90e",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/quality-gate-report.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/quality-gate-report.md",
+      "sourceHash": "fd74a67548a563d83ca13bdc5ecc0095ba6ccd3e65d7dd05513d8c38f5e4fb00",
+      "targetHash": "fd74a67548a563d83ca13bdc5ecc0095ba6ccd3e65d7dd05513d8c38f5e4fb00",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/README.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/README.md",
+      "sourceHash": "97d146f02aa11fdcfbf8aa28dc4365d8e2d8a85bffe11f755ce6a15e9bdae656",
+      "targetHash": "97d146f02aa11fdcfbf8aa28dc4365d8e2d8a85bffe11f755ce6a15e9bdae656",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/requirement.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/requirement.md",
+      "sourceHash": "e7aa4679cfa87a470969c9426a2c949480f8e7365654a842eec861907b9e5f73",
+      "targetHash": "e7aa4679cfa87a470969c9426a2c949480f8e7365654a842eec861907b9e5f73",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/tasks.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/tasks.md",
+      "sourceHash": "6f913ae28b09ec1bcf95b8cc65e1a37ee27cb38eb1e7e8a82d3434b02763747f",
+      "targetHash": "6f913ae28b09ec1bcf95b8cc65e1a37ee27cb38eb1e7e8a82d3434b02763747f",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/verify-report.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/verify-report.md",
+      "sourceHash": "2b15cd235ca39d7713e95effa79e7b2cbc31615300a27f6872250acebc78de13",
+      "targetHash": "2b15cd235ca39d7713e95effa79e7b2cbc31615300a27f6872250acebc78de13",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/protocol/templates/workbench-snapshot.md",
+      "sourcePath": "base/.xian-harness/protocol/templates/workbench-snapshot.md",
+      "sourceHash": "131f47748db8bfb3472cb4519c53dc741f26a28e091a25c5fc79b8661af45e6d",
+      "targetHash": "131f47748db8bfb3472cb4519c53dc741f26a28e091a25c5fc79b8661af45e6d",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/README.md",
+      "sourcePath": "base/.xian-harness/README.md",
+      "sourceHash": "7ac526281618eaf750fc172deec6460f6599478cccb5a2c0f6a4463ddc628248",
+      "targetHash": "7ac526281618eaf750fc172deec6460f6599478cccb5a2c0f6a4463ddc628248",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/schemas/agent-pair-providers.schema.json",
+      "sourcePath": "base/.xian-harness/schemas/agent-pair-providers.schema.json",
+      "sourceHash": "2293463277c7555403d79b1253bdd6bbe079fcad40e3913109bf1fd731ceb5a1",
+      "targetHash": "2293463277c7555403d79b1253bdd6bbe079fcad40e3913109bf1fd731ceb5a1",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": ".xian-harness/skill-registry.json",
+      "sourcePath": "profiles/python/.xian-harness/skill-registry.json",
+      "sourceHash": "cf66c68d9223fdd088f44bad216d6ed7c2ffb409def53793dd5b0ad68ab18979",
+      "targetHash": "cf66c68d9223fdd088f44bad216d6ed7c2ffb409def53793dd5b0ad68ab18979",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": "AGENTS.md",
+      "sourcePath": "profiles/python/AGENTS.md",
+      "sourceHash": "5467b01444b3b7d2cc6627e14152ecaebeeb82ce8b81f023a071b42147fb7170",
+      "targetHash": "5467b01444b3b7d2cc6627e14152ecaebeeb82ce8b81f023a071b42147fb7170",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": "CLAUDE.md",
+      "sourcePath": "profiles/python/CLAUDE.md",
+      "sourceHash": "c9374705ec65b6edb645f1af94ba7666c55f57eddb0bada1f5f8c0e2d26f3cd8",
+      "targetHash": "c9374705ec65b6edb645f1af94ba7666c55f57eddb0bada1f5f8c0e2d26f3cd8",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": "hooks/pre-tool-use-core.cjs",
+      "sourcePath": "base/hooks/pre-tool-use-core.cjs",
+      "sourceHash": "7a70da87514df818a6d6406a142b754b47836eea69eb818c7bffdf817b8c93b6",
+      "targetHash": "7a70da87514df818a6d6406a142b754b47836eea69eb818c7bffdf817b8c93b6",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": "hooks/session-start-core.cjs",
+      "sourcePath": "base/hooks/session-start-core.cjs",
+      "sourceHash": "f95d6242f0664cce6ab962ec04b5888ad8b4ce1e21afc76b0f6b19bd64a102d2",
+      "targetHash": "f95d6242f0664cce6ab962ec04b5888ad8b4ce1e21afc76b0f6b19bd64a102d2",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": "hooks/stop-core.cjs",
+      "sourcePath": "base/hooks/stop-core.cjs",
+      "sourceHash": "b392aa33ae447c9ae075ca742267cd4c557da34768ea382d06106068c22960fa",
+      "targetHash": "b392aa33ae447c9ae075ca742267cd4c557da34768ea382d06106068c22960fa",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
+      "path": "templates/python-project-checklist.md",
+      "sourcePath": "profiles/python/templates/python-project-checklist.md",
+      "sourceHash": "3616e04a6ac9521a4dab910e1cf2e1bb4922ced0d68acec518061ee6512af74c",
+      "targetHash": "3616e04a6ac9521a4dab910e1cf2e1bb4922ced0d68acec518061ee6512af74c",
+      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    }
+  ]
+}

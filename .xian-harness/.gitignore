@@ -1,0 +1,14 @@
+# Project-level change manifest is a derived cache. It is rebuilt from
+# canonical change artifacts and should not be committed by target projects.
+/changes/.manifest.json
+
+# Change-local locks and lease records are transient Runtime coordination
+# artifacts. They must never enter source identity or release evidence.
+/changes/**/.change-lease.json
+/changes/**/.change-lease.lock/
+/changes/**/.lock
+
+# Harness transition and verify logs are release evidence and must remain
+# Git-trackable even when a target repository has a broad "*.log" ignore rule.
+!changes/*/.change-transition.log
+!changes/*/verify/evidence/logs/*.log

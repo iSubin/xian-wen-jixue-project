@@ -1,0 +1,18 @@
+{
+  "protocol": "xian-harness.sample.experience-disposition",
+  "changeId": "base-golden-sample",
+  "reviewedAt": "2026-06-09 00:00:00",
+  "dispositions": [
+    {
+      "candidateId": "sample-evidence-bundle",
+      "decision": "promote",
+      "targetAsset": "harness-pack/base/.xian-harness/protocol/templates/evidence-samples/base-golden",
+      "why": "A reusable evidence bundle helps future agents understand the expected acceptance, verification, gate, Workbench, archive, and experience review chain.",
+      "risk": "low",
+      "evidence": [
+        ".xian-harness/changes/base-golden-sample/archive/archive-summary.md",
+        ".xian-harness/changes/base-golden-sample/workbench/snapshot.json"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "protocol": "xian-harness.sample.verify-result",
+  "changeId": "base-golden-sample",
+  "status": "pass",
+  "verifiedAt": "2026-06-09 00:00:00",
+  "evidenceDir": ".xian-harness/changes/base-golden-sample/verify/evidence",
+  "commands": [
+    {
+      "id": "VC-001",
+      "command": "bash script/smoke/base-profile-smoke.sh",
+      "status": "pass",
+      "logPath": ".xian-harness/changes/base-golden-sample/verify/evidence/logs/run-001.log",
+      "covers": [
+        "AC-001",
+        "AC-002"
+      ]
+    }
+  ],
+  "evidence": [
+    ".xian-harness/changes/base-golden-sample/verify/evidence/evidence-manifest.json",
+    ".xian-harness/changes/base-golden-sample/verify/evidence/logs/run-001.log"
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "enabled": true,
+  "defaultMode": "chat",
+  "staleThresholdMinutes": 60,
+  "maxHookOutputChars": 2000,
+  "hookObservability": {
+    "enabled": true,
+    "sampleRate": 1,
+    "metrics": true,
+    "decisions": true
+  },
+  "forbiddenSummary": "重型项目状态、workbench、quality-gate、archive evidence、pack state",
+  "outputBudgetSummary": "优先 diff 摘要或文件名；测试失败只给摘要和末尾日志；rg 必须限定范围；大输出写入 evidence 文件",
+  "verificationSummary": "默认定向测试；完整套件仅用于 deep-audit、gate、release 或用户明确要求；change 退出前做一次定向复测、typecheck、diff-check",
+  "forbiddenPaths": [
+    ".xian-harness/pack-state.json",
+    ".xian-harness/bootstrap-context.json",
+    ".xian-harness/workbench/**",
+    ".xian-harness/quality-gates/**",
+    ".xian-harness/archive/**"
+  ],
+  "modes": {
+    "chat": {
+      "maxSkills": 0,
+      "evidenceRequired": false,
+      "disclosure": "轻量回答，不访问仓库"
+    },
+    "change": {
+      "maxSkills": 3,
+      "evidenceRequired": false,
+      "disclosure": "定向变更流程"
+    }
+  }
+}

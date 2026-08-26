@@ -1,0 +1,42 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(d=\"$PWD\"; while [ \"$d\" != / ]; do if [ -f \"$d/.codex/hooks/session-start.cjs\" ]; then printf %s \"$d/.codex/hooks/session-start.cjs\"; exit 0; fi; d=\"$(dirname \"$d\")\"; done; printf %s \".codex/hooks/session-start.cjs\")\"",
+            "statusMessage": "加载历史经验摘要",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "^(Bash|shell|apply_patch|Edit|Write)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "root=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; node \"$root/.codex/hooks/pre-tool-use.cjs\"",
+            "statusMessage": "命令安全检查",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(d=\"$PWD\"; while [ \"$d\" != / ]; do if [ -f \"$d/.codex/hooks/stop.cjs\" ]; then printf %s \"$d/.codex/hooks/stop.cjs\"; exit 0; fi; d=\"$(dirname \"$d\")\"; done; printf %s \".codex/hooks/stop.cjs\")\"",
+            "statusMessage": "同步 change 投影",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

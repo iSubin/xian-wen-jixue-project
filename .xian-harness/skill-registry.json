@@ -1,0 +1,793 @@
+{
+  "version": 1,
+  "profile": "python",
+  "description": "Python profile skill registry for xian-harness generic governance with Python project entry rules.",
+  "entries": [
+    {
+      "name": "xian-open",
+      "profile": "base",
+      "group": "governance",
+      "roles": [
+        "product-owner"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "open",
+          "requirement",
+          "需求",
+          "接入",
+          "澄清",
+          "开一个",
+          "开新"
+        ]
+      },
+      "shortDescription": "Open or resume governed changes.",
+      "keywords": [
+        "open",
+        "intake",
+        "需求",
+        "澄清",
+        "接入",
+        "开一个",
+        "开新",
+        "change"
+      ]
+    },
+    {
+      "name": "xian-next",
+      "profile": "base",
+      "group": "governance",
+      "roles": [
+        "orchestrator"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "$xian-next",
+          "xian-next",
+          "continue",
+          "继续",
+          "下一步",
+          "推进",
+          "go"
+        ]
+      },
+      "shortDescription": "Explicit project direction entry.",
+      "keywords": [
+        "xian-next",
+        "$xian-next",
+        "next-action",
+        "continue",
+        "继续",
+        "下一步",
+        "推进",
+        "go"
+      ]
+    },
+    {
+      "name": "xian-batch",
+      "profile": "base",
+      "group": "governance",
+      "roles": [
+        "batch-orchestrator"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "/goal",
+          "goal",
+          "batch",
+          "批量执行",
+          "批处理",
+          "多个 change",
+          "多变更"
+        ]
+      },
+      "shortDescription": "Run goal-driven change batches.",
+      "keywords": [
+        "goal",
+        "batch",
+        "批量",
+        "串行",
+        "多变更",
+        "/goal",
+        "change",
+        "批处理"
+      ]
+    },
+    {
+      "name": "xian-spec",
+      "profile": "base",
+      "group": "governance",
+      "roles": [
+        "architect"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "spec",
+          "proposal",
+          "规格",
+          "方案"
+        ]
+      },
+      "methodologyProvider": {
+        "name": "xian-engineering-discipline",
+        "role": "engineering-discipline-provider",
+        "absorbedDisciplines": [
+          "brainstorming"
+        ],
+        "sourceSkills": [
+          "brainstorming"
+        ],
+        "lastReviewedAt": "2026-06-10"
+      },
+      "shortDescription": "Define scope and acceptance criteria.",
+      "keywords": [
+        "spec",
+        "proposal",
+        "规格",
+        "验收"
+      ]
+    },
+    {
+      "name": "xian-design",
+      "profile": "base",
+      "group": "governance",
+      "roles": [
+        "architect"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "design",
+          "architecture",
+          "设计",
+          "架构"
+        ]
+      },
+      "methodologyProvider": {
+        "name": "xian-engineering-discipline",
+        "role": "engineering-discipline-provider",
+        "absorbedDisciplines": [
+          "brainstorming",
+          "writing-plans"
+        ],
+        "sourceSkills": [
+          "brainstorming",
+          "writing-plans"
+        ],
+        "lastReviewedAt": "2026-06-10"
+      },
+      "shortDescription": "Design architecture and risk controls.",
+      "keywords": [
+        "design",
+        "架构",
+        "方案",
+        "取舍"
+      ]
+    },
+    {
+      "name": "xian-plan",
+      "profile": "base",
+      "group": "governance",
+      "roles": [
+        "planner"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "plan",
+          "task",
+          "规划",
+          "计划",
+          "普通 TypeScript"
+        ]
+      },
+      "methodologyProvider": {
+        "name": "xian-engineering-discipline",
+        "role": "engineering-discipline-provider",
+        "absorbedDisciplines": [
+          "writing-plans"
+        ],
+        "sourceSkills": [
+          "writing-plans"
+        ],
+        "lastReviewedAt": "2026-06-10"
+      },
+      "shortDescription": "Create tasks and verification mapping.",
+      "keywords": [
+        "plan",
+        "tasks",
+        "计划",
+        "验证映射"
+      ]
+    },
+    {
+      "name": "xian-build",
+      "profile": "base",
+      "group": "governance",
+      "roles": [
+        "builder"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "build",
+          "implement",
+          "开发",
+          "实现"
+        ]
+      },
+      "methodologyProvider": {
+        "name": "xian-engineering-discipline",
+        "role": "engineering-discipline-provider",
+        "absorbedDisciplines": [
+          "test-driven-development",
+          "verification-before-completion"
+        ],
+        "sourceSkills": [
+          "test-driven-development",
+          "verification-before-completion"
+        ],
+        "lastReviewedAt": "2026-06-10"
+      },
+      "shortDescription": "Implement approved tasks with evidence.",
+      "keywords": [
+        "build",
+        "implement",
+        "开发",
+        "实现"
+      ]
+    },
+    {
+      "name": "xian-diagnose",
+      "profile": "base",
+      "group": "governance",
+      "roles": [
+        "diagnostician"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "bug",
+          "error",
+          "not working",
+          "报错",
+          "不生效",
+          "失败",
+          "performance",
+          "slow",
+          "性能",
+          "慢",
+          "卡顿"
+        ]
+      },
+      "methodologyProvider": {
+        "name": "xian-engineering-discipline",
+        "role": "engineering-discipline-provider",
+        "absorbedDisciplines": [
+          "systematic-debugging"
+        ],
+        "sourceSkills": [
+          "systematic-debugging"
+        ],
+        "lastReviewedAt": "2026-06-10"
+      },
+      "shortDescription": "Diagnose bugs, failures, and performance issues.",
+      "keywords": [
+        "bug",
+        "error",
+        "报错",
+        "性能"
+      ]
+    },
+    {
+      "name": "xian-project-startup",
+      "profile": "base",
+      "group": "governance",
+      "roles": [
+        "project-startup"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "project startup",
+          "xian-project-startup",
+          "接手项目",
+          "初始化项目",
+          "项目基线",
+          "项目骨架",
+          "项目开发纪律",
+          "首次进入项目"
+        ]
+      },
+      "shortDescription": "Initial project startup and baseline rebuild.",
+      "keywords": [
+        "project",
+        "startup",
+        "接手项目",
+        "项目基线"
+      ]
+    },
+    {
+      "name": "xian-project-status",
+      "profile": "base",
+      "group": "governance",
+      "roles": [
+        "project-status"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "xian-project-status",
+          "project status",
+          "项目状态",
+          "查看项目状态",
+          "项目健康度",
+          "项目进展"
+        ]
+      },
+      "shortDescription": "Read-only project status summary.",
+      "keywords": [
+        "project",
+        "status",
+        "项目状态",
+        "项目健康度"
+      ]
+    },
+    {
+      "name": "xian-backlog",
+      "profile": "base",
+      "group": "governance",
+      "roles": [
+        "project-backlog"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "xian-backlog",
+          "$xian-backlog",
+          "todo",
+          "backlog",
+          "待办",
+          "记录待办",
+          "工作队列"
+        ]
+      },
+      "shortDescription": "Registry-first project backlog operations.",
+      "keywords": [
+        "todo",
+        "backlog",
+        "project-work-queue",
+        "registry",
+        "待办",
+        "工作队列"
+      ]
+    },
+    {
+      "name": "xian-project-sync",
+      "profile": "base",
+      "group": "governance",
+      "roles": [
+        "project-sync"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "xian-project-sync",
+          "project sync",
+          "同步项目文档",
+          "刷新项目总览",
+          "更新项目状态文档",
+          "同步项目状态"
+        ]
+      },
+      "shortDescription": "Sync verified project documents.",
+      "keywords": [
+        "project",
+        "sync",
+        "同步项目文档",
+        "项目总览"
+      ]
+    },
+    {
+      "name": "xian-project-research",
+      "profile": "base",
+      "group": "governance",
+      "roles": [
+        "project-research"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "xian-project-research",
+          "project research",
+          "外部调研",
+          "参考项目",
+          "开源项目调研",
+          "archetype research",
+          "吸收外部经验"
+        ]
+      },
+      "methodologyProvider": {
+        "name": "xian-engineering-discipline",
+        "role": "engineering-discipline-provider",
+        "absorbedDisciplines": [
+          "research-method",
+          "evidence-first-adoption"
+        ],
+        "sourceSkills": [
+          "directory-driven-research"
+        ],
+        "lastReviewedAt": "2026-06-10"
+      },
+      "shortDescription": "Research external knowledge for adoption.",
+      "keywords": [
+        "research",
+        "调研",
+        "参考项目",
+        "吸收"
+      ]
+    },
+    {
+      "name": "xian-verify",
+      "profile": "base",
+      "group": "governance",
+      "roles": [
+        "verifier"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "verify",
+          "test",
+          "验证",
+          "测试",
+          "自测"
+        ]
+      },
+      "shortDescription": "Run tests and persist verification evidence.",
+      "keywords": [
+        "verify",
+        "test",
+        "验证",
+        "测试"
+      ]
+    },
+    {
+      "name": "xian-review",
+      "profile": "base",
+      "group": "governance",
+      "roles": [
+        "reviewer"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "review",
+          "审查",
+          "复核"
+        ]
+      },
+      "methodologyProvider": {
+        "name": "xian-engineering-discipline",
+        "role": "engineering-discipline-provider",
+        "absorbedDisciplines": [
+          "requesting-code-review",
+          "receiving-code-review"
+        ],
+        "sourceSkills": [
+          "requesting-code-review",
+          "receiving-code-review"
+        ],
+        "lastReviewedAt": "2026-06-10"
+      },
+      "shortDescription": "Review diffs and manage issues.",
+      "keywords": [
+        "review",
+        "审查",
+        "复核",
+        "issue"
+      ]
+    },
+    {
+      "name": "xian-gate",
+      "profile": "base",
+      "group": "governance",
+      "roles": [
+        "gatekeeper"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "gate",
+          "quality",
+          "门禁",
+          "质量"
+        ]
+      },
+      "shortDescription": "Judge quality gate decisions.",
+      "keywords": [
+        "gate",
+        "quality",
+        "门禁",
+        "质量"
+      ]
+    },
+    {
+      "name": "xian-workbench",
+      "profile": "base",
+      "group": "governance",
+      "roles": [
+        "orchestrator"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "workbench",
+          "handoff",
+          "看板",
+          "状态",
+          "交接"
+        ]
+      },
+      "shortDescription": "Create Workbench snapshots and handoffs.",
+      "keywords": [
+        "workbench",
+        "handoff",
+        "看板",
+        "交接"
+      ]
+    },
+    {
+      "name": "xian-archive",
+      "profile": "base",
+      "group": "governance",
+      "roles": [
+        "release-manager"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "archive",
+          "release",
+          "归档",
+          "发布"
+        ]
+      },
+      "methodologyProvider": {
+        "name": "xian-engineering-discipline",
+        "role": "engineering-discipline-provider",
+        "absorbedDisciplines": [
+          "finishing-a-development-branch"
+        ],
+        "sourceSkills": [
+          "finishing-a-development-branch"
+        ],
+        "lastReviewedAt": "2026-06-10"
+      },
+      "shortDescription": "Archive passed changes with release evidence.",
+      "keywords": [
+        "archive",
+        "release",
+        "归档",
+        "发布"
+      ]
+    },
+    {
+      "name": "xian-commit",
+      "profile": "base",
+      "group": "governance",
+      "roles": [
+        "release-manager"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "commit",
+          "push",
+          "提交",
+          "推送",
+          "收口",
+          "交付"
+        ]
+      },
+      "shortDescription": "Close Git delivery with scoped commits.",
+      "keywords": [
+        "commit",
+        "push",
+        "提交",
+        "推送",
+        "收口",
+        "交付",
+        "delivery close"
+      ]
+    },
+    {
+      "name": "xian-release",
+      "profile": "base",
+      "group": "governance",
+      "roles": ["release-manager"],
+      "activation": {
+        "promptPatterns": ["xian-release", "release candidate", "version release", "发版", "版本号", "CHANGELOG", "版本日志", "创建 tag"]
+      },
+      "shortDescription": "Coordinate explicit CI-backed version releases.",
+      "keywords": ["release", "candidate", "changelog", "version", "tag", "发版"]
+    },
+    {
+      "name": "xian-cost",
+      "profile": "base",
+      "group": "governance",
+      "roles": [
+        "cost-analyst"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "cost",
+          "token",
+          "成本",
+          "耗时"
+        ]
+      },
+      "shortDescription": "Record cost, time, and token signals.",
+      "keywords": [
+        "cost",
+        "token",
+        "成本",
+        "耗时"
+      ]
+    },
+    {
+      "name": "xian-experience",
+      "profile": "base",
+      "group": "experience-governance",
+      "roles": [
+        "experience-governor"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "experience",
+          "learning",
+          "复盘",
+          "经验",
+          "沉淀",
+          "吸收"
+        ]
+      },
+      "shortDescription": "Review and promote reusable lessons.",
+      "keywords": [
+        "experience",
+        "复盘",
+        "经验",
+        "沉淀"
+      ]
+    },
+    {
+      "name": "xian-asset-governance",
+      "profile": "base",
+      "group": "experience-governance",
+      "roles": [
+        "asset-governor"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "asset classification",
+          "asset route",
+          "profile pollution",
+          "资产分类",
+          "资产归属",
+          "隔离"
+        ]
+      },
+      "shortDescription": "Route AI assets to the right owner.",
+      "keywords": [
+        "asset",
+        "profile",
+        "资产",
+        "隔离"
+      ]
+    },
+    {
+      "name": "xian-skill-governance",
+      "profile": "base",
+      "group": "experience-governance",
+      "roles": [
+        "skill-governor"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "SKILL.md",
+          "frontmatter",
+          "skill registry",
+          "skill",
+          "技能",
+          "触发词"
+        ]
+      },
+      "shortDescription": "Govern skills and registry activation.",
+      "keywords": [
+        "skill",
+        "registry",
+        "frontmatter",
+        "触发词"
+      ]
+    },
+    {
+      "name": "xian-hook-governance",
+      "profile": "base",
+      "group": "experience-governance",
+      "roles": [
+        "hook-governor"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "hook",
+          "session-start",
+          "forced eval",
+          "user-prompt-submit",
+          "误触",
+          "启动上下文"
+        ]
+      },
+      "shortDescription": "Govern hooks and prompt activation.",
+      "keywords": [
+        "hook",
+        "forced eval",
+        "session-start",
+        "误触"
+      ]
+    },
+    {
+      "name": "xian-agent-governance",
+      "profile": "base",
+      "group": "experience-governance",
+      "roles": [
+        "agent-governor"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "agent",
+          "Verifier",
+          "Gatekeeper",
+          "Builder",
+          "Reviewer",
+          "角色",
+          "子助手"
+        ]
+      },
+      "shortDescription": "Govern Agent roles and handoffs.",
+      "keywords": [
+        "agent",
+        "Verifier",
+        "Gatekeeper",
+        "角色"
+      ]
+    },
+    {
+      "name": "xian-pack-governance",
+      "profile": "base",
+      "group": "experience-governance",
+      "roles": [
+        "pack-governor"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "harness pack",
+          "profile overlay",
+          "manifest.yaml",
+          "pack sync",
+          "安装资产",
+          "profile 边界"
+        ]
+      },
+      "shortDescription": "Govern Pack assets and profile boundaries.",
+      "keywords": [
+        "pack",
+        "manifest.yaml",
+        "profile",
+        "安装资产"
+      ]
+    },
+    {
+      "name": "using-xian-harness",
+      "profile": "base",
+      "group": "governance",
+      "shortDescription": "Skill discovery and state machine entry.",
+      "keywords": [
+        "xian-harness",
+        "using-xian-harness",
+        "skill discovery",
+        "state machine"
+      ],
+      "activation": {
+        "promptPatterns": [
+          "xian-harness",
+          "using-xian-harness"
+        ]
+      }
+    }
+  ]
+}

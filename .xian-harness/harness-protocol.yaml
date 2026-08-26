@@ -1,0 +1,14 @@
+version: 1
+name: xian-wen-jixue-project
+adapters: []
+language:
+  default: zh-CN
+  protocolLanguage: en
+  businessLanguage: zh-CN
+  codeAnchorLanguage: en
+governance:
+  defaultMode: governed
+  defaultIsolation: branch
+  costTracking: true
+  engineeringTrace:
+    level: standard

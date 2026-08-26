@@ -1,200 +1,165 @@
 ---
 name: xian-commit
-description: AI coding agent 的 Git 交付治理入口。当用户要求提交、commit、push、推送、收口或处理 dirty worktree（当前工作区有未提交变化）时使用本 skill。按 prompts/commit-message.md 写 message,调用标准 git 命令,hook/policy 兜底校验。普通 push 由 policy 控制,force push 和破坏性 git 动作必须显式授权。
+description: Use when a verified or archived change needs Git delivery, or when the user asks to commit, push, close out, or handle a dirty worktree.
 ---
 
-# xian-commit 工作流
+# xian-commit
 
-xian-commit 是面向 code agent 的 Git 交付治理资产集合。你(AI agent)处理 commit / push / dirty worktree（当前工作区有未提交变化） / commit message / hook 拦截时,按下面工作流走。
+## 用途
 
-## 核心原则
+收口 Git delivery（代码交付）：归因 dirty worktree（当前工作区有未提交变化）、拆分合理 commit（提交），并按项目策略决定是否 push（推送）。
 
-1. **细粒度 commit**:不要把一堆无关改动塞进一个 commit。按逻辑单元拆分,一个 commit 做一件事。
-2. **commit message 由你写**:你看 diff,自己想 type / 标题 / 正文。**不要让工具替你想**。
-3. **形式兜底靠 hook**:`hooks/pre-commit` 和 `hooks/commit-msg` 校验形式。你写错了它们会拦,但你不能依赖它们替你思考。
-4. **普通 push 由 policy 控制**:默认配置为 `push.mode=auto-safe`,安全条件全部满足时可执行普通 push;配置缺失或 `explicit-only` 时需要用户明确说"push"或"推送"。commit 是本地动作,push 是对外发布。
-5. **不绕过 hook**:永远不要 `git commit --no-verify`。hook 误拦修 hook,不绕过。
-6. **无状态优先**:只从当前 git 事实、hook 输出、policy/config 和本轮明确授权判断,不要记忆"上次授权"。
+## 触发条件
 
-## 触发语义
+Use this skill when the user asks to commit, push, close out, deliver, handle dirty worktree, or finish Git delivery after a change is verified or archived.
 
-| 用户说法 | 进入路径 |
-|---|---|
-| "提交吧" / "commit it" | 本地交付收口:检查 dirty worktree（当前工作区有未提交变化）,拆分并执行 commit |
-| "推送一下" / "push" | 远端交付收口:检查 clean、ahead/behind、upstream 后执行普通 push |
-| "commit and push" / "提交并推送" | 先本地收口,再远端收口;这句话可作为普通 push 授权 |
-| "收口" / "交付一下" | 先读 git 事实;dirty 走本地收口,clean 且 ahead 走远端收口 |
+## 协议输入
 
-change finished / archived 只说明业务完成,不代表 Git 交付完成。worktree clean + commit 完成才是本地交付收口;分支不再 ahead 且 push 完成才是远端交付收口。
+- `git status --short --branch`
+- `git diff --stat`
+- `git diff --cached --stat`
+- `git ls-files --others --exclude-standard`
+- `.xian-commit/config`
+- `AGENTS.md` / `CLAUDE.md` commit message rules
+- `.xian-harness/changes/{change-id}` when closing a governed change
+- `.xian-harness/releases/{change-id}` when closing archive evidence
 
-## commit 流程
+## 执行流程
 
-### 1. Dirty worktree 归因
+1. Attribute dirty worktree（归因未提交文件） before staging anything.
+2. Split unrelated changes into separate commits or stop when scope is unclear.
+3. Stage only explicit pathspecs for the current logical commit.
+4. Write a Chinese commit message with type, title, and explanatory body.
+5. Commit without `--no-verify`.
+6. Follow `.xian-commit/config` push policy and the current task's publish intent.
+7. Report commit hash, push status, and any remaining worktree state.
 
-提交前先把当前工作区事实归因清楚。运行:
+## 默认交付意图
 
-```sh
-git status --short --branch
-git diff --stat
-git diff --cached --stat
-git ls-files --others --exclude-standard
-```
+- 实现、修复、执行或完成类 change 携带默认 publish intent。最终 commit clean 且 review / Gate 已通过时，当前主 Agent 直接完成 fast-forward push，不得停下来等待用户再次授权；普通发布不自动承担 integration coordinator。
+- `push.mode=explicit-only` 只禁止 post-commit hook 自动 push；它不禁止当前主 Agent 显式 push。普通 push 只执行 Git tree、远端分叉和 force-push 安全检查，不触发 full suite。
+- 只读、评审、分析、设计、parked 或 `no-commit/no-push` 请求不进入默认发布路径。普通中间 commit 仍只保存在本地。
 
-必要时再读 `git diff`、`git diff --cached` 或新建文件内容。
+## Workspace Finish 边界
 
-把 staged / unstaged / untracked 分成三类:
+- 串行 change 默认 `serial-trunk`（串行主线）：在当前主工作区的本地默认分支持续小粒度 commit，不自动创建 feature branch 或 worktree（工作树）。
+- `serial-trunk` 必须使用 `push.mode=explicit-only`；中间 commit 只保存在本地，普通发布在 change-local 验证、Gate、clean tree 和远端安全检查通过后显式 push。
+- 只有真实并行、用户明确要求、无法归因的 dirty worktree 或长时间高风险实验才使用 `parallel-isolated`（并行隔离），创建 worktree 与本地临时 branch，默认不推远端。
+- worktree 管理是本地执行纪律，不新增 change phase，不新增 tracked worktree registry，也不新增强制治理文档或 commit evidence（提交证据）。
+- 创建、删除或 prune worktree 等 worktree 拓扑变化不得触发 verify evidence 失效、full verify 或项目投影 churn（投影抖动）。
+- 如果确实因真实并行、用户明确要求、无法归因的 dirty worktree 或长时间高风险实验使用 worktree，创建者负责 merge、目标分支验证和清理。
+- 只有 Git tree matches verified tree（Git 文件树匹配已验证文件树）时，才允许 commit-bound evidence reuse（提交绑定证据复用）；真实代码树变化必须重新验证。
 
-1. **属于本次交付**: 与用户当前要求或已完成工作一致,可以进入 commit 计划。
-2. **不属于本次交付**: 暂停并询问用户是保留、拆分、丢弃还是另开处理。
-3. **来源不明**: 暂停,列出文件和判断依据,不要提交。
+## Release Verify 边界
 
-dirty worktree（当前工作区有未提交变化）只是代码事实,不自动代表可以提交,也不推进任何业务 change 状态。禁止在未归因前 `git add -A`。
-
-### 2. 交付收口的即时状态
-
-xian-commit 不写长期状态,但本轮运行要按 Git 事实判断即时状态:
-
-| 状态 | 判定 | 下一步 |
-|---|---|---|
-| `dirty-unattributed` | staged / unstaged / untracked 尚未归因 | 先归因 |
-| `committable` | 文件归因清楚,提交范围可解释 | 做 commit 计划 |
-| `local-delivered` | worktree clean,本地 commit 完成 | 检查是否 ahead |
-| `pending-push` | worktree clean 且 branch ahead | 等待本轮明确 push 授权 |
-| `remote-delivered` | worktree clean 且 branch 不 ahead | 无需 Git 收口 |
-| `blocked` | behind、diverged、protected branch 或来源不明 | 停止并说明阻断 |
-
-### 3. 拆细粒度 commit 计划
-
-在你的脑子里(不调用工具),决定:
-
-- 这次改动要拆成 N 个 commit?
-- 每个 commit 涉及哪些文件?
-- 每个 commit 是什么 type?(feat/fix/refactor/docs/test/chore)
-- 每个 commit 的标题(纯中文)和正文(说明为什么)?
-
-拆分原则:
-
-- 一个 commit 一个逻辑单元(feature / bugfix / refactor / doc / test)
-- 源码和对应测试可以放一起(测试跟代码一起 commit)
-- 跨模块的大重构,按模块拆
-- 生成日志、runtime、临时文件和证据噪声不能混入业务 commit
-- hook / skill / policy 同步属于治理资产,应和业务代码分开提交
-
-### 4. 逐个 commit
-
-对每个 commit:
+- 普通 commit 与普通 push 不运行或读取 Release Verify，也不因 branch merge、batch 或代码规模自动形成 release candidate。
+- 普通 commit、push、branch merge、batch 或 Goal 完成本身不触发 full suite。
+- 只有版本、tag、Pack rollout、registry artifact 或 deploy candidate 等明确 release intent 才单独运行：
 
 ```sh
-git add <这个 commit 涉及的文件>
-git commit -m "$(cat <<'EOF'
-<type>: <纯中文标题>
-
-<中文正文,说明为什么>
-EOF
-)"
+xian-harness release verify --target <target-project> --json
 ```
 
-注意:
+- Publication adapter 只消费精确匹配 immutable release candidate 的 passing Release Verify result；缺少结果时拒绝发布，不在 publish 命令内部自动补跑。
+- Release Verify 后不得修改 candidate tree；Git tree、test portfolio、toolchain、release policy 或 current accepted contracts 变化都会形成新的 release candidate identity。
+- CI 对同一 immutable candidate 只运行一次 Release Verify；tag、registry 与 deploy stage 消费同一 result，不重复执行 full suite。
 
-- 用 heredoc 写多行 message,不要用多个 `-m`
-- `--no-verify` 永远不要加
+## 快速归档证据收口
 
-### 5. 如果 hook 拦截
-
-`pre-commit` 或 `commit-msg` 会输出问题 + 期望格式。看输出,按 [prompts/commit-message.md](prompts/commit-message.md) 调整。
-
-**不要绕过**(不加 `--no-verify`)。修 message 或修 staged 文件,重新 commit。
-
-### 6. 全部 commit 完成后
-
-读取 `.xian-commit/config` 的 `push.mode`:
-
-- `explicit-only` 或未配置:停下来,告诉用户:"已完成 N 个细粒度 commit,是否 push?"
-- `auto-safe`:如果本轮刚完成 commit、tracked/staged worktree 干净、当前分支只 ahead、不 behind / diverged、有 upstream、未匹配 protected branch,则允许显式 push 到 upstream 分支。未跟踪文件不单独阻断 auto-safe。如果任一条件不满足,停下来说明原因并等待用户明确授权。
-- `never`:不要 push,并说明项目 policy 禁止 push。
-
-**不要把"继续"解释为 push 授权**。只有本轮明确说 push,或 `push.mode=auto-safe` 且安全条件同时满足,才能 push。
-
-## push 流程(显式授权或 auto-safe)
+当 dirty worktree 只包含同一个 change 的 archive evidence（归档证据）和 project projection（项目投影）时，可以走快路径，但必须先运行只读 close-plan（收口计划）命令：
 
 ```sh
-git push
+xian-harness delivery close-plan --target <target-project> --json
 ```
 
-`pre-push` hook 会检查当前分支相对 upstream 的 behind 状态。如果被拦:
+只有当返回的 `status` 是 `archive-evidence-close`，且 `changeId` 指向本次归档 change 时，才允许进入快路径。`status` 是 `unknown`、`changeId` 为空、`unknownPaths` 非空或 `mixedChangeIds` 非空时，必须回到常规 dirty worktree 归因。
 
-```sh
-git pull --rebase origin <branch>
-git push
+快路径仍必须确认：
+
+1. `archive-result.json` status 是 `archived`。
+2. `release verify` 或 release acceptance evidence 是 pass（通过）。
+3. `git diff --check` 通过。
+4. secret literal scan（敏感字面量扫描）没有发现真实密钥。
+
+## 常见分支
+
+- 常规路径：归因 dirty worktree，拆分 scoped commit，再按 push policy 收口。
+- archive evidence close：只在 close-plan 明确归因同一 change 时使用快路径。
+- 来源不明：停止并列出文件，不提交。
+- branch behind/diverged：停止，说明需要先同步，不自动 rebase 或 force push。
+- push policy 禁止：只完成本地 commit，并说明远端未发布。
+
+## 确定性工具
+
+- `git status --short --branch`
+- `git diff --stat`
+- `git diff --cached --stat`
+- `git ls-files --others --exclude-standard`
+- `git diff --check`
+- `git commit`
+- `git push`
+- `xian-harness delivery close-plan --target <target-project> --json`
+
+## 必需证据
+
+- Dirty worktree attribution（工作区归因） summary.
+- Staged path list for each commit.
+- Commit hash and Chinese commit message.
+- Push decision and policy reason.
+- Remaining dirty / ahead / behind state.
+
+## commit message 格式
+
+```text
+<type>: 中文简短标题
+
+中文正文，说明改了什么、为什么改、影响范围。
 ```
 
-如果用户没有明确说 push,只报告当前分支 ahead/behind 状态,不要代替用户发布远端。
+常用 type：`feat`、`fix`、`refactor`、`docs`、`test`、`chore`。
 
-例外:`push.mode=auto-safe` 且本地交付收口后安全条件全部满足时,可以执行普通 push。post-commit 仍会触发 `pre-push` 做第二道 behind / protected / never 校验。auto-safe 不允许 `--force`、`--force-with-lease` 或任何会改写历史的动作。
+## 参考样例
 
-## explicit-only 动作
+- `replace-change-session-lease-with-scoped-file-lock`: archive evidence close 后的 commit / push 收口参考。
+- `compact-historical-change-artifacts`: path-scoped staging 与 auto-safe push 参考。
 
-以下动作必须逐项获得本轮明确授权:
+## 自检清单
 
-- `git push`、`git push --force`、`git push --force-with-lease`
-- `git reset`、`git clean`
-- 删除 branch / tag
-- `git stash pop` 或可能覆盖工作区的 stash 操作
-- 对已发布提交执行 rebase / amend / squash
+- 是否先归因 staged / unstaged / untracked 文件？
+- 是否避免了 `git add -A` 和 `git add .`？
+- 是否每个 commit 只包含一个逻辑单元？
+- 是否写了中文标题和中文正文？
+- 是否没有使用 `--no-verify`？
+- 是否按 `.xian-commit/config` 判断 push？
 
-普通 push 可以由"push"、"推送一下"、"commit and push"明确授权,或由 `push.mode=auto-safe` 在安全条件全部满足时触发。force、reset、clean、delete 不能从"继续"、auto-safe 或历史上下文推断授权。
+## 输出
 
-## policy/config
+- Commit hash（提交哈希）和标题。
+- Push（推送）是否完成，以及原因。
+- Remaining worktree / ahead / behind status.
+- 如果阻断，给出最小下一步。
 
-可选配置文件为 `.xian-commit/config`,格式见 [policy.example.conf](policy.example.conf)。
+## 交互预算
 
-最小 schema 只覆盖:
+- 必须：obey the current hook-provided Interaction Budget before reading files or running commands.
+- 必须：keep chat-mode requests tool-free unless the user explicitly asks for inspection, snapshot refresh, deep audit, or change execution.
+- 必须：require explicit deep-audit or change intent before reading pack state, workbench, quality-gate, archive, or other large project status artifacts.
 
-- `push.mode`
-- `branch.protected`
-- `path.allow`
-- `path.deny`
-- `message.types`
-- `message.title_language`
-- `message.body_required`
+## 交接规则
 
-`path.allow` 在 denylist 前生效,用于放行项目明确拥有的协议证据或审计产物。默认 pre-commit 不拒绝普通 `*.log`;项目如需限制日志,应通过 `path.deny` 自行配置。
+- 当前请求携带 publish intent 且不存在真实阻塞时，由同一主 Agent在同一任务中完成 commit 与 push；只有明确 release intent 才另行执行 Release Verify。只有 Git delivery 完成后才输出终态结果，不输出等待用户回复“继续”的 handoff。
+- 当前请求不携带 publish intent 时，输出时先说明 commit / push 结果、剩余工作区状态和阻断风险；末尾输出 `下一步建议：<中文下一步>`，空一行后单独输出 `$xian-xxx`，再空一行输出 `直接回复“继续”即可进入该步骤。`；不要在首屏附加“因为...”。
+- 如果 Git delivery 已完成且项目 idle，不要推荐继续提交；推荐下一项真实需求或项目状态查看。
+- 如果 dirty worktree 来源不明，不要输出 `直接回复“继续”即可进入该步骤。`；改为要求用户决定保留、拆分或另开处理。
+- 表达层原则：中文优先，默认用自然中文给结论、必要风险和下一步；必须保留英文术语、协议字段、状态名或命令名时，紧跟中文括注解释；不写“流程报告 / Review 报告 / evidence 清单”式长篇；只有 deep-audit、gate、verify 或用户明确要求完整显性化时才展开治理细节。
+- Default mapping: clean + ahead -> push policy check; dirty attributed -> commit; dirty unknown -> stop for attribution; behind/diverged -> stop for synchronization decision.
+- If the mapping conflicts with runtime `nextAction`, state the conflict and run `$xian-next` or `xian-harness continue --json` for arbitration.
 
-`push.mode` 取值:
+## 约束与原因
 
-- `auto-safe`:默认配置,commit 完成后安全条件满足时自动普通 push。
-- `explicit-only`:关闭自动 push,只有当前用户请求明确说 push 才执行普通 push。
-- `never`:拒绝所有 push。旧配置 `disabled` 视为 `never` 兼容。
-
-policy/config 是规则,不是运行状态。不要在里面记录 change 阶段、上次 push 授权或 agent 计划。
-
-本 skill 同时适用于 Codex 和 Claude Code。第一版不分叉平台专用说明,如果未来触发语义明显分化再拆源文件。
-
-changelog 只做非阻断提醒,不作为 commit / push / gate 的阻断条件。
-
-## changelog 策略
-
-默认不生成、不维护 changelog。只有项目 policy 或用户明确要求时,才检查 staged 范围是否包含对应 changelog 文件。
-
-检查结果只进入交付摘要:
-
-- `not-required`
-- `recommended`
-- `required-by-policy`
-- `present`
-- `missing-nonblocking`
-
-即使项目 policy 声明 changelog required,缺失也只作为 `missing-nonblocking` 进入交付摘要;`xian-commit` 不因 changelog 缺失阻断 commit、push 或 gate。
-
-## 不要做的事
-
-- 无脑 `git add -A` 或 `git add .`(会污染 commit,把临时文件、`.xian-relay/`、secrets 一并加)
-- `git commit --no-verify`(绕过 hook)
-- 把 `.xian-relay/`、`*.env`、`*.tmp`、`*.swp`、`id_rsa`、`*.pem`、`.DS_Store` 等 staged
-- push 时未经用户授权
-- force push / reset / clean / delete / stash pop 未逐项确认
-- 用英文写 commit 标题
-- commit message 加 emoji
-- 缺正文的 commit(只有 `<type>: <标题>` 一行)
-
-详细规范见 [prompts/commit-message.md](prompts/commit-message.md)。
+- 不要使用 `git add -A` 或 `git add .`。原因：无差别 staging 会把临时文件、运行态派生产物或 unrelated changes 混进交付，破坏 commit 事实边界。
+- 不要使用 `git commit --no-verify`。原因：绕过 hook 会跳过项目提交格式、安全和路径策略，破坏交付证据链。
+- 不要提交来源不明的 dirty 文件。原因：Git commit 是产品事实，不能把未知运行态漂移包装成已完成工作。
+- 不要把多个无关逻辑单元放进一个 commit。原因：后续 review、revert 和 release attribution 需要 commit 边界清晰。
+- 不要把 read-only、review、design、parked 或 `no-push` 意图推断成 publish intent。原因：默认授权只来自当前具体实现任务与项目规则，明确的范围缩小始终优先。
+- 不要执行 force push、reset、clean、stash pop 或删除分支。原因：这些动作会覆盖或删除用户状态，必须逐项获得本轮明确授权。

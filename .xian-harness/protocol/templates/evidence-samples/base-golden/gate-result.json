@@ -1,0 +1,30 @@
+{
+  "protocol": "xian-harness.sample.gate-result",
+  "changeId": "base-golden-sample",
+  "status": "pass",
+  "checkedAt": "2026-06-09 00:00:00",
+  "summary": {
+    "blockingCount": 0,
+    "qualityIssueCount": 0,
+    "acceptanceCoverage": "pass"
+  },
+  "inputs": {
+    "acceptanceCriteria": ".xian-harness/changes/base-golden-sample/acceptance-criteria.md",
+    "verifyResult": ".xian-harness/changes/base-golden-sample/verify/verify-result.json",
+    "evidenceManifest": ".xian-harness/changes/base-golden-sample/verify/evidence/evidence-manifest.json"
+  },
+  "evidence": [
+    {
+      "kind": "acceptance",
+      "path": ".xian-harness/changes/base-golden-sample/acceptance-criteria.md"
+    },
+    {
+      "kind": "verification",
+      "path": ".xian-harness/changes/base-golden-sample/verify/verify-result.json"
+    },
+    {
+      "kind": "gate",
+      "path": ".xian-harness/changes/base-golden-sample/gate/quality-issues.json"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "profile": "python",
+  "maxBytes": 1024,
+  "description": "Profile-based bootstrap context manifest for xian-harness Python profile.",
+  "sources": [
+    {
+      "label": "Xian Harness Current State",
+      "path": ".xian-harness/state.yaml",
+      "kind": "state-summary",
+      "required": false
+    }
+  ]
+}

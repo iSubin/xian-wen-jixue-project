@@ -1,0 +1,29 @@
+{
+  "protocol": "xian-harness.sample.workbench-snapshot",
+  "changeId": "base-golden-sample",
+  "generatedAt": "2026-06-09 00:00:00",
+  "phase": "archive",
+  "recommendedRoute": {
+    "role": "maintainer",
+    "nextAction": "Review archive summary and experience disposition before reusing this sample."
+  },
+  "verification": {
+    "status": "pass",
+    "evidenceDir": ".xian-harness/changes/base-golden-sample/verify/evidence"
+  },
+  "qualityGate": {
+    "status": "pass",
+    "blockingCount": 0,
+    "qualityIssueCount": 0
+  },
+  "handoff": {
+    "reader": "next-agent",
+    "facts": [
+      "acceptance-criteria.md",
+      "verify-result.json",
+      "gate-result.json",
+      "archive-summary.md",
+      "experience-disposition.json"
+    ]
+  }
+}
