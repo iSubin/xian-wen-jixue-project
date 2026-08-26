@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "mode": "project-doc-sync",
+  "target": "<target-project>",
+  "generatedAt": "2026-08-26T20:54:03+08:00",
+  "status": "fail",
+  "inputs": {
+    "projectStatusPath": ".xian-harness/project/project-status.json",
+    "docsIndexPath": "docs/README.md"
+  },
+  "summary": {
+    "issueCount": 1,
+    "blockingCount": 1,
+    "warningCount": 0
+  },
+  "issues": [
+    {
+      "id": "docs.root-entry.broken-link:LICENSE",
+      "rule": "docs.root-entry.broken-link",
+      "severity": "P1",
+      "status": "open",
+      "path": "LICENSE",
+      "sourcePath": "README.md",
+      "message": "README.md contains a Markdown link that does not resolve to an existing local path.",
+      "recommendation": "Update the root instruction link, restore the missing document, or move the detail into docs/README.md.",
+      "evidence": [
+        "README.md"
+      ]
+    }
+  ],
+  "freshnessIssues": [],
+  "fixes": {
+    "applied": false,
+    "createdDocuments": [],
+    "updatedIndexes": [],
+    "skippedIssues": []
+  },
+  "paths": {
+    "json": ".xian-harness/project/doc-sync-report.json",
+    "markdown": ".xian-harness/project/doc-sync-report.md"
+  }
+}

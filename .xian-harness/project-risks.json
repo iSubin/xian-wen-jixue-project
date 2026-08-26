@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "type": "project-risks",
+  "lastUpdatedAt": "2026-06-24T00:00:00+08:00",
+  "lastUpdatedBy": "redefine-project-status-md-as-render-output",
+  "items": [
+    {
+      "id": "render-source-drift",
+      "category": "documentation",
+      "title": "Rendered document may drift from canonical facts",
+      "description": "Rendered Markdown can become stale when canonical facts change without re-render.",
+      "status": "active",
+      "severity": "P2",
+      "likelihood": "medium",
+      "impact": "Continue or project review may see stale human-readable docs.",
+      "mitigation": "Run docs status and docs render --fix during archive.",
+      "provenance": {
+        "introducedAt": "redefine-project-status-md-as-render-output",
+        "lastTouchedAt": "redefine-project-status-md-as-render-output"
+      }
+    }
+  ]
+}

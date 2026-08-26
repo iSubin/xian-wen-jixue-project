@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "type": "capability-registry",
+  "lastUpdatedAt": "2026-06-24T00:00:00+08:00",
+  "lastUpdatedBy": "redefine-project-status-md-as-render-output",
+  "items": [
+    {
+      "id": "document-render-pipeline",
+      "category": "project-harness",
+      "title": "Document Render Pipeline",
+      "description": "Machine-rendered project status documents with sourceHash freshness.",
+      "status": "active",
+      "maturityLevel": "mvp",
+      "owningSkill": "xian-project-status",
+      "provenance": {
+        "introducedAt": "redefine-project-status-md-as-render-output",
+        "lastTouchedAt": "redefine-project-status-md-as-render-output"
+      }
+    }
+  ]
+}

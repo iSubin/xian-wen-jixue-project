@@ -43,3 +43,13 @@
 - 新的重要架构决策应在文档中说明背景、结论、边界和迁移方式。
 - 不提交 API Key、Cookie、SESSDATA、访问令牌或用户私有内容。
 - Claude Code 课程、飞书发布和课程专用抓取资产已迁至独立工程 `xian-courses-ai/xian-claude-code-course`。
+
+## Project Harness Documents
+
+- docs/项目说明.md: [项目说明.md](项目说明.md)
+- docs/项目基线.md: [项目基线.md](项目基线.md)
+- docs/项目开发纪律.md: [项目开发纪律.md](项目开发纪律.md)
+- docs/项目情况.md: [项目情况.md](项目情况.md)
+- docs/项目状态.md: [项目状态.md](项目状态.md)
+- docs/需求文档.md: [需求文档.md](需求文档.md)
+- docs/待办清单.md: [待办清单.md](待办清单.md)
