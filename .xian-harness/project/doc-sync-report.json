@@ -2,33 +2,81 @@
   "version": 1,
   "mode": "project-doc-sync",
   "target": "<target-project>",
-  "generatedAt": "2026-08-26T20:54:03+08:00",
-  "status": "fail",
+  "generatedAt": "2026-08-26T21:09:18+08:00",
+  "status": "warning",
   "inputs": {
     "projectStatusPath": ".xian-harness/project/project-status.json",
     "docsIndexPath": "docs/README.md"
   },
   "summary": {
-    "issueCount": 1,
-    "blockingCount": 1,
-    "warningCount": 0
+    "issueCount": 2,
+    "blockingCount": 0,
+    "warningCount": 2
   },
   "issues": [
     {
-      "id": "docs.root-entry.broken-link:LICENSE",
-      "rule": "docs.root-entry.broken-link",
-      "severity": "P1",
+      "id": "project-docs.render-freshness:project-status",
+      "rule": "project-docs.render-freshness",
+      "severity": "P2",
       "status": "open",
-      "path": "LICENSE",
-      "sourcePath": "README.md",
-      "message": "README.md contains a Markdown link that does not resolve to an existing local path.",
-      "recommendation": "Update the root instruction link, restore the missing document, or move the detail into docs/README.md.",
+      "path": "docs/项目状态.md",
+      "sourcePath": "templates/docs/project-status.md.tmpl",
+      "message": "Rendered project document is stale: Canonical source facts changed since the document was rendered. Rerun docs render with --fix to update this managed projection.",
+      "recommendation": "Run xian-harness docs render --doc project-status --target <target-project> --fix.",
       "evidence": [
-        "README.md"
+        "templates/docs/project-status.md.tmpl",
+        "6e41b5b5d510102b1739f16682b499d38c3c34d4018a15ea0e3e1ec428a50e5f",
+        "source-stale"
+      ]
+    },
+    {
+      "id": "project-docs.render-freshness:todo-list",
+      "rule": "project-docs.render-freshness",
+      "severity": "P2",
+      "status": "open",
+      "path": "docs/待办清单.md",
+      "sourcePath": "templates/docs/todo-list.md.tmpl",
+      "message": "Rendered project document is stale: Canonical source facts changed since the document was rendered. Rerun docs render with --fix to update this managed projection.",
+      "recommendation": "Run xian-harness docs render --doc todo-list --target <target-project> --fix.",
+      "evidence": [
+        "templates/docs/todo-list.md.tmpl",
+        "2665b7c0209517f78ccc51238c4f378fc67e7c096fee3f1c9a1ab415b0136547",
+        "source-stale"
       ]
     }
   ],
-  "freshnessIssues": [],
+  "freshnessIssues": [
+    {
+      "id": "project-docs.render-freshness:project-status",
+      "rule": "project-docs.render-freshness",
+      "severity": "P2",
+      "status": "open",
+      "path": "docs/项目状态.md",
+      "sourcePath": "templates/docs/project-status.md.tmpl",
+      "message": "Rendered project document is stale: Canonical source facts changed since the document was rendered. Rerun docs render with --fix to update this managed projection.",
+      "recommendation": "Run xian-harness docs render --doc project-status --target <target-project> --fix.",
+      "evidence": [
+        "templates/docs/project-status.md.tmpl",
+        "6e41b5b5d510102b1739f16682b499d38c3c34d4018a15ea0e3e1ec428a50e5f",
+        "source-stale"
+      ]
+    },
+    {
+      "id": "project-docs.render-freshness:todo-list",
+      "rule": "project-docs.render-freshness",
+      "severity": "P2",
+      "status": "open",
+      "path": "docs/待办清单.md",
+      "sourcePath": "templates/docs/todo-list.md.tmpl",
+      "message": "Rendered project document is stale: Canonical source facts changed since the document was rendered. Rerun docs render with --fix to update this managed projection.",
+      "recommendation": "Run xian-harness docs render --doc todo-list --target <target-project> --fix.",
+      "evidence": [
+        "templates/docs/todo-list.md.tmpl",
+        "2665b7c0209517f78ccc51238c4f378fc67e7c096fee3f1c9a1ab415b0136547",
+        "source-stale"
+      ]
+    }
+  ],
   "fixes": {
     "applied": false,
     "createdDocuments": [],

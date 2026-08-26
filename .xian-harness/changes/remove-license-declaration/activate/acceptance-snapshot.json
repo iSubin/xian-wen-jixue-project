@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "changeId": "remove-license-declaration",
+  "capturedAt": "2026-08-26T21:04:23+08:00",
+  "kind": "activation-snapshot",
+  "source": "change.activate",
+  "acceptanceHash": "3ee40bb5db83fdf941bf5c104e3c7c6915af82ed74befc610b7f08b7a17d0d68",
+  "verificationPlanHash": "ee490c89f178df4cbdf8ef260be5982d145d5e2676b7504c63ebcd751af863bb",
+  "sourcePaths": [
+    ".xian-harness/changes/remove-license-declaration/contract-revisions/rev-0001.json"
+  ],
+  "acceptanceItems": [
+    {
+      "id": "AC-001",
+      "text": "README.md 不再包含 GPL、LICENSE 或许可证导航与章节。",
+      "sourcePath": ".xian-harness/changes/remove-license-declaration/contract-revisions/rev-0001.json#acceptance.business",
+      "line": 1
+    },
+    {
+      "id": "AC-002",
+      "text": "Harness 文档检查不再报告 docs.root-entry.broken-link:LICENSE。",
+      "sourcePath": ".xian-harness/changes/remove-license-declaration/contract-revisions/rev-0001.json#acceptance.business",
+      "line": 2
+    },
+    {
+      "id": "AC-003",
+      "text": "不修改业务代码、依赖或历史提交。",
+      "sourcePath": ".xian-harness/changes/remove-license-declaration/contract-revisions/rev-0001.json#acceptance.business",
+      "line": 3
+    },
+    {
+      "id": "AC-004",
+      "text": "Generated contract views, tasks, and verification mappings remain consistent with the captured facts.",
+      "sourcePath": ".xian-harness/changes/remove-license-declaration/contract-revisions/rev-0001.json#acceptance.technical",
+      "line": 1
+    }
+  ],
+  "verificationCommands": [
+    "! rg -n 'GPL|LICENSE|许可证' README.md",
+    "xian-harness docs inspect --target . --json",
+    "xian-harness project docs-sync --target . --json",
+    "git diff --check"
+  ]
+}

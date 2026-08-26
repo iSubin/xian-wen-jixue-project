@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "changeId": "remove-license-declaration",
+  "mode": "lite",
+  "tier": "small",
+  "tierDecision": {
+    "declaredTier": "small",
+    "effectiveTier": "small",
+    "riskSignals": [],
+    "forcedUpgrade": null,
+    "downgrade": null
+  },
+  "phase": "verify",
+  "terminalKind": null,
+  "activationStatus": "active",
+  "isolation": "branch",
+  "executionPause": null,
+  "engineeringTrace": null,
+  "sourceRefs": [],
+  "parentRefs": [],
+  "language": {
+    "default": "zh-CN",
+    "protocolLanguage": "en",
+    "businessLanguage": "zh-CN",
+    "codeAnchorLanguage": "en"
+  },
+  "cost": {
+    "tokenUsage": null,
+    "elapsedSeconds": null,
+    "commitCount": 0,
+    "artifactCount": 1
+  },
+  "nextAction": "Quick verification passed. Run quick-close to complete this Small change."
+}

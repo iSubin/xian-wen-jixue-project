@@ -1,31 +1,31 @@
 # Project Status
 
-- Generated at: 2026-08-26T20:54:01+08:00
+- Generated at: 2026-08-26T21:09:16+08:00
 - Risk level: attention
-- Active change: none
-- Change count: 0
+- Active change: remove-license-declaration
+- Change count: 1
 
 ## 当前结论
 
-项目当前处于：idle
+项目当前处于：active-change
 
-项目没有 active change、blocking failure 或高优先级待办；可以通过 continue 或 backlog 选择下一项工作。
+当前 active change 是 remove-license-declaration，应继续该 change，而不是打开新需求。
 
 ## 推荐下一步
 
 | Field | Value |
 |---|---|
-| Recommended action | project-idle-next |
+| Recommended action | continue-active-change |
 | Recommended role | orchestrator |
 | Recommended skill | using-xian-harness |
 | Next command | `xian-harness continue --target . --json` |
-| Why | No active change, blocking risk, or actionable high-priority backlog item is visible. |
+| Why | Active change must be resolved before opening a new demand. |
 
 ## 当前工作
 
 | Change | Phase | Categories | Gate | Release | Archive | Next |
 |---|---|---|---|---|---|---|
-| none |  |  |  |  |  | `xian-harness continue --target . --json` |
+| remove-license-declaration | open | active |  |  |  | xian-harness continue --target . --json |
 
 ## 已完成 Change 索引
 
@@ -49,7 +49,7 @@
 
 | Metric | Count |
 |---|---:|
-| Active | 0 |
+| Active | 1 |
 | Archived | 0 |
 | Blocked | 0 |
 | Failed | 0 |

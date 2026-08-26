@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "changeId": "remove-license-declaration",
+  "currentDraft": null,
+  "currentAccepted": "rev-0004",
+  "currentFrozen": null,
+  "supersededRevisions": [
+    "rev-0001",
+    "rev-0002",
+    "rev-0003"
+  ],
+  "revisionStatuses": {
+    "rev-0001": "superseded",
+    "rev-0002": "superseded",
+    "rev-0003": "superseded",
+    "rev-0004": "accepted"
+  },
+  "generatedViews": [],
+  "viewAuthority": "contract-generated",
+  "updatedAt": "2026-08-26T21:10:11+08:00"
+}

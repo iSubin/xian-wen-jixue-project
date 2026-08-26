@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "terminalId": "a65d613a-6561-432c-9d60-13d0a7b99443",
+  "changeId": "remove-license-declaration",
+  "action": "quick.verify",
+  "actionSubjectIdentity": "sha256:3555f80440a52200171003fc93b07ca20cc6b779a5b22e8b537fd4c24bde6b87",
+  "candidateInputIdentity": "sha256:514ceb41d0c99dfd760eac21f69dcccd752225741794aeb954710034901b9957",
+  "attemptId": "quick-0e189976-d5bd-4a8e-ba30-4e4937889ce5",
+  "fencingToken": 2,
+  "writerGeneration": 1,
+  "status": "interrupted",
+  "completion": "recovered",
+  "completedAt": "2026-08-26T21:10:38+08:00",
+  "resultPath": null,
+  "resultPayloadDigest": null,
+  "resultBytesDigest": null,
+  "completionProof": null,
+  "reason": "Quick Verify source, toolchain, governance, or command identity changed while commands were running; the attempt result was not published."
+}

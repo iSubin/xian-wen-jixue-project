@@ -1,0 +1,166 @@
+{
+  "version": 1,
+  "changeId": "remove-license-declaration",
+  "target": "<target-project>",
+  "status": "pass",
+  "startedAt": "2026-08-26T21:14:41+08:00",
+  "finishedAt": "2026-08-26T21:14:44+08:00",
+  "quickVerifyDir": ".xian-harness/changes/remove-license-declaration/quick-verify",
+  "evidenceDir": ".xian-harness/changes/remove-license-declaration/quick-verify",
+  "resultPath": ".xian-harness/changes/remove-license-declaration/quick-verify/quick-verify-result.json",
+  "reportPath": ".xian-harness/changes/remove-license-declaration/quick-verify/quick-verify-result.json",
+  "verifyPath": ".xian-harness/changes/remove-license-declaration/quick-verify/quick-verify-result.json",
+  "commands": [
+    {
+      "command": "! rg -n 'GPL|LICENSE|许可证' README.md",
+      "cwd": "<target-project>",
+      "status": "pass",
+      "exitCode": 0,
+      "startedAt": "2026-08-26T21:14:41+08:00",
+      "finishedAt": "2026-08-26T21:14:41+08:00",
+      "durationMs": 242,
+      "logPath": ".xian-harness/cache/quick-verify/remove-license-declaration/run-001.log",
+      "execution": "executed",
+      "logPolicy": {
+        "storage": "local-cache",
+        "tracked": false,
+        "digestAlgorithm": "sha256",
+        "digest": "4dd223f0b7a2bda2ead1efd7988257a41d2acfa6d6d13c244b25b12ac02fffdf",
+        "tailExcerpt": [
+          "Command: ! rg -n 'GPL|LICENSE|许可证' README.md",
+          "CWD: <target-project>",
+          "Started At: 2026-08-26T21:14:41+08:00",
+          "Finished At: 2026-08-26T21:14:41+08:00",
+          "Duration Ms: 242",
+          "Exit Code: 0",
+          "## STDOUT",
+          "## STDERR"
+        ]
+      }
+    },
+    {
+      "command": "xian-harness docs inspect --target . --json",
+      "cwd": "<target-project>",
+      "status": "pass",
+      "exitCode": 0,
+      "startedAt": "2026-08-26T21:14:41+08:00",
+      "finishedAt": "2026-08-26T21:14:43+08:00",
+      "durationMs": 1359,
+      "logPath": ".xian-harness/cache/quick-verify/remove-license-declaration/run-002.log",
+      "execution": "executed",
+      "logPolicy": {
+        "storage": "local-cache",
+        "tracked": false,
+        "digestAlgorithm": "sha256",
+        "digest": "6f481cafb2dc43309421b6944e0b730ef114af3f246ea5e87c84e7e56897425d",
+        "tailExcerpt": [
+          "  ],",
+          "  \"summary\": {",
+          "    \"issueCount\": 0,",
+          "    \"blockingCount\": 0",
+          "  },",
+          "  \"issues\": []",
+          "}",
+          "## STDERR"
+        ]
+      }
+    },
+    {
+      "command": "xian-harness change inspect remove-license-declaration --target . --json",
+      "cwd": "<target-project>",
+      "status": "pass",
+      "exitCode": 0,
+      "startedAt": "2026-08-26T21:14:43+08:00",
+      "finishedAt": "2026-08-26T21:14:44+08:00",
+      "durationMs": 1350,
+      "logPath": ".xian-harness/cache/quick-verify/remove-license-declaration/run-003.log",
+      "execution": "executed",
+      "logPolicy": {
+        "storage": "local-cache",
+        "tracked": false,
+        "digestAlgorithm": "sha256",
+        "digest": "c8593448db0a453ddbf7e958506bd36232136e3b1f3b0a796ed159dda525348f",
+        "tailExcerpt": [
+          "    {",
+          "      \"name\": \"small-change-note.md\",",
+          "      \"path\": \"<target-project>/.xian-harness/changes/remove-license-declaration/small-change-note.md\",",
+          "      \"exists\": true",
+          "    }",
+          "  ]",
+          "}",
+          "## STDERR"
+        ]
+      }
+    },
+    {
+      "command": "git diff --exit-code -- . ':(exclude)README.md' ':(exclude).xian-harness/**'",
+      "cwd": "<target-project>",
+      "status": "pass",
+      "exitCode": 0,
+      "startedAt": "2026-08-26T21:14:44+08:00",
+      "finishedAt": "2026-08-26T21:14:44+08:00",
+      "durationMs": 173,
+      "logPath": ".xian-harness/cache/quick-verify/remove-license-declaration/run-004.log",
+      "execution": "executed",
+      "logPolicy": {
+        "storage": "local-cache",
+        "tracked": false,
+        "digestAlgorithm": "sha256",
+        "digest": "5cf51238da2056934deb55c291f868ebea22329ae66dde20bce42a6d90781002",
+        "tailExcerpt": [
+          "Command: git diff --exit-code -- . ':(exclude)README.md' ':(exclude).xian-harness/**'",
+          "CWD: <target-project>",
+          "Started At: 2026-08-26T21:14:44+08:00",
+          "Finished At: 2026-08-26T21:14:44+08:00",
+          "Duration Ms: 173",
+          "Exit Code: 0",
+          "## STDOUT",
+          "## STDERR"
+        ]
+      }
+    },
+    {
+      "command": "git diff --check -- README.md",
+      "cwd": "<target-project>",
+      "status": "pass",
+      "exitCode": 0,
+      "startedAt": "2026-08-26T21:14:44+08:00",
+      "finishedAt": "2026-08-26T21:14:44+08:00",
+      "durationMs": 173,
+      "logPath": ".xian-harness/cache/quick-verify/remove-license-declaration/run-005.log",
+      "execution": "executed",
+      "logPolicy": {
+        "storage": "local-cache",
+        "tracked": false,
+        "digestAlgorithm": "sha256",
+        "digest": "0c4beeeca7b8c83dcfea49747f320534652c57d406021386e4d0a440142ff17e",
+        "tailExcerpt": [
+          "Command: git diff --check -- README.md",
+          "CWD: <target-project>",
+          "Started At: 2026-08-26T21:14:44+08:00",
+          "Finished At: 2026-08-26T21:14:44+08:00",
+          "Duration Ms: 173",
+          "Exit Code: 0",
+          "## STDOUT",
+          "## STDERR"
+        ]
+      }
+    }
+  ],
+  "warnings": [],
+  "sourceSnapshotIdentity": {
+    "version": 1,
+    "diffHash": "sha256:911772aaa03d1dc99e24ebf835d68b6b3fd83226a4df5ecc7beda609a160b0af",
+    "sourceHash": "sha256:911772aaa03d1dc99e24ebf835d68b6b3fd83226a4df5ecc7beda609a160b0af",
+    "protocolHash": null,
+    "git": {
+      "baseCommit": "bed1d56af0919b2a5399dd7209bd4b5346d28730",
+      "headCommit": "bed1d56af0919b2a5399dd7209bd4b5346d28730"
+    },
+    "fileCount": 1,
+    "hash": "sha256:514ceb41d0c99dfd760eac21f69dcccd752225741794aeb954710034901b9957"
+  },
+  "governanceSnapshotIdentity": "sha256:fc7028a53762464430869bfffef944ba457c43ea5f8cdb06b1cc20e4d1555ce4",
+  "changeGovernanceSnapshotIdentity": "sha256:889f6ea48cfb9bfbbd102d8e7b00f6edcda7052092c045b420e103415373c09c",
+  "evidenceSeal": "sha256:53f12cfddcc73a143305008e09fe3656e790f73ea4c55187909a94464b341112"
+}

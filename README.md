@@ -11,7 +11,6 @@
 
 <p align="center">
   <a href="#快速部署"><img src="https://img.shields.io/badge/Version-v0.1.3-orange.svg?style=for-the-badge" alt="Version v0.1.3"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL%20v3-blue.svg?style=for-the-badge" alt="GPL v3 License"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/Python-3.10+-blue.svg?style=for-the-badge" alt="Python 3.10+"></a>
   <a href="https://vuejs.org/"><img src="https://img.shields.io/badge/Vue-3.x-green.svg?style=for-the-badge" alt="Vue 3"></a>
   <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/FastAPI-0.100+-teal.svg?style=for-the-badge" alt="FastAPI"></a>
@@ -198,7 +197,6 @@
 - [常见 Q&A](#常见-qa)
 - [TODO / 后续计划](#todo--后续计划)
 - [贡献](#-贡献)
-- [许可证](#-许可证)
 - [致谢](#-致谢)
 
 ---
@@ -638,12 +636,6 @@ Git 文库采用人类阅读优先的结构：
 - 将总结文本分享后发现受到欢迎，故决定发展成完整项目并开源
 - 项目尚处于萌芽期，可能有疏忽和考虑不周全之处，**欢迎在 Issue 中反馈**
 - 如果这个项目对你有帮助，请点个 ⭐️Star，你的反馈是我持续改进的动力！
-
----
-
-## 📄 许可证
-
-本项目采用 [GPL v3](LICENSE) 许可证。
 
 ---
 

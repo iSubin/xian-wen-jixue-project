@@ -2,15 +2,15 @@
   "version": 1,
   "mode": "project-status",
   "target": "<target-project>",
-  "generatedAt": "2026-08-26T20:54:01+08:00",
+  "generatedAt": "2026-08-26T21:09:16+08:00",
   "state": {
     "initializedAt": "2026-08-26T20:38:56+08:00",
-    "activeChange": null,
-    "changeCount": 0
+    "activeChange": "remove-license-declaration",
+    "changeCount": 1
   },
   "summary": {
-    "changeCount": 0,
-    "activeCount": 0,
+    "changeCount": 1,
+    "activeCount": 1,
     "archivedCount": 0,
     "blockedCount": 0,
     "failedCount": 0,
@@ -20,7 +20,25 @@
     "highPriorityTodoCount": 0
   },
   "riskLevel": "attention",
-  "changes": [],
+  "changes": [
+    {
+      "changeId": "remove-license-declaration",
+      "phase": "open",
+      "terminalKind": null,
+      "activationStatus": "active",
+      "executionPause": null,
+      "gateStatus": null,
+      "releaseStatus": null,
+      "archiveStatus": null,
+      "categories": [
+        "active"
+      ],
+      "statePath": ".xian-harness/changes/remove-license-declaration/.change-state.json",
+      "gateResultPath": null,
+      "releaseVerifyPath": null,
+      "archiveResultPath": null
+    }
+  ],
   "documents": [
     {
       "path": "docs/README.md",
@@ -448,10 +466,10 @@
     "samples": []
   },
   "progress": {
-    "currentChild": null,
-    "changeId": null,
+    "currentChild": "remove-license-declaration",
+    "changeId": "remove-license-declaration",
     "coordinationMode": null,
-    "phase": null,
+    "phase": "open",
     "action": null,
     "activity": "unknown",
     "startedAt": null,
@@ -459,7 +477,7 @@
     "elapsedMs": null,
     "quietForMs": null,
     "lastResult": null,
-    "nextBoundary": null,
+    "nextBoundary": "Draft change.md with intent, scope, acceptance, verification, risk, and result details.",
     "status": "unknown",
     "reason": "No canonical current-child activity timestamp is available.",
     "evidencePointer": null

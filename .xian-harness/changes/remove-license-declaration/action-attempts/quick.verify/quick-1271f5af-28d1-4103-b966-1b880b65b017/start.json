@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "changeId": "remove-license-declaration",
+  "action": "quick.verify",
+  "actionSubjectIdentity": "sha256:2ffdd91e5875a8689cac59d2229e691da4e1e87f91f700bdfad64e154e5fe47a",
+  "candidateInputIdentity": "sha256:514ceb41d0c99dfd760eac21f69dcccd752225741794aeb954710034901b9957",
+  "attemptId": "quick-1271f5af-28d1-4103-b966-1b880b65b017",
+  "fencingToken": 1,
+  "writerGeneration": 1,
+  "leaseToken": "5d309024-bcd6-4c84-9983-d6ec57acba3f",
+  "processIncarnationIdentity": "sha256:f0af76cbc7c80a48f0fa346b88abfd9fafc5b12ea06c8a94339a3c4e0c9b61a4",
+  "startedAt": "2026-08-26T21:09:12+08:00",
+  "evidencePointer": ".xian-harness/changes/remove-license-declaration/quick-verify/attempts/2ffdd91e5875a8689cac59d2229e691da4e1e87f91f700bdfad64e154e5fe47a",
+  "expectedResultPath": ".xian-harness/changes/remove-license-declaration/quick-verify/attempts/2ffdd91e5875a8689cac59d2229e691da4e1e87f91f700bdfad64e154e5fe47a/result.json",
+  "retryPolicyIdentity": "quick-verify-recovery.v1",
+  "retryOfAttemptId": null
+}

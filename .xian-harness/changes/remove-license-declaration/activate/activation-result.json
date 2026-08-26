@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "changeId": "remove-license-declaration",
+  "activatedAt": "2026-08-26T21:04:23+08:00",
+  "sourceBaseCommit": "bed1d56af0919b2a5399dd7209bd4b5346d28730",
+  "previousActiveChange": null,
+  "previousActivationStatus": "active",
+  "activationStatus": "active",
+  "phase": "open",
+  "statePath": ".xian-harness/changes/remove-license-declaration/.change-state.json"
+}

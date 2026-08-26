@@ -1,7 +1,8 @@
 version: 1
 initializedAt: 2026-08-26T20:38:56+08:00
-activeChange: null
-changes: []
+activeChange: remove-license-declaration
+changes:
+  - remove-license-declaration
 lastPackInstall:
   requestedProfile: auto
   effectiveProfile: python
