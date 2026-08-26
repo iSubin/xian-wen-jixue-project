@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "changeId": "remove-license-declaration",
+  "target": "<target-project>",
+  "status": "closed",
+  "closedAt": "2026-08-26T21:18:33+08:00",
+  "reason": "删除 README 中错误的 GPL v3 与 LICENSE 声明，并消除失效链接；当前 commit 的定向验证已通过。",
+  "quickCloseDir": ".xian-harness/changes/remove-license-declaration/quick-close",
+  "resultPath": ".xian-harness/changes/remove-license-declaration/quick-close/quick-close-result.json",
+  "reportPath": ".xian-harness/changes/remove-license-declaration/quick-close/quick-close-result.json",
+  "quickVerifyResultPath": ".xian-harness/changes/remove-license-declaration/quick-verify/quick-verify-result.json",
+  "state": {
+    "version": 1,
+    "changeId": "remove-license-declaration",
+    "mode": "lite",
+    "tier": "small",
+    "tierDecision": {
+      "declaredTier": "small",
+      "effectiveTier": "small",
+      "riskSignals": [],
+      "forcedUpgrade": null,
+      "downgrade": null
+    },
+    "phase": "archived",
+    "terminalKind": "quick-closed",
+    "activationStatus": "archived",
+    "isolation": "branch",
+    "executionPause": null,
+    "engineeringTrace": null,
+    "sourceRefs": [],
+    "parentRefs": [],
+    "language": {
+      "default": "zh-CN",
+      "protocolLanguage": "en",
+      "businessLanguage": "zh-CN",
+      "codeAnchorLanguage": "en"
+    },
+    "cost": {
+      "tokenUsage": null,
+      "elapsedSeconds": null,
+      "commitCount": 0,
+      "artifactCount": 1
+    },
+    "nextAction": "Quick close completed. Review quick-close summary for final evidence."
+  }
+}

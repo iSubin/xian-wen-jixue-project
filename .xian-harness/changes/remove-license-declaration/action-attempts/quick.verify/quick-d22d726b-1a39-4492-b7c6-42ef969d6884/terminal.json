@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "terminalId": "c2d041f7-610e-4082-a8d6-e41fe1afab03",
+  "changeId": "remove-license-declaration",
+  "action": "quick.verify",
+  "actionSubjectIdentity": "sha256:d4e4c920e4afaebc505e52ece4d8faad23633094d5d76f5a076753223d7b6ff8",
+  "candidateInputIdentity": "sha256:8b08e2052ee9c619658a71a9ff2b9cfb3f3c94d87412c9e81f14d276749ab092",
+  "attemptId": "quick-d22d726b-1a39-4492-b7c6-42ef969d6884",
+  "fencingToken": 4,
+  "writerGeneration": 1,
+  "status": "pass",
+  "completion": "normal",
+  "completedAt": "2026-08-26T21:17:34+08:00",
+  "resultPath": ".xian-harness/changes/remove-license-declaration/quick-verify/attempts/d4e4c920e4afaebc505e52ece4d8faad23633094d5d76f5a076753223d7b6ff8/result.json",
+  "resultPayloadDigest": "sha256:cc6e8d79aa868b1a423c62c7c3bc82bbdc4525e273abcea4e3bb42681e826ec2",
+  "resultBytesDigest": "sha256:49d6983ce0799eddaffc45b38f195ff2e32d142fa0c114bd58c1e92d79848362",
+  "completionProof": {
+    "kind": "quick-verify",
+    "inventoryCount": 5,
+    "inventoryDigest": "sha256:7ef06709d4d8ea40534e82da51750e4c3035848d75e1b12605838e923adfb1dd",
+    "status": "pass"
+  },
+  "reason": null
+}

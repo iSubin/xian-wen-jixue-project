@@ -10,9 +10,9 @@
     "forcedUpgrade": null,
     "downgrade": null
   },
-  "phase": "verify",
-  "terminalKind": null,
-  "activationStatus": "active",
+  "phase": "archived",
+  "terminalKind": "quick-closed",
+  "activationStatus": "archived",
   "isolation": "branch",
   "executionPause": null,
   "engineeringTrace": null,
@@ -30,5 +30,5 @@
     "commitCount": 0,
     "artifactCount": 1
   },
-  "nextAction": "Quick verification passed. Run quick-close to complete this Small change."
+  "nextAction": "Quick close completed. Review quick-close summary for final evidence."
 }

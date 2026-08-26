@@ -1,0 +1,560 @@
+{
+  "version": 2,
+  "target": "<target-project>",
+  "mode": "project-continue",
+  "status": "empty",
+  "activeChange": null,
+  "selectedChangeId": null,
+  "changeCount": 0,
+  "decisions": [],
+  "archivedContext": [],
+  "archivedContextSummary": {
+    "total": 0,
+    "returned": 0,
+    "folded": false,
+    "includeArchived": false,
+    "expandCommand": "xian-harness continue --target <target-project> --include-archived --json"
+  },
+  "recommendedDecision": null,
+  "recommendedAction": "delivery-close",
+  "recommendedRole": "orchestrator",
+  "recommendedSkills": [
+    "xian-commit"
+  ],
+  "recommendedSkillRefs": [
+    {
+      "name": "xian-commit",
+      "kind": "codex-skill"
+    }
+  ],
+  "recommendedCommandRefs": [
+    {
+      "command": "git status --short",
+      "kind": "shell-command",
+      "executable": true,
+      "available": true,
+      "fallbackCommands": [
+        "git status --short --branch",
+        "git diff --stat"
+      ]
+    }
+  ],
+  "closeoutReadiness": {
+    "status": "blocked",
+    "nextState": "attribute-worktree-before-closeout",
+    "reason": "Workspace has dirty or untracked files, so closeout must first attribute local delivery changes.",
+    "blockers": [
+      "Workspace dirty=4, untracked=3"
+    ],
+    "suggestedCommands": [
+      "git status --short",
+      "git diff --stat"
+    ],
+    "commit": {
+      "recommended": false,
+      "reason": "Commit suggestion is blocked until dirty and untracked paths are attributed.",
+      "suggestedCommand": null,
+      "suggestedSkill": "xian-commit",
+      "suggestedMessage": null
+    },
+    "tag": {
+      "recommended": false,
+      "reason": "Harness has no generic project tag capability; follow the target project's release policy if tagging is required.",
+      "suggestedCommand": null,
+      "suggestedSkill": null
+    },
+    "release": {
+      "recommended": false,
+      "reason": "Harness does not define a generic deploy or release workflow for every project; use project-specific release changes when needed.",
+      "suggestedCommand": null,
+      "suggestedSkill": null
+    }
+  },
+  "experienceCandidates": [],
+  "recommendedRoute": null,
+  "commands": [
+    "git status --short"
+  ],
+  "fallbackCommands": [
+    "git status --short --branch",
+    "git diff --stat"
+  ],
+  "evidence": [
+    ".xian-harness/project/project-status.json",
+    ".xian-harness/project/doc-sync-report.json",
+    ".xian-harness/project/project-status.json"
+  ],
+  "nextCommands": [
+    "git status --short"
+  ],
+  "reason": "Workspace has dirty or untracked files; inspect ownership before opening a new demand.",
+  "reasonCode": "dirty-workspace-close",
+  "confidence": "medium",
+  "blockedReason": null,
+  "nextAction": "Attribute dirty worktree changes and close local delivery before opening a new demand.",
+  "progress": {
+    "currentChild": null,
+    "changeId": null,
+    "coordinationMode": null,
+    "phase": null,
+    "action": null,
+    "activity": "unknown",
+    "startedAt": null,
+    "lastActivityAt": null,
+    "elapsedMs": null,
+    "quietForMs": null,
+    "lastResult": null,
+    "nextBoundary": null,
+    "status": "unknown",
+    "reason": "No canonical current-child activity timestamp is available.",
+    "evidencePointer": null
+  },
+  "facts": {
+    "projectDecisionPath": ".xian-harness/project/next-decision.json",
+    "projectSummaryPath": ".xian-harness/project/next-decision.md",
+    "projectStatusPath": ".xian-harness/project/project-status.json",
+    "docSyncReportPath": ".xian-harness/project/doc-sync-report.json",
+    "selectedSnapshotPath": null,
+    "selectedSummaryPath": null,
+    "projectDocuments": [
+      {
+        "path": "docs/README.md",
+        "role": "Project Documentation Index",
+        "class": "active-entry",
+        "audience": [
+          "human",
+          "agent"
+        ],
+        "sourceOfTruth": [
+          "docs directory",
+          "Project Document Registry"
+        ],
+        "updateCommand": "xian-harness project docs-sync --target <target-project> --fix",
+        "stalePolicy": "Must link the active project entry documents without broken local links.",
+        "communicates": [
+          "documentation entrypoints",
+          "where to read project status, requirements, backlog, and operating rules"
+        ],
+        "nextAction": "Follow the current-status, requirements, todo, or operating-policy links for the task at hand.",
+        "status": "present",
+        "title": "先闻继学文档中心"
+      },
+      {
+        "path": "docs/项目说明.md",
+        "role": "Project Brief",
+        "class": "canonical-source",
+        "audience": [
+          "human",
+          "agent"
+        ],
+        "sourceOfTruth": [
+          "manual project brief",
+          "product positioning decisions"
+        ],
+        "updateCommand": null,
+        "stalePolicy": "Manual document; update when the project identity, audience, or boundary changes.",
+        "communicates": [
+          "project identity",
+          "target users",
+          "product boundary"
+        ],
+        "nextAction": "Use docs/项目状态.md for current progress and docs/需求文档.md for requirement status.",
+        "status": "present",
+        "title": "项目说明"
+      },
+      {
+        "path": "docs/项目基线.md",
+        "role": "Project Baseline",
+        "class": "generated-surface",
+        "audience": [
+          "human",
+          "agent"
+        ],
+        "sourceOfTruth": [
+          "project marker inspection",
+          ".xian-harness/project-risks.json",
+          ".xian-harness/project-boundaries.json"
+        ],
+        "updateCommand": "xian-harness docs render --doc project-baseline --target <target-project> --fix",
+        "stalePolicy": "Render freshness is checked against baseline facts by docs status.",
+        "communicates": [
+          "project roots",
+          "runtime entrypoints",
+          "profile and baseline risks"
+        ],
+        "nextAction": "Use it to choose the correct cwd, profile, and verification entrypoint before changing code.",
+        "status": "present",
+        "title": "项目基线"
+      },
+      {
+        "path": "docs/项目开发纪律.md",
+        "role": "Project Discipline",
+        "class": "operating-policy",
+        "audience": [
+          "human",
+          "agent"
+        ],
+        "sourceOfTruth": [
+          "AGENTS.md",
+          "docs/xian-harness/current-change-protocol.md",
+          "docs/xian-harness/slimming-product-contract.md"
+        ],
+        "updateCommand": null,
+        "stalePolicy": "Manual operating agreement; update when lifecycle, evidence, or commit rules change.",
+        "communicates": [
+          "work rules",
+          "commit and evidence policy",
+          "canonical facts versus generated views"
+        ],
+        "nextAction": "Follow this document before opening or closing a governed/audit change.",
+        "status": "present",
+        "title": "项目开发纪律"
+      },
+      {
+        "path": "docs/项目情况.md",
+        "role": "Project Situation",
+        "class": "diagnostic-surface",
+        "audience": [
+          "human",
+          "agent"
+        ],
+        "sourceOfTruth": [
+          "Project Situation inspection",
+          ".xian-harness/project-risks.json",
+          ".xian-harness/capability-registry.json"
+        ],
+        "updateCommand": "xian-harness docs render --doc project-situation --target <target-project> --fix",
+        "stalePolicy": "Rendered diagnostic surface; refresh for takeover, diagnosis, or risk review.",
+        "communicates": [
+          "diagnostic snapshot",
+          "capability and risk signals",
+          "active source code signals"
+        ],
+        "nextAction": "Use this for project takeover or diagnosis, not as the daily next-step router.",
+        "status": "present",
+        "title": "项目情况"
+      },
+      {
+        "path": "docs/项目状态.md",
+        "role": "Project Status",
+        "class": "generated-surface",
+        "audience": [
+          "human",
+          "agent"
+        ],
+        "sourceOfTruth": [
+          ".xian-harness/state.yaml",
+          ".xian-harness/project/project-status.json",
+          ".xian-harness/project/next-decision.json"
+        ],
+        "updateCommand": "xian-harness docs render --doc project-status --target <target-project> --fix",
+        "stalePolicy": "Rendered current-progress surface; refresh after lifecycle, backlog, or projection facts change.",
+        "communicates": [
+          "current progress",
+          "active change and blockers",
+          "recommended next action"
+        ],
+        "nextAction": "Follow the Recommended Next Step or run xian-harness continue --target <target-project> --json.",
+        "status": "present",
+        "title": "Project Status"
+      },
+      {
+        "path": "docs/需求文档.md",
+        "role": "Requirement",
+        "class": "canonical-source",
+        "audience": [
+          "human",
+          "agent"
+        ],
+        "sourceOfTruth": [
+          "manual product requirements",
+          "linked change evidence"
+        ],
+        "updateCommand": null,
+        "stalePolicy": "Manual canonical source; update when requirements, status, or acceptance boundaries change.",
+        "communicates": [
+          "requirements",
+          "product boundaries",
+          "linked changes and evidence"
+        ],
+        "nextAction": "Open or link backlog/change items for accepted requirement gaps.",
+        "status": "present",
+        "title": "需求文档"
+      },
+      {
+        "path": "docs/待办清单.md",
+        "role": "Todo List",
+        "class": "generated-surface",
+        "audience": [
+          "human",
+          "agent"
+        ],
+        "sourceOfTruth": [
+          ".xian-harness/backlog/registry.json",
+          ".xian-harness/project/project-status.json",
+          "ProjectWorkQueue"
+        ],
+        "updateCommand": "xian-harness docs render --doc todo-list --target <target-project> --fix",
+        "stalePolicy": "Rendered backlog surface; refresh after todo/backlog import, promote, close, or reject.",
+        "communicates": [
+          "actionable backlog queue",
+          "promoted or parked changes",
+          "next command for each item"
+        ],
+        "nextAction": "Use xian-harness todo/backlog commands; do not edit the generated markdown directly.",
+        "status": "present",
+        "title": "待办清单"
+      }
+    ],
+    "workspace": {
+      "sourceControl": {
+        "type": "git",
+        "present": true,
+        "branch": "master",
+        "upstream": "origin/master",
+        "ahead": 1,
+        "behind": null,
+        "gitRoot": ".",
+        "pathspec": ".",
+        "dirtyCount": 4,
+        "untrackedCount": 3
+      },
+      "commitPolicy": {
+        "staging": "path-scoped",
+        "push": "explicit-only",
+        "profileScoped": true,
+        "ruleSource": "AGENTS.md and active profile"
+      },
+      "artifactBoundary": {
+        "status": "none",
+        "rootCount": 0,
+        "fileCount": 0,
+        "bytes": 0,
+        "roots": [],
+        "summary": "No heavy generated artifact root was detected in the current workspace status.",
+        "nextAction": "Continue normal path-scoped delivery attribution."
+      },
+      "riskLevel": "dirty",
+      "summary": "Git workspace has 4 modified/staged and 3 untracked file(s) under the selected target path."
+    },
+    "projectSituation": {
+      "identity": {
+        "recommendedProfile": "base",
+        "presentMarkers": [
+          {
+            "path": "requirements.txt",
+            "type": "python",
+            "present": true
+          }
+        ],
+        "runtime": [
+          {
+            "name": "Python",
+            "evidence": "requirements.txt",
+            "status": "detected"
+          }
+        ]
+      },
+      "entrypoints": [
+        {
+          "path": "package.json",
+          "kind": "node-package",
+          "status": "missing"
+        },
+        {
+          "path": "pom.xml",
+          "kind": "maven",
+          "status": "missing"
+        },
+        {
+          "path": "build.gradle",
+          "kind": "gradle",
+          "status": "missing"
+        },
+        {
+          "path": "settings.gradle",
+          "kind": "gradle-settings",
+          "status": "missing"
+        },
+        {
+          "path": "requirements.txt",
+          "kind": "python-requirements",
+          "status": "present"
+        },
+        {
+          "path": "pyproject.toml",
+          "kind": "python-project",
+          "status": "missing"
+        },
+        {
+          "path": "go.mod",
+          "kind": "go-module",
+          "status": "missing"
+        },
+        {
+          "path": "Cargo.toml",
+          "kind": "rust-cargo",
+          "status": "missing"
+        },
+        {
+          "path": "docker-compose.yml",
+          "kind": "docker-compose",
+          "status": "missing"
+        },
+        {
+          "path": "Dockerfile",
+          "kind": "dockerfile",
+          "status": "present"
+        }
+      ],
+      "structure": {
+        "topLevelDirectories": [
+          "__pycache__",
+          ".pytest_cache",
+          ".venv",
+          ".xian-commit",
+          "config",
+          "data",
+          "design-system",
+          "docs",
+          "exports",
+          "frontend",
+          "hooks",
+          "runtime",
+          "scripts",
+          "src",
+          "temp",
+          "templates",
+          "tests",
+          "tools"
+        ],
+        "topLevelFiles": [
+          ".dockerignore",
+          ".DS_Store",
+          ".gitignore",
+          "AGENTS.md",
+          "CLAUDE.md",
+          "deploy一键部署.bat",
+          "deploy一键部署.sh",
+          "docker-compose.postgres.yml",
+          "Dockerfile",
+          "package-lock.json",
+          "README.md",
+          "requirements.txt",
+          "run一键启动.bat",
+          "run一键启动.sh",
+          "test_task_sync.py",
+          "VERSION",
+          "xianwen-app.py",
+          "xianwen.db",
+          "一键启动.bat",
+          "一键启动.sh"
+        ]
+      },
+      "baseline": {
+        "path": "docs/项目基线.md",
+        "status": "present",
+        "riskItemCount": 1,
+        "topRisks": [
+          {
+            "severity": "P2",
+            "summary": "Rendered document may drift from canonical facts",
+            "evidence": "redefine-project-status-md-as-render-output",
+            "mitigation": "Run docs status and docs render --fix during archive."
+          }
+        ]
+      },
+      "codeSignals": {
+        "totalCount": 600,
+        "byType": {
+          "TODO": 534,
+          "FIXME": 66
+        },
+        "samples": [
+          {
+            "type": "TODO",
+            "path": ".venv/lib/python3.12/site-packages/Cryptodome/SelfTest/Hash/test_keccak.py",
+            "line": 141,
+            "text": "add ExtremelyLong tests"
+          },
+          {
+            "type": "TODO",
+            "path": ".venv/lib/python3.12/site-packages/Cryptodome/SelfTest/PublicKey/test_RSA.py",
+            "line": 45,
+            "text": "PyCryptodome treats the message as starting *after* the leading \"00\""
+          },
+          {
+            "type": "TODO",
+            "path": ".venv/lib/python3.12/site-packages/Cryptodome/SelfTest/PublicKey/test_RSA.py",
+            "line": 46,
+            "text": "That behaviour should probably be changed in the future."
+          },
+          {
+            "type": "TODO",
+            "path": ".venv/lib/python3.12/site-packages/Cryptodome/Util/number.py",
+            "line": 360,
+            "text": "maybe we shouldn't abort but rather start over."
+          },
+          {
+            "type": "TODO",
+            "path": ".venv/lib/python3.12/site-packages/_pytest/assertion/rewrite.py",
+            "line": 858,
+            "text": "This assert should not be needed."
+          },
+          {
+            "type": "TODO",
+            "path": ".venv/lib/python3.12/site-packages/_pytest/cacheprovider.py",
+            "line": 580,
+            "text": "evaluate generating upward relative paths"
+          },
+          {
+            "type": "TODO",
+            "path": ".venv/lib/python3.12/site-packages/_pytest/capture.py",
+            "line": 708,
+            "text": "This type error is real, need to fix."
+          },
+          {
+            "type": "TODO",
+            "path": ".venv/lib/python3.12/site-packages/_pytest/compat.py",
+            "line": 127,
+            "text": "(RonnyPfannschmidt): This function should be refactored when we"
+          },
+          {
+            "type": "TODO",
+            "path": ".venv/lib/python3.12/site-packages/_pytest/config/argparsing.py",
+            "line": 404,
+            "text": "(py313): Replace with `exit_on_error=False`. Note that while it"
+          },
+          {
+            "type": "TODO",
+            "path": ".venv/lib/python3.12/site-packages/_pytest/doctest.py",
+            "line": 316,
+            "text": "Type ignored -- breaks Liskov Substitution."
+          }
+        ],
+        "scannedFileCount": 5000,
+        "skippedFileCount": 3759
+      },
+      "riskLevel": "attention",
+      "summary": "Project baseline has 1 risk item(s), and code scan found 600 TODO/FIXME signal(s)."
+    }
+  },
+  "direction": {
+    "currentSituation": "Project is initialized and has no tracked changes.",
+    "processDebt": [
+      {
+        "description": "Workspace has 4 dirty and 3 untracked file(s)",
+        "severity": "soft-debt"
+      },
+      {
+        "description": "Rendered document freshness drift is advisory; review doc-sync only when planning docs work.",
+        "severity": "background"
+      }
+    ],
+    "recommendedTarget": "project-level next work",
+    "reason": "Workspace has dirty or untracked files; inspect ownership before opening a new demand.",
+    "minimumNextStep": "Attribute dirty worktree changes and close local delivery before opening a new demand.",
+    "nextSkill": "xian-commit",
+    "nextActionSource": "project-recommendation"
+  }
+}
