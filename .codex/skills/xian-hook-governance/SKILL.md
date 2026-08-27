@@ -17,6 +17,7 @@ Use this skill before changing `.codex/hooks`, `.claude/hooks`, `session-start`,
 
 - `harness-pack/base/.codex/hooks/`
 - `harness-pack/base/.claude/hooks/`
+- `harness-pack/registry/hooks.json`
 - `.xian-harness/bootstrap-context.json`
 - `.xian-harness/skill-registry.json`
 - `harness-pack/manifest.yaml`
@@ -29,20 +30,22 @@ Use this skill before changing `.codex/hooks`, `.claude/hooks`, `session-start`,
 2. Create or update a Hook Contract from `.xian-harness/protocol/templates/hooks/hook-contract.md`.
 3. Fill Lifecycle Event, Runtime Adapter, Input Schema, Output Contract, Skip Conditions, Profile Boundary, and Verification Commands before changing hook behavior.
 4. Check whether the hook reads registry, bootstrap context, pack state, cwd markers, or target project files.
-5. Keep registry and bootstrap context as the facts of record; hook code should execute them, not replace them.
-6. Preserve fallback behavior for older targets only when it does not weaken profile isolation.
-7. Add hook tests for profile boundaries, reserved paths, malformed registry, and missing optional files.
+5. Keep `harness-pack/registry/hooks.json`, Skill registry, and bootstrap context as the facts of record; hook code should execute installed projections, not replace or compile them.
+6. Run `npm run pack:registry:compile`, then `npm run pack:registry:check`; do not hand-edit generated `.codex/hooks.json` or manifest Hook aliases.
+7. Preserve only generic name-based fail-open behavior when the installed Skill registry is missing or malformed; do not add a second semantic keyword table.
+8. Add hook tests for profile boundaries, reserved paths, malformed registry, and missing optional files.
 
 ## 确定性工具
 
 - `npm test -- --run test/skill-registry.test.ts test/skill-contract.test.ts`
+- `npm run pack:registry:compile && npm run pack:registry:check`
 - `npm test -- --run test/pack.test.ts`
 - `xian-harness pack status --target <target-project> --profile auto --json`
 - `rg -n "skill-registry|bootstrap-context|reserved|profile" harness-pack/base/.codex/hooks harness-pack/base/.claude/hooks`
 
 ## 必需证据
 
-- Hook path and lifecycle event.
+- Hook path, lifecycle event, and canonical `harness-pack/registry/hooks.json` entry.
 - Hook Contract path or reason the change does not need a contract update.
 - Input fact files read by the hook.
 - Test proving expected activation and non-activation.

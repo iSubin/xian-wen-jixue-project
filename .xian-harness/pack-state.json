@@ -6,9 +6,9 @@
     "manifestName": "xian-harness-pack",
     "manifestVersion": 1,
     "fileCount": 133,
-    "contentHash": "787bf18865005e38b32d4e435d14a2eacfda24a3657276b1e7c055ac992f7eec"
+    "contentHash": "6f06a3d450e076185541fd4f6fe8ad08129b66f374c896b561e70d7f2cf8377c"
   },
-  "updatedAt": "2026-08-26T20:38:57+08:00",
+  "updatedAt": "2026-08-27T21:09:44+08:00",
   "files": [
     {
       "path": ".claude/commands/README.md",
@@ -253,9 +253,9 @@
     {
       "path": ".codex/hooks/hook-skill-selection.cjs",
       "sourcePath": "base/.codex/hooks/hook-skill-selection.cjs",
-      "sourceHash": "8aabddec8b16cd9b7be5dc153896eae69762c343c252fefcfb2a351363cfc0a8",
-      "targetHash": "8aabddec8b16cd9b7be5dc153896eae69762c343c252fefcfb2a351363cfc0a8",
-      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceHash": "593b574a3321940f1056394e226c489e31edc27cfb772d88e43c41e291574ad0",
+      "targetHash": "593b574a3321940f1056394e226c489e31edc27cfb772d88e43c41e291574ad0",
+      "installedAt": "2026-08-27T21:09:44+08:00",
       "sourceMode": 420,
       "targetMode": 420,
       "tombstone": false
@@ -451,6 +451,16 @@
       "tombstone": false
     },
     {
+      "path": ".codex/skills/xian-commit/SKILL.md",
+      "sourcePath": "base/.codex/skills/xian-commit/SKILL.md",
+      "sourceHash": "029fe3e44265678ad5f6ee4e171a807349b41052512f1e54e81d3a11be8f8c4c",
+      "targetHash": "029fe3e44265678ad5f6ee4e171a807349b41052512f1e54e81d3a11be8f8c4c",
+      "installedAt": "2026-08-27T21:09:44+08:00",
+      "sourceMode": 420,
+      "targetMode": 420,
+      "tombstone": false
+    },
+    {
       "path": ".codex/skills/xian-cost/agents/openai.yaml",
       "sourcePath": "base/.codex/skills/xian-cost/agents/openai.yaml",
       "sourceHash": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
@@ -563,9 +573,9 @@
     {
       "path": ".codex/skills/xian-hook-governance/SKILL.md",
       "sourcePath": "base/.codex/skills/xian-hook-governance/SKILL.md",
-      "sourceHash": "de89544fa72b2301e7bbb01e53263cce7b1956af457bee431f0d5c4a6750caa7",
-      "targetHash": "de89544fa72b2301e7bbb01e53263cce7b1956af457bee431f0d5c4a6750caa7",
-      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceHash": "0b5cc1e511a874fa5fec37c085ffd73b945ab0552e4b6bbe209d7ee463f1386a",
+      "targetHash": "0b5cc1e511a874fa5fec37c085ffd73b945ab0552e4b6bbe209d7ee463f1386a",
+      "installedAt": "2026-08-27T21:09:44+08:00",
       "sourceMode": 420,
       "targetMode": 420,
       "tombstone": false
@@ -743,9 +753,9 @@
     {
       "path": ".codex/skills/xian-release/scripts/prepare-release.mjs",
       "sourcePath": "base/.codex/skills/xian-release/scripts/prepare-release.mjs",
-      "sourceHash": "aada00ed8eddb08e4a41c35282ace39e82fef805921a7f0dbbc096132c7433fd",
-      "targetHash": "aada00ed8eddb08e4a41c35282ace39e82fef805921a7f0dbbc096132c7433fd",
-      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceHash": "19c354af5b722be02cefca9cac10513ccf67838836e362d5fef93b24a4e44de9",
+      "targetHash": "19c354af5b722be02cefca9cac10513ccf67838836e362d5fef93b24a4e44de9",
+      "installedAt": "2026-08-27T21:09:44+08:00",
       "sourceMode": 420,
       "targetMode": 420,
       "tombstone": false
@@ -793,9 +803,9 @@
     {
       "path": ".codex/skills/xian-skill-governance/SKILL.md",
       "sourcePath": "base/.codex/skills/xian-skill-governance/SKILL.md",
-      "sourceHash": "b66c2a42c5eefcc41c88791c06c77fa127cff266b61b88a2581b60d1262279d0",
-      "targetHash": "b66c2a42c5eefcc41c88791c06c77fa127cff266b61b88a2581b60d1262279d0",
-      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceHash": "9aa1630108f1b47e170e421050fe00a7ff58f747e7e6a671314cb50e4546abc6",
+      "targetHash": "9aa1630108f1b47e170e421050fe00a7ff58f747e7e6a671314cb50e4546abc6",
+      "installedAt": "2026-08-27T21:09:44+08:00",
       "sourceMode": 420,
       "targetMode": 420,
       "tombstone": false
@@ -1263,9 +1273,9 @@
     {
       "path": ".xian-harness/skill-registry.json",
       "sourcePath": "profiles/python/.xian-harness/skill-registry.json",
-      "sourceHash": "cf66c68d9223fdd088f44bad216d6ed7c2ffb409def53793dd5b0ad68ab18979",
-      "targetHash": "cf66c68d9223fdd088f44bad216d6ed7c2ffb409def53793dd5b0ad68ab18979",
-      "installedAt": "2026-08-26T20:38:57+08:00",
+      "sourceHash": "f6050bfad964a0a903bdceb8c08116b96c70eafd6a9a8f9a56af186580ecfc7c",
+      "targetHash": "f6050bfad964a0a903bdceb8c08116b96c70eafd6a9a8f9a56af186580ecfc7c",
+      "installedAt": "2026-08-27T21:09:44+08:00",
       "sourceMode": 420,
       "targetMode": 420,
       "tombstone": false

@@ -15,8 +15,9 @@ description: Use when modifying harness skills, SKILL.md contracts, registry, or
 
 ## 协议输入
 
-- `harness-pack/manifest.yaml`
-- `.xian-harness/skill-registry.json`
+- `harness-pack/registry/skills.json`
+- `harness-pack/manifest.yaml`（generated projection）
+- `.xian-harness/skill-registry.json`（installed generated projection）
 - `harness-pack/base/.codex/skills/{skill}/SKILL.md`
 - `harness-pack/profiles/{profile}/.codex/skills/{skill}/SKILL.md`
 - `.xian-harness/changes/{change-id}`
@@ -27,9 +28,10 @@ description: Use when modifying harness skills, SKILL.md contracts, registry, or
 1. Decide whether the requested change updates an existing skill or creates a new skill.
 2. Choose the owning profile before writing content.
 3. Keep frontmatter trigger-focused: `description` says when to use the skill, not the workflow.
-4. Update `harness-pack/manifest.yaml` and `.xian-harness/skill-registry.json` together when the skill list, role, group, or activation changes.
-5. Add or update contract tests that prove the skill is generic, profile-isolated, and discoverable.
-6. Route command-like assets through the command naming rules before treating them as ordinary skills.
+4. Update `harness-pack/registry/skills.json` when the skill list, role, group, layer, activation, description, or keywords change; do not hand-edit generated manifest/registry projections.
+5. Run `npm run pack:registry:compile`, then `npm run pack:registry:check` to materialize and verify every Pack-source projection.
+6. Add or update contract tests that prove the skill is generic, profile-isolated, and discoverable.
+7. Route command-like assets through the command naming rules before treating them as ordinary skills.
 
 ## 常见分支
 
@@ -40,6 +42,7 @@ description: Use when modifying harness skills, SKILL.md contracts, registry, or
 ## 确定性工具
 
 - `npm test -- --run test/skill-contract.test.ts test/skill-registry.test.ts`
+- `npm run pack:registry:compile && npm run pack:registry:check`
 - `npm test -- --run test/pack.test.ts`
 - `xian-harness pack status --target <target-project> --profile auto --json`
 - `rg -n "name:|description:|Primary Asset Scope" harness-pack/base/.codex/skills harness-pack/profiles`
@@ -47,8 +50,8 @@ description: Use when modifying harness skills, SKILL.md contracts, registry, or
 ## 必需证据
 
 - Skill path and owner profile.
-- Manifest skill group entry.
-- `.xian-harness/skill-registry.json` entry when activation, role, routing, or group changes.
+- `harness-pack/registry/skills.json` canonical entry and generated manifest/registry check.
+- Installed `.xian-harness/skill-registry.json` compatibility when activation, role, routing, or group changes.
 - Contract test proving required sections and profile isolation.
 - Pack status evidence when the skill is installable.
 
@@ -64,14 +67,14 @@ Primary Asset Scope: skills and skill registry entries
 4. SKILL.md 使用中文 Skill 契约 v2；技术锚点、命令、字段名和路径保持英文。
 5. 补齐“常见分支”、“参考样例”、“自检清单”和“约束与原因”段；暂无参考样例时说明补齐条件。
 6. 每条约束必须写具体原因，引用协议边界、证据链、profile 隔离或已发生教训，不能写成笼统最佳实践。
-7. 修改 installable skill 后同步 `harness-pack` 源、当前工作区 `.codex/skills`、registry/manifest 和 pack status 证据。
+7. 修改 installable skill 后只更新 `harness-pack` source Skill 与 canonical registry，运行 compiler/check；当前工作区 root mirror 由后续 owner-authorized Pack lifecycle 投影，不在本流程手工同步。
 
 ## 晋升规则
 
 - Promote to base only when the skill applies across project stacks.
 - Promote to a vertical profile when the trigger depends on that profile's markers, commands, or technology rules.
 - 不要create a new skill when a narrower update to an existing skill is enough.
-- Keep machine-readable activation and routing in `.xian-harness/skill-registry.json`.
+- Keep machine-readable activation and routing in `harness-pack/registry/skills.json`; installed `.xian-harness/skill-registry.json` is its generated compatibility projection.
 - Keep human-readable process rules in `SKILL.md`.
 
 ## 参考样例
@@ -83,7 +86,7 @@ Primary Asset Scope: skills and skill registry entries
 - 是否判断了 create vs update？
 - 是否确认 owner profile？
 - 是否套用中文 Skill 契约 v2？
-- 是否同步 manifest、registry、tests 和 pack status 证据？
+- 是否更新 canonical registry、运行 compiler/check，并补齐 tests 与 pack status 证据？
 
 ## 交互预算
 

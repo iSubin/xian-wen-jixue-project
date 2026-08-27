@@ -25,13 +25,14 @@
       "keywords": [
         "open",
         "intake",
+        "governed-lite",
+        "audit",
+        "close",
         "需求",
-        "澄清",
         "接入",
-        "开一个",
-        "开新",
-        "change"
-      ]
+        "开一个"
+      ],
+      "packLayer": "core"
     },
     {
       "name": "xian-next",
@@ -61,7 +62,8 @@
         "下一步",
         "推进",
         "go"
-      ]
+      ],
+      "packLayer": "core"
     },
     {
       "name": "xian-batch",
@@ -72,8 +74,6 @@
       ],
       "activation": {
         "promptPatterns": [
-          "/goal",
-          "goal",
           "batch",
           "批量执行",
           "批处理",
@@ -81,17 +81,18 @@
           "多变更"
         ]
       },
-      "shortDescription": "Run goal-driven change batches.",
+      "shortDescription": "Run Host-coordinated change batches.",
       "keywords": [
-        "goal",
         "batch",
+        "host",
+        "governed-lite",
+        "audit",
+        "close",
         "批量",
         "串行",
-        "多变更",
-        "/goal",
-        "change",
-        "批处理"
-      ]
+        "多变更"
+      ],
+      "packLayer": "advanced-governance"
     },
     {
       "name": "xian-spec",
@@ -125,7 +126,8 @@
         "proposal",
         "规格",
         "验收"
-      ]
+      ],
+      "packLayer": "advanced-governance"
     },
     {
       "name": "xian-design",
@@ -161,7 +163,8 @@
         "架构",
         "方案",
         "取舍"
-      ]
+      ],
+      "packLayer": "advanced-governance"
     },
     {
       "name": "xian-plan",
@@ -196,7 +199,8 @@
         "tasks",
         "计划",
         "验证映射"
-      ]
+      ],
+      "packLayer": "advanced-governance"
     },
     {
       "name": "xian-build",
@@ -232,7 +236,8 @@
         "implement",
         "开发",
         "实现"
-      ]
+      ],
+      "packLayer": "advanced-governance"
     },
     {
       "name": "xian-diagnose",
@@ -273,7 +278,8 @@
         "error",
         "报错",
         "性能"
-      ]
+      ],
+      "packLayer": "advanced-governance"
     },
     {
       "name": "xian-project-startup",
@@ -300,7 +306,8 @@
         "startup",
         "接手项目",
         "项目基线"
-      ]
+      ],
+      "packLayer": "advanced-governance"
     },
     {
       "name": "xian-project-status",
@@ -325,7 +332,8 @@
         "status",
         "项目状态",
         "项目健康度"
-      ]
+      ],
+      "packLayer": "core"
     },
     {
       "name": "xian-backlog",
@@ -353,7 +361,8 @@
         "registry",
         "待办",
         "工作队列"
-      ]
+      ],
+      "packLayer": "core"
     },
     {
       "name": "xian-project-sync",
@@ -378,7 +387,8 @@
         "sync",
         "同步项目文档",
         "项目总览"
-      ]
+      ],
+      "packLayer": "advanced-governance"
     },
     {
       "name": "xian-project-research",
@@ -416,7 +426,8 @@
         "调研",
         "参考项目",
         "吸收"
-      ]
+      ],
+      "packLayer": "advanced-governance"
     },
     {
       "name": "xian-verify",
@@ -440,7 +451,8 @@
         "test",
         "验证",
         "测试"
-      ]
+      ],
+      "packLayer": "core"
     },
     {
       "name": "xian-review",
@@ -475,7 +487,8 @@
         "审查",
         "复核",
         "issue"
-      ]
+      ],
+      "packLayer": "advanced-governance"
     },
     {
       "name": "xian-gate",
@@ -492,13 +505,18 @@
           "质量"
         ]
       },
-      "shortDescription": "Judge quality gate decisions.",
+      "shortDescription": "Gate before governed close/audit.",
       "keywords": [
         "gate",
+        "close",
+        "audit",
+        "governed-lite",
+        "decision",
         "quality",
         "门禁",
         "质量"
-      ]
+      ],
+      "packLayer": "core"
     },
     {
       "name": "xian-workbench",
@@ -516,13 +534,18 @@
           "交接"
         ]
       },
-      "shortDescription": "Create Workbench snapshots and handoffs.",
+      "shortDescription": "Read-only workbench views.",
       "keywords": [
         "workbench",
+        "view",
+        "audit",
+        "close",
+        "read-only",
         "handoff",
         "看板",
         "交接"
-      ]
+      ],
+      "packLayer": "audit"
     },
     {
       "name": "xian-archive",
@@ -556,7 +579,8 @@
         "release",
         "归档",
         "发布"
-      ]
+      ],
+      "packLayer": "audit"
     },
     {
       "name": "xian-commit",
@@ -584,18 +608,38 @@
         "收口",
         "交付",
         "delivery close"
-      ]
+      ],
+      "packLayer": "core"
     },
     {
       "name": "xian-release",
       "profile": "base",
       "group": "governance",
-      "roles": ["release-manager"],
+      "roles": [
+        "release-manager"
+      ],
       "activation": {
-        "promptPatterns": ["xian-release", "release candidate", "version release", "发版", "版本号", "CHANGELOG", "版本日志", "创建 tag"]
+        "promptPatterns": [
+          "xian-release",
+          "release candidate",
+          "version release",
+          "发版",
+          "版本号",
+          "CHANGELOG",
+          "版本日志",
+          "创建 tag"
+        ]
       },
       "shortDescription": "Coordinate explicit CI-backed version releases.",
-      "keywords": ["release", "candidate", "changelog", "version", "tag", "发版"]
+      "keywords": [
+        "release",
+        "candidate",
+        "changelog",
+        "version",
+        "tag",
+        "发版"
+      ],
+      "packLayer": "audit"
     },
     {
       "name": "xian-cost",
@@ -618,7 +662,8 @@
         "token",
         "成本",
         "耗时"
-      ]
+      ],
+      "packLayer": "advanced-governance"
     },
     {
       "name": "xian-experience",
@@ -643,7 +688,8 @@
         "复盘",
         "经验",
         "沉淀"
-      ]
+      ],
+      "packLayer": "advanced-governance"
     },
     {
       "name": "xian-asset-governance",
@@ -668,7 +714,8 @@
         "profile",
         "资产",
         "隔离"
-      ]
+      ],
+      "packLayer": "advanced-governance"
     },
     {
       "name": "xian-skill-governance",
@@ -693,7 +740,8 @@
         "registry",
         "frontmatter",
         "触发词"
-      ]
+      ],
+      "packLayer": "advanced-governance"
     },
     {
       "name": "xian-hook-governance",
@@ -718,7 +766,8 @@
         "forced eval",
         "session-start",
         "误触"
-      ]
+      ],
+      "packLayer": "advanced-governance"
     },
     {
       "name": "xian-agent-governance",
@@ -744,7 +793,8 @@
         "Verifier",
         "Gatekeeper",
         "角色"
-      ]
+      ],
+      "packLayer": "advanced-governance"
     },
     {
       "name": "xian-pack-governance",
@@ -769,25 +819,30 @@
         "manifest.yaml",
         "profile",
         "安装资产"
-      ]
+      ],
+      "packLayer": "core"
     },
     {
       "name": "using-xian-harness",
       "profile": "base",
       "group": "governance",
-      "shortDescription": "Skill discovery and state machine entry.",
+      "shortDescription": "Lightweight governed-lite router.",
       "keywords": [
         "xian-harness",
         "using-xian-harness",
-        "skill discovery",
-        "state machine"
+        "router",
+        "governed-lite",
+        "audit",
+        "close",
+        "skill-routing"
       ],
       "activation": {
         "promptPatterns": [
           "xian-harness",
           "using-xian-harness"
         ]
-      }
+      },
+      "packLayer": "core"
     }
   ]
 }

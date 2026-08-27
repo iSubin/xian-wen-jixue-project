@@ -1,21 +1,5 @@
 const { unique } = require('./hook-routing.cjs');
 
-const fallbackSkillTerms = {
-  'xian-open': ['open', 'intake', '需求', '接入', '澄清', '开一个', '开新'],
-  'xian-next': ['next', 'next-action', 'continue', '继续', '下一步', '推进', 'go'],
-  'xian-spec': ['spec', 'proposal', '规格', '方案', '需求'],
-  'xian-design': ['design', 'architecture', '设计', '架构', '方案'],
-  'xian-plan': ['plan', 'task', '规划', '计划', '任务', '普通 typescript'],
-  'xian-build': ['build', 'implement', '开发', '实现', '修复'],
-  'xian-diagnose': ['bug', 'error', '报错', '失败', '性能', '慢'],
-  'xian-project-startup': ['project startup', 'xian-project-startup', '接手项目', '初始化项目', '项目基线', '项目骨架'],
-  'xian-verify': ['verify', 'test', '验证', '测试', '自测'],
-  'xian-review': ['review', '审查', '复核', '评审', '反馈', 'issue'],
-  'xian-gate': ['gate', 'quality', '门禁', '质量'],
-  'xian-workbench': ['workbench', 'handoff', '看板', '交接'],
-  'xian-archive': ['archive', 'release', '归档', '发布']
-};
-
 const defaultModeSkillLimits = {
   chat: 0,
   change: 3
@@ -127,8 +111,7 @@ function scoreFallbackSkill(name, prompt) {
   const normalizedName = name.toLowerCase().replace(/^xian-/, '').replace(/-/g, ' ');
   const terms = unique([
     name.toLowerCase(),
-    normalizedName,
-    ...(fallbackSkillTerms[name] || [])
+    normalizedName
   ]).map((term) => term.toLowerCase());
 
   return terms.reduce((score, term) => lower.includes(term) ? score + 1 : score, 0);
