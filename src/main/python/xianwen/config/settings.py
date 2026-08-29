@@ -88,6 +88,9 @@ class LLMProfileConfig:
     model_id: str = ""
     temperature: float = 0.7
     context_window_size: int = 1000000
+    cli_path: str = "codex"
+    reasoning_effort: str = ""
+    cli_timeout_sec: int = 900
 
 
 @dataclass
@@ -105,6 +108,9 @@ class LLMConfig:
     model_id: str = ""
     temperature: float = 0.7
     context_window_size: int = 1000000
+    cli_path: str = "codex"
+    reasoning_effort: str = ""
+    cli_timeout_sec: int = 900
 
 
 _BUILTIN_PROVIDER_DEFAULTS: dict[str, dict[str, Any]] = {
@@ -143,6 +149,12 @@ _BUILTIN_PROVIDER_DEFAULTS: dict[str, dict[str, Any]] = {
         "base_url": "https://api.deepseek.com",
         "api_key": "",
         "model_id": "deepseek-v4-flash",
+    },
+    "codex_cli": {
+        "label": "Codex CLI（本机）",
+        "base_url": "",
+        "api_key": "",
+        "model_id": "",
     },
 }
 
@@ -253,6 +265,9 @@ def _build_default_settings() -> dict[str, Any]:
                 "model_id": default_provider["model_id"],
                 "temperature": 0.7,
                 "context_window_size": 1000000,
+                "cli_path": "codex",
+                "reasoning_effort": "",
+                "cli_timeout_sec": 900,
             }
         ],
     }
@@ -335,6 +350,9 @@ class JSONConfigManager:
                             "model_id": str(llm_raw.get("model_id") or defaults.get("model_id", "")),
                             "temperature": float(llm_raw.get("temperature", 0.7)),
                             "context_window_size": int(llm_raw.get("context_window_size", 1000000)),
+                            "cli_path": str(llm_raw.get("cli_path") or "codex"),
+                            "reasoning_effort": str(llm_raw.get("reasoning_effort") or ""),
+                            "cli_timeout_sec": max(10, int(llm_raw.get("cli_timeout_sec", 900))),
                         }],
                     }
                     loaded["llm"] = migrated
@@ -359,6 +377,9 @@ class JSONConfigManager:
                             "model_id": str(cfg.get("model_id") or defaults.get("model_id", "")),
                             "temperature": float(cfg.get("temperature", 0.7)),
                             "context_window_size": int(cfg.get("context_window_size", 1000000)),
+                            "cli_path": str(cfg.get("cli_path") or "codex"),
+                            "reasoning_effort": str(cfg.get("reasoning_effort") or ""),
+                            "cli_timeout_sec": max(10, int(cfg.get("cli_timeout_sec", 900))),
                         })
                     if not active_profile_id and profiles:
                         active_profile_id = profiles[0]["id"]
@@ -414,6 +435,9 @@ class JSONConfigManager:
             "model_id": str(payload.get("model_id") or provider_defaults.get("model_id", "")),
             "temperature": float(payload.get("temperature", 0.7)),
             "context_window_size": int(payload.get("context_window_size", 1000000)),
+            "cli_path": str(payload.get("cli_path") or "codex"),
+            "reasoning_effort": str(payload.get("reasoning_effort") or "").strip().lower(),
+            "cli_timeout_sec": max(10, int(payload.get("cli_timeout_sec", 900))),
         }
         with self._lock:
             llm = self._config.get("llm", {})
@@ -445,6 +469,12 @@ class JSONConfigManager:
                         updated["temperature"] = float(payload["temperature"])
                     if "context_window_size" in payload and payload["context_window_size"] is not None:
                         updated["context_window_size"] = int(payload["context_window_size"])
+                    if "cli_path" in payload:
+                        updated["cli_path"] = str(payload.get("cli_path") or "codex").strip() or "codex"
+                    if "reasoning_effort" in payload:
+                        updated["reasoning_effort"] = str(payload.get("reasoning_effort") or "").strip().lower()
+                    if "cli_timeout_sec" in payload and payload["cli_timeout_sec"] is not None:
+                        updated["cli_timeout_sec"] = max(10, int(payload["cli_timeout_sec"]))
                     if "api_key" in payload and payload.get("api_key"):
                         updated["api_key"] = str(payload["api_key"])
                     # If provider changed, fill defaults for fields not provided
@@ -620,6 +650,9 @@ class JSONConfigManager:
             model_id=str(active_profile.get("model_id") or ""),
             temperature=float(active_profile.get("temperature", 0.7)),
             context_window_size=int(active_profile.get("context_window_size", 1000000)),
+            cli_path=str(active_profile.get("cli_path") or "codex"),
+            reasoning_effort=str(active_profile.get("reasoning_effort") or "").strip().lower(),
+            cli_timeout_sec=max(10, int(active_profile.get("cli_timeout_sec", 900))),
         )
 
     def get_llm_profiles_config(self) -> LLMProfilesConfig:
@@ -638,6 +671,9 @@ class JSONConfigManager:
                 model_id=str(p.get("model_id") or ""),
                 temperature=float(p.get("temperature", 0.7)),
                 context_window_size=int(p.get("context_window_size", 1000000)),
+                cli_path=str(p.get("cli_path") or "codex"),
+                reasoning_effort=str(p.get("reasoning_effort") or "").strip().lower(),
+                cli_timeout_sec=max(10, int(p.get("cli_timeout_sec", 900))),
             ))
         if not active_id and profiles:
             active_id = profiles[0].id
@@ -761,4 +797,7 @@ def to_llm_config(settings: Settings) -> "LLMConfigDataclass":
         temperature=llm_cfg.temperature,
         context_window_size=llm_cfg.context_window_size,
         provider=llm_cfg.provider,
+        cli_path=llm_cfg.cli_path,
+        reasoning_effort=llm_cfg.reasoning_effort,
+        cli_timeout_sec=llm_cfg.cli_timeout_sec,
     )

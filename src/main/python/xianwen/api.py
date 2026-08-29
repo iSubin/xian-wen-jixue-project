@@ -485,6 +485,9 @@ class LLMProfileInfo(BaseModel):
     model_id: str
     temperature: float
     context_window_size: int
+    cli_path: str
+    reasoning_effort: str
+    cli_timeout_sec: int
     has_api_key: bool
     api_key_hint: str
 
@@ -501,6 +504,9 @@ class LLMProfileCreate(BaseModel):
     api_key: Optional[str] = Field(default=None, description="API Key（可选）")
     model_id: Optional[str] = None
     temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)
+    cli_path: Optional[str] = None
+    reasoning_effort: Optional[str] = None
+    cli_timeout_sec: Optional[int] = Field(default=None, ge=10, le=7200)
 
 
 class LLMProfileUpdate(BaseModel):
@@ -512,6 +518,9 @@ class LLMProfileUpdate(BaseModel):
     model_id: Optional[str] = None
     temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)
     context_window_size: Optional[int] = Field(default=None, ge=1)
+    cli_path: Optional[str] = None
+    reasoning_effort: Optional[str] = None
+    cli_timeout_sec: Optional[int] = Field(default=None, ge=10, le=7200)
 
 
 class LLMActiveProfileUpdate(BaseModel):
@@ -1345,6 +1354,9 @@ initial_llm_config = LLMConfig(
     temperature=llm_cfg.temperature,
     context_window_size=llm_cfg.context_window_size,
     provider=llm_cfg.provider,
+    cli_path=llm_cfg.cli_path,
+    reasoning_effort=llm_cfg.reasoning_effort,
+    cli_timeout_sec=llm_cfg.cli_timeout_sec,
 )
 initial_provider_id = llm_cfg.provider.strip() if llm_cfg.provider.strip() else None
 
@@ -1355,7 +1367,7 @@ llm_provider_manager = LLMProviderManager(
 # Load all profiles from settings.json into the manager
 llm_profiles_config = config_manager.get_llm_profiles_config()
 llm_provider_manager.load_profiles(
-    [{"id": p.id, "name": p.name, "provider": p.provider, "base_url": p.base_url, "api_key": p.api_key, "model_id": p.model_id, "temperature": p.temperature, "context_window_size": p.context_window_size} for p in llm_profiles_config.profiles],
+    [{"id": p.id, "name": p.name, "provider": p.provider, "base_url": p.base_url, "api_key": p.api_key, "model_id": p.model_id, "temperature": p.temperature, "context_window_size": p.context_window_size, "cli_path": p.cli_path, "reasoning_effort": p.reasoning_effort, "cli_timeout_sec": p.cli_timeout_sec} for p in llm_profiles_config.profiles],
     llm_profiles_config.active_profile_id,
 )
 
@@ -3217,6 +3229,9 @@ async def update_llm_profile(payload: LLMProfileUpdate):
             model_id=payload.model_id,
             temperature=payload.temperature,
             context_window_size=payload.context_window_size,
+            cli_path=payload.cli_path,
+            reasoning_effort=payload.reasoning_effort,
+            cli_timeout_sec=payload.cli_timeout_sec,
         )
         # Persist to settings.json
         config_manager.update_profile(payload.profile_id, payload.model_dump(exclude_none=True, exclude={"profile_id"}))
@@ -3236,6 +3251,9 @@ async def create_llm_profile(payload: LLMProfileCreate):
             api_key=payload.api_key,
             model_id=payload.model_id,
             temperature=payload.temperature,
+            cli_path=payload.cli_path,
+            reasoning_effort=payload.reasoning_effort,
+            cli_timeout_sec=payload.cli_timeout_sec,
         )
         new_profile_id = result.pop("new_profile_id")
         # Persist to settings.json with the same profile_id
@@ -3283,6 +3301,19 @@ async def test_llm_connection():
         # 使用当前运行时配置创建临时 LLM 客户端，不触发 worker 懒初始化。
         runtime_config = llm_provider_manager.get_runtime_config()
         llm_client = get_llm(runtime_config)
+
+        if runtime_config.provider == "codex_cli":
+            preflight = getattr(llm_client, "preflight", None)
+            if preflight is None:
+                raise LLMConnectionError("Codex CLI Provider 缺少可用性检查能力")
+            status = await preflight(force=True)
+            executable = str(status.get("executable") or runtime_config.cli_path)
+            logger.info(f"Codex CLI 检查通过: executable={executable}")
+            return LLMTestResult(
+                status="success",
+                message="Codex CLI 可用且已登录；测试未发起模型调用",
+                response=executable,
+            )
 
         # 记录当前配置
         llm_client_config = getattr(llm_client, "config", None)

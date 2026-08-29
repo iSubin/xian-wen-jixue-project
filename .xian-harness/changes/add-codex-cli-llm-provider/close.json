@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "changeId": "add-codex-cli-llm-provider",
+  "target": "<target-project>",
+  "status": "closed",
+  "closedAt": "2026-08-29T16:23:40+08:00",
+  "mode": "governed",
+  "outcome": "verified",
+  "closePath": ".xian-harness/changes/add-codex-cli-llm-provider/close.json",
+  "verifyResultPath": ".xian-harness/changes/add-codex-cli-llm-provider/verify/attempts/attempt-2026-08-29T16-23-14-08-00-1787991794609-42346-b0mg9x7qkg/result.json",
+  "gateResultPath": ".xian-harness/changes/add-codex-cli-llm-provider/gate/attempts/gate-4cbd6f09-d5ba-4fab-ba06-904c6d996d3a/result.json",
+  "gate": {
+    "required": true,
+    "status": "pass",
+    "path": ".xian-harness/changes/add-codex-cli-llm-provider/gate/attempts/gate-4cbd6f09-d5ba-4fab-ba06-904c6d996d3a/result.json",
+    "reason": null
+  },
+  "evidence": [
+    ".xian-harness/changes/add-codex-cli-llm-provider/change.md",
+    ".xian-harness/changes/add-codex-cli-llm-provider/verify/attempts/attempt-2026-08-29T16-23-14-08-00-1787991794609-42346-b0mg9x7qkg/result.json",
+    ".xian-harness/changes/add-codex-cli-llm-provider/gate/attempts/gate-4cbd6f09-d5ba-4fab-ba06-904c6d996d3a/result.json",
+    ".xian-harness/changes/add-codex-cli-llm-provider/result/7551d7492ea0d5d41b86944c04f8fb5c590d684cde52da8b14a41e13b525e384/manifest.json",
+    ".xian-harness/changes/add-codex-cli-llm-provider/result-commit.json"
+  ],
+  "resultCommit": {
+    "resultCommitIdentity": "sha256:7551d7492ea0d5d41b86944c04f8fb5c590d684cde52da8b14a41e13b525e384",
+    "manifestPath": ".xian-harness/changes/add-codex-cli-llm-provider/result/7551d7492ea0d5d41b86944c04f8fb5c590d684cde52da8b14a41e13b525e384/manifest.json",
+    "pointerPath": ".xian-harness/changes/add-codex-cli-llm-provider/result-commit.json"
+  },
+  "lifecycleCompaction": {
+    "activation": {
+      "version": 1,
+      "changeId": "add-codex-cli-llm-provider",
+      "activatedAt": "2026-08-29T16:03:01+08:00",
+      "sourceBaseCommit": "3625b73121deb0918162f2e6591cb493bd71f541",
+      "previousActiveChange": null,
+      "previousActivationStatus": "active",
+      "activationStatus": "active",
+      "phase": "open",
+      "statePath": ".xian-harness/changes/add-codex-cli-llm-provider/.change-state.json"
+    },
+    "compactedArtifacts": [
+      {
+        "path": ".xian-harness/changes/add-codex-cli-llm-provider/activate/acceptance-snapshot.json",
+        "bytes": 2363,
+        "sha256": "4e1506fd630651d6da055218a513aa3b10269776dec4c0e9d782e5c3f6fc6c66"
+      },
+      {
+        "path": ".xian-harness/changes/add-codex-cli-llm-provider/activate/activation-result.json",
+        "bytes": 384,
+        "sha256": "7db90f7f7a36374e50ae1737c29fa1cf312e89684a7166df68f014b2ec391535"
+      },
+      {
+        "path": ".xian-harness/changes/add-codex-cli-llm-provider/activate/activation.md",
+        "bytes": 466,
+        "sha256": "75cf4b580092136e5b72f9428c0854b806226a0ef54009ebc37835ec06afe08b"
+      }
+    ]
+  },
+  "cost": {
+    "artifactScope": "close-action-written-facts",
+    "artifactCount": 2,
+    "note": "Counts only facts written by the close action itself: close.json and the change.closed event. Use xian-harness cost artifacts for full change directory artifact budget."
+  },
+  "state": {
+    "version": 1,
+    "changeId": "add-codex-cli-llm-provider",
+    "mode": "governed",
+    "tier": "standard",
+    "tierDecision": {
+      "declaredTier": "standard",
+      "effectiveTier": "standard",
+      "riskSignals": [
+        {
+          "id": "runtime.code",
+          "tier": "standard",
+          "reason": "Runtime code changes require at least the standard verification flow.",
+          "evidence": [
+            "/Users/subin/Documents/Claude-Project/xian-wen-jixue-project/frontend/src/composables/useTaskViewModel.ts",
+            "/Users/subin/Documents/Claude-Project/xian-wen-jixue-project/frontend/src/types.ts"
+          ]
+        }
+      ],
+      "forcedUpgrade": null,
+      "downgrade": null
+    },
+    "phase": "archived",
+    "terminalKind": "governed-closed",
+    "activationStatus": "archived",
+    "isolation": "branch",
+    "executionPause": null,
+    "engineeringTrace": null,
+    "sourceRefs": [],
+    "parentRefs": [],
+    "language": {
+      "default": "zh-CN",
+      "protocolLanguage": "en",
+      "businessLanguage": "zh-CN",
+      "codeAnchorLanguage": "en"
+    },
+    "cost": {
+      "tokenUsage": null,
+      "elapsedSeconds": null,
+      "commitCount": 0,
+      "artifactCount": 1
+    },
+    "nextAction": "Governed close completed. Review close.json for final evidence."
+  }
+}

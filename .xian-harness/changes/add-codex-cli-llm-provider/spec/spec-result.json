@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "changeId": "add-codex-cli-llm-provider",
+  "phase": "spec",
+  "status": "pass",
+  "generatedAt": "2026-08-29T16:20:03+08:00",
+  "summary": "已确认 codex_cli 作为现有 LLM Profile Provider；明确无 shell、stdin、read-only、ephemeral、隔离目录、环境白名单、输出上限、超时与进程组回收边界，且不引入 Harness reviewer authority。",
+  "missingFacts": [],
+  "acceptedBusinessContractIdentity": "sha256:2e440fc061ba4223eb92b9b9fa4eb4f3f6390e524ad367baa0743717c97d4594",
+  "requirementFacts": {
+    "requirementsDefined": true,
+    "boundariesDefined": true,
+    "acceptanceCriteriaDefined": true,
+    "nonGoalsDefined": true,
+    "verificationMapped": true
+  }
+}

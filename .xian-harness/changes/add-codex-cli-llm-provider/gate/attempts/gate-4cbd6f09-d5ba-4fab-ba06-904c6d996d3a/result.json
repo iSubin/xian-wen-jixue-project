@@ -1,0 +1,160 @@
+{
+  "version": 1,
+  "changeId": "add-codex-cli-llm-provider",
+  "target": "<target-project>",
+  "status": "pass",
+  "startedAt": "2026-08-29T16:23:32+08:00",
+  "finishedAt": "2026-08-29T16:23:33+08:00",
+  "qualityGateDir": ".xian-harness/changes/add-codex-cli-llm-provider/gate",
+  "gateResultPath": ".xian-harness/changes/add-codex-cli-llm-provider/gate/attempts/gate-4cbd6f09-d5ba-4fab-ba06-904c6d996d3a/result.json",
+  "issuesPath": ".xian-harness/changes/add-codex-cli-llm-provider/gate/attempts/gate-4cbd6f09-d5ba-4fab-ba06-904c6d996d3a/result.json",
+  "reportPath": ".xian-harness/changes/add-codex-cli-llm-provider/gate/attempts/gate-4cbd6f09-d5ba-4fab-ba06-904c6d996d3a/result.json",
+  "inputs": {
+    "verificationStatus": "pass",
+    "staleVerificationEvidence": null,
+    "packStatusPath": null,
+    "packStatusSummary": null,
+    "acceptancePath": ".xian-harness/changes/add-codex-cli-llm-provider/contract-revisions/rev-0005.json",
+    "acceptanceSummary": {
+      "status": "pass",
+      "checked": 0,
+      "unchecked": 6,
+      "checklistTotal": 6,
+      "placeholderCount": 0
+    },
+    "acceptanceCoverageSummary": {
+      "status": "not-applicable",
+      "requiredSmokeScripts": [],
+      "matchedSmokeScripts": [],
+      "missingSmokeScripts": []
+    },
+    "verificationRegistrySummary": {
+      "status": "pass",
+      "sourcePath": ".xian-harness/changes/add-codex-cli-llm-provider/contract-revisions/rev-0005.json",
+      "passedCommands": [
+        ".venv/bin/python -m pytest -q tests/test_codex_cli_llm.py",
+        "frontend/node_modules/.bin/vue-tsc -b frontend/tsconfig.json"
+      ],
+      "matchedRuleIds": [
+        "VC-001",
+        "VC-002"
+      ],
+      "missingRuleIds": [],
+      "rules": [
+        {
+          "id": "VC-001",
+          "title": null,
+          "kind": "acceptance-rule",
+          "severity": "P1",
+          "status": "pass",
+          "smokeScript": null,
+          "command": ".venv/bin/python -m pytest -q tests/test_codex_cli_llm.py",
+          "ownerSkill": "xian-verify",
+          "referenceFiles": [],
+          "matchedEvidence": [
+            "rule:VC-001",
+            "command:exact:.venv/bin/python -m pytest -q tests/test_codex_cli_llm.py"
+          ],
+          "mismatch": null
+        },
+        {
+          "id": "VC-002",
+          "title": null,
+          "kind": "acceptance-rule",
+          "severity": "P1",
+          "status": "pass",
+          "smokeScript": null,
+          "command": "frontend/node_modules/.bin/vue-tsc -b frontend/tsconfig.json",
+          "ownerSkill": "xian-verify",
+          "referenceFiles": [],
+          "matchedEvidence": [
+            "rule:VC-002",
+            "command:exact:frontend/node_modules/.bin/vue-tsc -b frontend/tsconfig.json"
+          ],
+          "mismatch": null
+        }
+      ]
+    },
+    "registryLintSummary": null,
+    "skillRegistrySummary": null,
+    "templateRegistrySummary": null,
+    "standardRegistrySummary": null,
+    "lifecycleContractSummary": null,
+    "agentPairReviewSummary": null,
+    "phaseResultsSummary": {
+      "spec": {
+        "phase": "spec",
+        "path": ".xian-harness/changes/add-codex-cli-llm-provider/spec/spec-result.json",
+        "status": "pass",
+        "summary": "已确认 codex_cli 作为现有 LLM Profile Provider；明确无 shell、stdin、read-only、ephemeral、隔离目录、环境白名单、输出上限、超时与进程组回收边界，且不引入 Harness reviewer authority。",
+        "generatedAt": "2026-08-29T16:20:03+08:00",
+        "missingFacts": []
+      },
+      "build": {
+        "phase": "build",
+        "path": ".xian-harness/changes/add-codex-cli-llm-provider/build/build-result.json",
+        "status": "pass",
+        "summary": "已实现 codex_cli Provider、Profile/API/设置界面、原子客户端切换和受约束 subprocess 生命周期；本机预检、73 项维护测试及前端构建通过。",
+        "generatedAt": "2026-08-29T16:21:08+08:00",
+        "missingFacts": []
+      }
+    },
+    "runnerEnvironmentPath": null,
+    "runnerEnvironment": {
+      "status": "missing",
+      "checkedAt": "not-checked",
+      "checks": []
+    }
+  },
+  "policy": {
+    "adapter": null,
+    "profile": "generic",
+    "version": 1,
+    "path": null
+  },
+  "agents": {
+    "builder": null,
+    "verifier": "xian-verify",
+    "gatekeeper": "xian-gate"
+  },
+  "evidence": [
+    {
+      "kind": "command",
+      "name": "xian-harness verify",
+      "status": "pass",
+      "path": ".xian-harness/changes/add-codex-cli-llm-provider/verify/attempts/attempt-2026-08-29T16-23-14-08-00-1787991794609-42346-b0mg9x7qkg/result.json"
+    },
+    {
+      "kind": "static",
+      "name": "change acceptance",
+      "status": "pass",
+      "path": ".xian-harness/changes/add-codex-cli-llm-provider/contract-revisions/rev-0005.json"
+    }
+  ],
+  "issues": [],
+  "summary": {
+    "total": 0,
+    "openCount": 0,
+    "blockingOpenCount": 0,
+    "openBySeverity": {
+      "P0": 0,
+      "P1": 0,
+      "P2": 0,
+      "P3": 0
+    },
+    "p0": 0,
+    "p1": 0,
+    "p2": 0,
+    "p3": 0
+  },
+  "decision": {
+    "archiveAllowed": true,
+    "reason": "All required sealed Candidate actions and Gate policies passed."
+  },
+  "attemptMetadata": {
+    "candidateInputIdentity": "sha256:86e5955b68bb6b98275063dbdbf67a874948bfaeb253482cd11cccf10ead66af",
+    "retryCycleIdentity": "sha256:9394777bd17d44404aec7e6a0433850d93b05a61d0e87599b230e43fdadb44a4",
+    "verifyEvidenceIdentity": "sha256:647581e19d3867368b93af5fb29758c5002902d0835f3c45f8b046ce9f9abab3",
+    "failureCategory": null
+  }
+}

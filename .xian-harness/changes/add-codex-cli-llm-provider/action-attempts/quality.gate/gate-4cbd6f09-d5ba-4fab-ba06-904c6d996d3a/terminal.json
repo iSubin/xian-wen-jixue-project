@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "terminalId": "76ba1151-a9c3-4605-beb9-0cc182c817b6",
+  "changeId": "add-codex-cli-llm-provider",
+  "action": "quality.gate",
+  "actionSubjectIdentity": "sha256:9394777bd17d44404aec7e6a0433850d93b05a61d0e87599b230e43fdadb44a4",
+  "candidateInputIdentity": "sha256:86e5955b68bb6b98275063dbdbf67a874948bfaeb253482cd11cccf10ead66af",
+  "attemptId": "gate-4cbd6f09-d5ba-4fab-ba06-904c6d996d3a",
+  "fencingToken": 1,
+  "writerGeneration": 1,
+  "status": "pass",
+  "completion": "normal",
+  "completedAt": "2026-08-29T16:23:34+08:00",
+  "resultPath": ".xian-harness/changes/add-codex-cli-llm-provider/gate/attempts/gate-4cbd6f09-d5ba-4fab-ba06-904c6d996d3a/result.json",
+  "resultPayloadDigest": "sha256:30c8efeade86b0ee4dd1d975a1ad66f0ae929087e1dff9f15f44a18998cdb1ce",
+  "resultBytesDigest": "sha256:031c16deeadc56dc6fe2a7368edfa1c3809f26642c0c72c58795fccc948712c2",
+  "completionProof": {
+    "kind": "gate",
+    "inventoryCount": 1,
+    "inventoryDigest": "sha256:156e7e4761157106baf07a155b9ceb166f6d473aae5c32ed507043e3aec4ff9b",
+    "status": "pass"
+  },
+  "reason": null
+}

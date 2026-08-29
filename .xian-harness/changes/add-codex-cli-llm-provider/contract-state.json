@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "changeId": "add-codex-cli-llm-provider",
+  "currentDraft": null,
+  "currentAccepted": "rev-0005",
+  "currentFrozen": null,
+  "supersededRevisions": [
+    "rev-0001",
+    "rev-0002",
+    "rev-0003",
+    "rev-0004"
+  ],
+  "revisionStatuses": {
+    "rev-0001": "superseded",
+    "rev-0002": "superseded",
+    "rev-0003": "superseded",
+    "rev-0004": "superseded",
+    "rev-0005": "accepted"
+  },
+  "generatedViews": [],
+  "viewAuthority": "contract-generated",
+  "updatedAt": "2026-08-29T16:22:59+08:00"
+}

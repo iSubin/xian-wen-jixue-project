@@ -2,6 +2,19 @@ version: 1
 initializedAt: 2026-08-26T20:38:56+08:00
 activeChange: null
 changes: []
+lastVerification:
+  changeId: add-codex-cli-llm-provider
+  status: pass
+  verifiedAt: 2026-08-29T16:23:28+08:00
+  evidenceDir: .xian-harness/changes/add-codex-cli-llm-provider/verify/attempts/attempt-2026-08-29T16-23-14-08-00-1787991794609-42346-b0mg9x7qkg
+  verifyPath: .xian-harness/changes/add-codex-cli-llm-provider/verify/attempts/attempt-2026-08-29T16-23-14-08-00-1787991794609-42346-b0mg9x7qkg/result.json
+lastQualityGate:
+  changeId: add-codex-cli-llm-provider
+  status: pass
+  checkedAt: 2026-08-29T16:23:33+08:00
+  gateResultPath: .xian-harness/changes/add-codex-cli-llm-provider/gate/attempts/gate-4cbd6f09-d5ba-4fab-ba06-904c6d996d3a/result.json
+  issuesPath: .xian-harness/changes/add-codex-cli-llm-provider/gate/attempts/gate-4cbd6f09-d5ba-4fab-ba06-904c6d996d3a/result.json
+  reportPath: .xian-harness/changes/add-codex-cli-llm-provider/gate/attempts/gate-4cbd6f09-d5ba-4fab-ba06-904c6d996d3a/result.json
 lastPackInstall:
   requestedProfile: auto
   effectiveProfile: python

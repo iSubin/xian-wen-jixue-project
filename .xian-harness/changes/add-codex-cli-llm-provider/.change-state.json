@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "changeId": "add-codex-cli-llm-provider",
+  "mode": "governed",
+  "tier": "standard",
+  "tierDecision": {
+    "declaredTier": "standard",
+    "effectiveTier": "standard",
+    "riskSignals": [
+      {
+        "id": "runtime.code",
+        "tier": "standard",
+        "reason": "Runtime code changes require at least the standard verification flow.",
+        "evidence": [
+          "/Users/subin/Documents/Claude-Project/xian-wen-jixue-project/frontend/src/composables/useTaskViewModel.ts",
+          "/Users/subin/Documents/Claude-Project/xian-wen-jixue-project/frontend/src/types.ts"
+        ]
+      }
+    ],
+    "forcedUpgrade": null,
+    "downgrade": null
+  },
+  "phase": "archived",
+  "terminalKind": "governed-closed",
+  "activationStatus": "archived",
+  "isolation": "branch",
+  "executionPause": null,
+  "engineeringTrace": null,
+  "sourceRefs": [],
+  "parentRefs": [],
+  "language": {
+    "default": "zh-CN",
+    "protocolLanguage": "en",
+    "businessLanguage": "zh-CN",
+    "codeAnchorLanguage": "en"
+  },
+  "cost": {
+    "tokenUsage": null,
+    "elapsedSeconds": null,
+    "commitCount": 0,
+    "artifactCount": 1
+  },
+  "nextAction": "Governed close completed. Review close.json for final evidence."
+}

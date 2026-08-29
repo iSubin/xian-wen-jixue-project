@@ -46,6 +46,13 @@ class LLMWorker(Worker):
         self._frame_assets_root = frame_assets_root or str(get_task_assets_root())
         self._frame_writer = frame_writer
 
+    def update_llm_client(self, llm_client: LLM) -> None:
+        """原子替换后续任务使用的 LLM；已开始的调用继续持有原客户端。"""
+        self._llm_client = llm_client
+        logger.info(
+            f"[{self.name}] LLM 客户端已切换: provider={getattr(llm_client.config, 'provider', '<unknown>')}"
+        )
+
     def load_system_prompt(self, prompt_file: str):
         try:
             with open(prompt_file, "r", encoding="utf-8") as f:
@@ -400,7 +407,11 @@ class LLMWorker(Worker):
         return "".join(response_chunks)
 
     def _standard_summary_timeout_sec(self) -> float:
-        return float(config.summarization.llm_call_timeout_sec)
+        default_timeout = float(config.summarization.llm_call_timeout_sec)
+        client_config = getattr(self._llm_client, "config", None)
+        if getattr(client_config, "provider", "") == "codex_cli":
+            return max(default_timeout, float(getattr(client_config, "cli_timeout_sec", 900)))
+        return default_timeout
 
     @staticmethod
     def _raise_if_summary_incomplete(summary: str, transcript_text: str) -> None:

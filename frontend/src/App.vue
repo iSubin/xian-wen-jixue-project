@@ -29,6 +29,7 @@ import type {
   SettingsModalTab,
   Task,
   GitSettingsUpdate,
+  UpdateProfileRequest,
 } from './types'
 import { TaskStatus } from './types'
 import Sidebar from './components/Sidebar.vue'
@@ -538,30 +539,14 @@ const handleExportSummaryImage = async () => {
   }
 }
 
-const handleUpdateLlmSettings = async (payload: {
-  profile_id: string
-  name?: string
-  provider?: string
-  base_url?: string
-  api_key?: string
-  model_id?: string
-  temperature?: number
-}) => {
+const handleUpdateLlmSettings = async (payload: UpdateProfileRequest) => {
   try {
     await updateProfile(payload)
     success('LLM 配置已更新')
   } catch (_e) {}
 }
 
-const handleUpdateLlmSettingsAndTest = async (payload: {
-  profile_id: string
-  name?: string
-  provider?: string
-  base_url?: string
-  api_key?: string
-  model_id?: string
-  temperature?: number
-}) => {
+const handleUpdateLlmSettingsAndTest = async (payload: UpdateProfileRequest) => {
   try {
     await updateProfile(payload)
     success('LLM 配置已更新')

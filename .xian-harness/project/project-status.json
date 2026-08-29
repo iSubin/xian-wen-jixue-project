@@ -2,7 +2,7 @@
   "version": 1,
   "mode": "project-status",
   "target": "<target-project>",
-  "generatedAt": "2026-08-26T21:21:02+08:00",
+  "generatedAt": "2026-08-29T16:23:42+08:00",
   "state": {
     "initializedAt": "2026-08-26T20:38:56+08:00",
     "activeChange": null,
@@ -438,7 +438,7 @@
         }
       ],
       "scannedFileCount": 5000,
-      "skippedFileCount": 3759
+      "skippedFileCount": 3761
     },
     "riskLevel": "attention",
     "summary": "Project baseline has 1 risk item(s), and code scan found 600 TODO/FIXME signal(s)."

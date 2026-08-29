@@ -35,7 +35,9 @@ import {
   type Task,
   type SummaryMode,
   type LLMProvider,
+  type LLMProfileFormState,
   type LLMSettings,
+  type UpdateProfileRequest,
   type TranscriptionSettings,
   type SummarizationSettings,
   type Folder,
@@ -64,7 +66,7 @@ const props = defineProps<{
   llmSettings: LLMSettings | null
   activeProfileId: string
   editingProfileId: string
-  profileFormState: { name: string; provider: string; base_url: string; model_id: string; temperature: number; api_key: string }
+  profileFormState: LLMProfileFormState
   isUpdatingLlmSettings: boolean
   isTestingLlm: boolean
   isSwitchingProfile: boolean
@@ -114,15 +116,7 @@ const emit = defineEmits<{
     source: SearchMatchSource
     requestId: number
   }]
-  updateLlmSettings: [payload: {
-    profile_id: string
-    name?: string
-    provider?: string
-    base_url?: string
-    api_key?: string
-    model_id?: string
-    temperature?: number
-  }]
+  updateLlmSettings: [payload: UpdateProfileRequest]
   switchActiveProfile: [profileId: string]
   editProfile: [profileId: string]
   createProfile: [name: string, provider: string]
@@ -174,6 +168,19 @@ const llmTemperature = computed({
   get: () => props.profileFormState.temperature,
   set: (v: number) => { props.profileFormState.temperature = v },
 })
+const llmCliPath = computed({
+  get: () => props.profileFormState.cli_path,
+  set: (v: string) => { props.profileFormState.cli_path = v },
+})
+const llmReasoningEffort = computed({
+  get: () => props.profileFormState.reasoning_effort,
+  set: (v: string) => { props.profileFormState.reasoning_effort = v },
+})
+const llmCliTimeoutSec = computed({
+  get: () => props.profileFormState.cli_timeout_sec,
+  set: (v: number) => { props.profileFormState.cli_timeout_sec = v },
+})
+const isCodexCliProfile = computed(() => props.profileFormState.provider === 'codex_cli')
 const appVersion = __APP_VERSION__
 const captureTasks = computed(() => props.tasks.filter(task => task.source_type !== 'manual'))
 const libraryDocumentCount = computed(() =>
@@ -385,26 +392,23 @@ const requiredModelFilesLabel = computed(() => {
 })
 
 const submitLlmSettings = () => {
-  if (!llmBaseUrl.value || !llmModelId.value) return
+  if (!isCodexCliProfile.value && (!llmBaseUrl.value || !llmModelId.value)) return
 
-  const payload: {
-    profile_id: string
-    name?: string
-    provider?: string
-    base_url?: string
-    api_key?: string
-    model_id?: string
-    temperature?: number
-  } = {
+  const payload: UpdateProfileRequest = {
     profile_id: props.editingProfileId,
     provider: props.profileFormState.provider,
-    base_url: llmBaseUrl.value.trim(),
     model_id: llmModelId.value.trim(),
-    temperature: llmTemperature.value,
   }
 
-  if (llmApiKey.value.trim()) {
-    payload.api_key = llmApiKey.value.trim()
+  if (isCodexCliProfile.value) {
+    payload.base_url = ''
+    payload.cli_path = llmCliPath.value.trim() || 'codex'
+    payload.reasoning_effort = llmReasoningEffort.value
+    payload.cli_timeout_sec = llmCliTimeoutSec.value
+  } else {
+    payload.base_url = llmBaseUrl.value.trim()
+    payload.temperature = llmTemperature.value
+    if (llmApiKey.value.trim()) payload.api_key = llmApiKey.value.trim()
   }
 
   emit('updateLlmSettings', payload)
@@ -825,7 +829,12 @@ watch(() => props.summarizationSettings, (settings) => {
                   </button>
                 </div>
 
+                <div v-if="isCodexCliProfile" class="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs leading-5 text-violet-700">
+                  使用本机已登录的 Codex CLI；无需 API Key。
+                </div>
+
                 <input
+                  v-if="!isCodexCliProfile"
                   v-model="llmBaseUrl"
                   type="text"
                   placeholder="Base URL"
@@ -836,12 +845,13 @@ watch(() => props.summarizationSettings, (settings) => {
                 <input
                   v-model="llmModelId"
                   type="text"
-                  placeholder="模型 ID"
+                  :placeholder="isCodexCliProfile ? '模型（留空使用默认值）' : '模型 ID'"
                   :disabled="props.isTestingLlm || props.isUpdatingLlmSettings || props.isSwitchingProfile"
                   class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
 
                 <input
+                  v-if="!isCodexCliProfile"
                   v-model.number="llmTemperature"
                   type="number"
                   min="0"
@@ -852,7 +862,41 @@ watch(() => props.summarizationSettings, (settings) => {
                   class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
 
-                <div class="relative">
+                <template v-if="isCodexCliProfile">
+                  <input
+                    v-model="llmCliPath"
+                    type="text"
+                    placeholder="Codex CLI 路径（默认 codex）"
+                    :disabled="props.isTestingLlm || props.isUpdatingLlmSettings || props.isSwitchingProfile"
+                    class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                  <div class="grid grid-cols-2 gap-2">
+                    <select
+                      v-model="llmReasoningEffort"
+                      :disabled="props.isTestingLlm || props.isUpdatingLlmSettings || props.isSwitchingProfile"
+                      class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="">默认 reasoning</option>
+                      <option value="low">low</option>
+                      <option value="medium">medium</option>
+                      <option value="high">high</option>
+                      <option value="xhigh">xhigh</option>
+                      <option value="max">max</option>
+                    </select>
+                    <input
+                      v-model.number="llmCliTimeoutSec"
+                      type="number"
+                      min="10"
+                      max="7200"
+                      step="10"
+                      placeholder="超时（秒）"
+                      :disabled="props.isTestingLlm || props.isUpdatingLlmSettings || props.isSwitchingProfile"
+                      class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                  </div>
+                </template>
+
+                <div v-if="!isCodexCliProfile" class="relative">
                   <PhKey :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     v-model="llmApiKey"
@@ -863,14 +907,14 @@ watch(() => props.summarizationSettings, (settings) => {
                   >
                 </div>
 
-                <p v-if="editingProfile?.has_api_key" class="text-[11px] text-slate-500">
+                <p v-if="!isCodexCliProfile && editingProfile?.has_api_key" class="text-[11px] text-slate-500">
                   当前 API Key: {{ editingProfile?.api_key_hint }}
                 </p>
 
                 <div class="space-y-2 pt-1">
                   <button
                     @click="submitLlmSettings"
-                    :disabled="props.isTestingLlm || props.isUpdatingLlmSettings || props.isSwitchingProfile || !llmBaseUrl || !llmModelId"
+                    :disabled="props.isTestingLlm || props.isUpdatingLlmSettings || props.isSwitchingProfile || (!isCodexCliProfile && (!llmBaseUrl || !llmModelId))"
                     class="w-full bg-slate-800 hover:bg-slate-700 text-white py-2.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     <PhFloppyDisk :size="16" weight="fill" />
@@ -879,7 +923,7 @@ watch(() => props.summarizationSettings, (settings) => {
                   </button>
                   <button
                     @click="handleTestLlm"
-                    :disabled="props.isPrewarming || props.isTestingLlm || props.isUpdatingLlmSettings || props.isSwitchingProfile || !llmBaseUrl || !llmModelId"
+                    :disabled="props.isPrewarming || props.isTestingLlm || props.isUpdatingLlmSettings || props.isSwitchingProfile || (!isCodexCliProfile && (!llmBaseUrl || !llmModelId))"
                     class="w-full bg-blue-500 hover:bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     <PhSpinner v-if="props.isPrewarming" :size="16" class="animate-spin" />
@@ -887,7 +931,7 @@ watch(() => props.summarizationSettings, (settings) => {
                     <PhFlask v-else :size="16" weight="fill" />
                     <span v-if="props.isPrewarming">初始化中...</span>
                     <span v-else-if="props.isTestingLlm">测试中...</span>
-                    <span v-else>测试模型</span>
+                    <span v-else>{{ isCodexCliProfile ? '检查 CLI' : '测试模型' }}</span>
                   </button>
                 </div>
               </div>

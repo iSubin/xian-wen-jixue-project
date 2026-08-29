@@ -72,8 +72,23 @@ export interface LLMProfile {
   model_id: string;
   temperature: number;
   context_window_size: number;
+  cli_path: string;
+  reasoning_effort: string;
+  cli_timeout_sec: number;
   has_api_key: boolean;
   api_key_hint: string;
+}
+
+export interface LLMProfileFormState {
+  name: string;
+  provider: string;
+  base_url: string;
+  model_id: string;
+  temperature: number;
+  api_key: string;
+  cli_path: string;
+  reasoning_effort: string;
+  cli_timeout_sec: number;
 }
 
 export interface LLMSettings {
@@ -88,6 +103,9 @@ export interface CreateProfileRequest {
   api_key?: string;
   model_id?: string;
   temperature?: number;
+  cli_path?: string;
+  reasoning_effort?: string;
+  cli_timeout_sec?: number;
 }
 
 export interface UpdateProfileRequest {
@@ -99,6 +117,9 @@ export interface UpdateProfileRequest {
   model_id?: string;
   temperature?: number;
   context_window_size?: number;
+  cli_path?: string;
+  reasoning_effort?: string;
+  cli_timeout_sec?: number;
 }
 
 export interface SwitchActiveProfileRequest {

@@ -1,0 +1,466 @@
+{
+  "changeId": "add-codex-cli-llm-provider",
+  "candidateInputIdentity": "sha256:86e5955b68bb6b98275063dbdbf67a874948bfaeb253482cd11cccf10ead66af",
+  "actionSubjectIdentity": "sha256:25646ac50c6e38a3a5106c83f3477e04a81084f26977e6d7deccd2e72207aae4",
+  "attemptId": "attempt-2026-08-29T16-23-14-08-00-1787991794609-42346-b0mg9x7qkg",
+  "target": "<target-project>",
+  "status": "pass",
+  "startedAt": "2026-08-29T16:23:14+08:00",
+  "finishedAt": "2026-08-29T16:23:28+08:00",
+  "evidenceDir": ".xian-harness/changes/add-codex-cli-llm-provider/verify/attempts/attempt-2026-08-29T16-23-14-08-00-1787991794609-42346-b0mg9x7qkg",
+  "verifyPath": ".xian-harness/changes/add-codex-cli-llm-provider/verify/attempts/attempt-2026-08-29T16-23-14-08-00-1787991794609-42346-b0mg9x7qkg/result.json",
+  "commands": [
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_codex_cli_llm.py",
+      "cwd": "<target-project>",
+      "status": "pass",
+      "exitCode": 0,
+      "startedAt": "2026-08-29T16:23:15+08:00",
+      "finishedAt": "2026-08-29T16:23:22+08:00",
+      "durationMs": 7712,
+      "logPath": ".xian-harness/cache/verify/add-codex-cli-llm-provider/attempt-2026-08-29T16-23-14-08-00-1787991794609-42346-b0mg9x7qkg/logs/run-001.log",
+      "execution": "executed",
+      "ruleId": "VC-001",
+      "evidenceId": "VC-001",
+      "kind": "command",
+      "severity": "P1",
+      "ownerSkill": "xian-verify",
+      "covers": [
+        "AC-001",
+        "AC-002",
+        "AC-003",
+        "AC-004",
+        "AC-005",
+        "AC-006"
+      ],
+      "logPolicy": {
+        "storage": "local-cache",
+        "tracked": false,
+        "digestAlgorithm": "sha256",
+        "digest": "62a6a112f9926028b7939dc0ec7323f26e2e2b5175c1b6d2883ba463d714091d",
+        "tailExcerpt": [
+          "Started At: 2026-08-29T16:23:15+08:00",
+          "Finished At: 2026-08-29T16:23:22+08:00",
+          "Duration Ms: 7712",
+          "Exit Code: 0",
+          "## STDOUT",
+          "..........                                                               [100%]",
+          "10 passed in 6.96s",
+          "## STDERR"
+        ]
+      }
+    },
+    {
+      "command": "frontend/node_modules/.bin/vue-tsc -b frontend/tsconfig.json",
+      "cwd": "<target-project>",
+      "status": "pass",
+      "exitCode": 0,
+      "startedAt": "2026-08-29T16:23:22+08:00",
+      "finishedAt": "2026-08-29T16:23:27+08:00",
+      "durationMs": 5094,
+      "logPath": ".xian-harness/cache/verify/add-codex-cli-llm-provider/attempt-2026-08-29T16-23-14-08-00-1787991794609-42346-b0mg9x7qkg/logs/run-002.log",
+      "execution": "executed",
+      "ruleId": "VC-002",
+      "evidenceId": "VC-002",
+      "kind": "command",
+      "severity": "P1",
+      "ownerSkill": "xian-verify",
+      "covers": [
+        "AC-001",
+        "AC-002",
+        "AC-003",
+        "AC-004",
+        "AC-005",
+        "AC-006"
+      ],
+      "logPolicy": {
+        "storage": "local-cache",
+        "tracked": false,
+        "digestAlgorithm": "sha256",
+        "digest": "2dade4a376730ed14fce7d561fd6db220de846beac727dace0cdd86834eef0f0",
+        "tailExcerpt": [
+          "Owner Skill: xian-verify",
+          "Covers: AC-001, AC-002, AC-003, AC-004, AC-005, AC-006",
+          "Started At: 2026-08-29T16:23:22+08:00",
+          "Finished At: 2026-08-29T16:23:27+08:00",
+          "Duration Ms: 5094",
+          "Exit Code: 0",
+          "## STDOUT",
+          "## STDERR"
+        ]
+      }
+    }
+  ],
+  "evidenceDependencyGraph": {
+    "version": 1,
+    "graphKind": "verify-evidence-dependency-dag",
+    "changeId": "add-codex-cli-llm-provider",
+    "generatedAt": "2026-08-29T16:23:28+08:00",
+    "authority": "contract-revision",
+    "contractRevision": "rev-0005",
+    "environmentProjection": {
+      "runtime": {
+        "node": "v22.22.0",
+        "platform": "darwin",
+        "arch": "x64",
+        "osRelease": "25.5.0"
+      },
+      "env": {
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "TERM": "dumb"
+      },
+      "allowlistedKeys": [
+        "CI",
+        "GITHUB_ACTIONS",
+        "LANG",
+        "LC_ALL",
+        "NODE_ENV",
+        "TERM"
+      ],
+      "redacted": true
+    },
+    "environmentHash": "sha256:508d5be8c793d8faf99c6ab87d42a2dfcbc1889923e1c0f6b6607b13d49a06f3",
+    "sharedSourceSnapshot": {
+      "hash": "sha256:49b2a79b78155da645da9601065a8dc2520955f583847f6f5b146cd514e59ba5",
+      "pathCount": 272
+    },
+    "nodes": [
+      {
+        "id": "VC-001",
+        "evidenceId": "VC-001",
+        "commandIndex": 1,
+        "dependsOnSections": [
+          "verificationPlanHash"
+        ],
+        "sectionFingerprints": {
+          "verificationPlanHash": "sha256:7edcc1c2a3769526ec88af835f33cb7a68a61e10ef0d77a72286c05294d5ec04"
+        },
+        "sourceHash": "sha256:225fd5f5f936b41b37706ee2dc419c7e84623fb71c680529757705931ba138b7",
+        "sourcePaths": [
+          "config/settings.example.json",
+          "frontend/src/App.vue",
+          "frontend/src/components/SettingsModal.vue",
+          "frontend/src/components/Sidebar.vue",
+          "frontend/src/composables/useTaskViewModel.ts",
+          "frontend/src/types.ts",
+          "src/main/python/xianwen/api.py",
+          "src/main/python/xianwen/config/settings.py",
+          "src/main/python/xianwen/llm/codex_cli_client.py",
+          "src/main/python/xianwen/llm/llm.py",
+          "src/main/python/xianwen/llm/llm_worker.py",
+          "src/main/python/xianwen/llm/provider_manager.py",
+          "tests/test_codex_cli_llm.py"
+        ],
+        "sourceDigestManifest": [
+          {
+            "path": "config/settings.example.json",
+            "digest": "6c0889f3c8084a13a4388225e71ea777b1c372508cf3dc94c413831eb387aadc"
+          },
+          {
+            "path": "frontend/src/App.vue",
+            "digest": "98850b94d0844819c043196c66588a1683cf445e41d07b0448f3a8a4bd6546aa"
+          },
+          {
+            "path": "frontend/src/components/SettingsModal.vue",
+            "digest": "7dde6368591f869e9615299714b96266e7df079a7fa1332e4fe0d89b2413a1d9"
+          },
+          {
+            "path": "frontend/src/components/Sidebar.vue",
+            "digest": "8df712155be106147744f6f7286a71f3b78b00809589b2036e969de14535d716"
+          },
+          {
+            "path": "frontend/src/composables/useTaskViewModel.ts",
+            "digest": "78e19439ec5b9d889b33d6c7f4f3cf67cec44db03c3dc51b337ab0a2b88c2537"
+          },
+          {
+            "path": "frontend/src/types.ts",
+            "digest": "58705424e86d47075ffb740a74f717e2ea918feb9169bda6255a0f6cf2d78742"
+          },
+          {
+            "path": "src/main/python/xianwen/api.py",
+            "digest": "473e2be75fb297a0d4d0133ca4f8fbdd41049f90b5314288e461aeb5b94e4791"
+          },
+          {
+            "path": "src/main/python/xianwen/config/settings.py",
+            "digest": "d56f466a6d320a24fe8b1edb43da72849b969166e80ef8cdd133fdc56fd4622d"
+          },
+          {
+            "path": "src/main/python/xianwen/llm/codex_cli_client.py",
+            "digest": "cdb383e05a0593d2b43b90104760fb12d5ab1f26fc9c866afe0636a835e2d3ef"
+          },
+          {
+            "path": "src/main/python/xianwen/llm/llm.py",
+            "digest": "474be2d2340a1081d1ebfebf6f24a5648c76d898d4bbfb8f4472afab30e899e5"
+          },
+          {
+            "path": "src/main/python/xianwen/llm/llm_worker.py",
+            "digest": "e0a4ad3eb48b232b178368d6077401b93f965752ff40923aa2fde65fbed826a0"
+          },
+          {
+            "path": "src/main/python/xianwen/llm/provider_manager.py",
+            "digest": "0eaf4ff3b462a8db04a717cf350baae1c6fd4e30758928de94577cbd8c4b4458"
+          },
+          {
+            "path": "tests/test_codex_cli_llm.py",
+            "digest": "d71c597c9e8a27ad2ff1ef2f2c84d4a8c46688984286c75383f2c9d4d6454ed7"
+          }
+        ],
+        "invocationFingerprint": "sha256:2139bcbbdbb05b0e756fe52abc5143dc242b273750e3d1405ea69f2ba66089cc",
+        "invocationProjection": {
+          "source": "shell",
+          "shellMode": "node:child_process.exec",
+          "command": ".venv/bin/python -m pytest -q tests/test_codex_cli_llm.py",
+          "executable": null,
+          "args": [],
+          "cwd": "<target-project>",
+          "timeoutMs": null,
+          "safetyPolicy": {
+            "aggregateShellRejected": true,
+            "destructiveCommandRejected": true,
+            "wrapperInspection": "recursive-shell-and-env-wrapper"
+          },
+          "registryRule": {
+            "registryPath": null,
+            "ruleId": "VC-001",
+            "evidenceId": "VC-001",
+            "kind": "command",
+            "severity": "P1",
+            "ownerSkill": "xian-verify",
+            "covers": [
+              "AC-001",
+              "AC-002",
+              "AC-003",
+              "AC-004",
+              "AC-005",
+              "AC-006"
+            ]
+          },
+          "wrapperPolicy": {
+            "shellAggregateOperators": "reject",
+            "envSplitString": "reject",
+            "commandBuiltinInspection": "safe-introspection-only"
+          },
+          "resourceContract": null
+        },
+        "environmentHash": "sha256:508d5be8c793d8faf99c6ab87d42a2dfcbc1889923e1c0f6b6607b13d49a06f3",
+        "status": "pass",
+        "logDigest": "62a6a112f9926028b7939dc0ec7323f26e2e2b5175c1b6d2883ba463d714091d"
+      },
+      {
+        "id": "VC-002",
+        "evidenceId": "VC-002",
+        "commandIndex": 2,
+        "dependsOnSections": [
+          "verificationPlanHash"
+        ],
+        "sectionFingerprints": {
+          "verificationPlanHash": "sha256:f6691f40ad74c55e9256634e272980718611869fa7536674a92264d027079c98"
+        },
+        "sourceHash": "sha256:225fd5f5f936b41b37706ee2dc419c7e84623fb71c680529757705931ba138b7",
+        "sourcePaths": [
+          "config/settings.example.json",
+          "frontend/src/App.vue",
+          "frontend/src/components/SettingsModal.vue",
+          "frontend/src/components/Sidebar.vue",
+          "frontend/src/composables/useTaskViewModel.ts",
+          "frontend/src/types.ts",
+          "src/main/python/xianwen/api.py",
+          "src/main/python/xianwen/config/settings.py",
+          "src/main/python/xianwen/llm/codex_cli_client.py",
+          "src/main/python/xianwen/llm/llm.py",
+          "src/main/python/xianwen/llm/llm_worker.py",
+          "src/main/python/xianwen/llm/provider_manager.py",
+          "tests/test_codex_cli_llm.py"
+        ],
+        "sourceDigestManifest": [
+          {
+            "path": "config/settings.example.json",
+            "digest": "6c0889f3c8084a13a4388225e71ea777b1c372508cf3dc94c413831eb387aadc"
+          },
+          {
+            "path": "frontend/src/App.vue",
+            "digest": "98850b94d0844819c043196c66588a1683cf445e41d07b0448f3a8a4bd6546aa"
+          },
+          {
+            "path": "frontend/src/components/SettingsModal.vue",
+            "digest": "7dde6368591f869e9615299714b96266e7df079a7fa1332e4fe0d89b2413a1d9"
+          },
+          {
+            "path": "frontend/src/components/Sidebar.vue",
+            "digest": "8df712155be106147744f6f7286a71f3b78b00809589b2036e969de14535d716"
+          },
+          {
+            "path": "frontend/src/composables/useTaskViewModel.ts",
+            "digest": "78e19439ec5b9d889b33d6c7f4f3cf67cec44db03c3dc51b337ab0a2b88c2537"
+          },
+          {
+            "path": "frontend/src/types.ts",
+            "digest": "58705424e86d47075ffb740a74f717e2ea918feb9169bda6255a0f6cf2d78742"
+          },
+          {
+            "path": "src/main/python/xianwen/api.py",
+            "digest": "473e2be75fb297a0d4d0133ca4f8fbdd41049f90b5314288e461aeb5b94e4791"
+          },
+          {
+            "path": "src/main/python/xianwen/config/settings.py",
+            "digest": "d56f466a6d320a24fe8b1edb43da72849b969166e80ef8cdd133fdc56fd4622d"
+          },
+          {
+            "path": "src/main/python/xianwen/llm/codex_cli_client.py",
+            "digest": "cdb383e05a0593d2b43b90104760fb12d5ab1f26fc9c866afe0636a835e2d3ef"
+          },
+          {
+            "path": "src/main/python/xianwen/llm/llm.py",
+            "digest": "474be2d2340a1081d1ebfebf6f24a5648c76d898d4bbfb8f4472afab30e899e5"
+          },
+          {
+            "path": "src/main/python/xianwen/llm/llm_worker.py",
+            "digest": "e0a4ad3eb48b232b178368d6077401b93f965752ff40923aa2fde65fbed826a0"
+          },
+          {
+            "path": "src/main/python/xianwen/llm/provider_manager.py",
+            "digest": "0eaf4ff3b462a8db04a717cf350baae1c6fd4e30758928de94577cbd8c4b4458"
+          },
+          {
+            "path": "tests/test_codex_cli_llm.py",
+            "digest": "d71c597c9e8a27ad2ff1ef2f2c84d4a8c46688984286c75383f2c9d4d6454ed7"
+          }
+        ],
+        "invocationFingerprint": "sha256:261b1459e3a9f06c2a56e8f86814c91cc6c85d73b5c8f4da0939d21d6b9d723a",
+        "invocationProjection": {
+          "source": "shell",
+          "shellMode": "node:child_process.exec",
+          "command": "frontend/node_modules/.bin/vue-tsc -b frontend/tsconfig.json",
+          "executable": null,
+          "args": [],
+          "cwd": "<target-project>",
+          "timeoutMs": null,
+          "safetyPolicy": {
+            "aggregateShellRejected": true,
+            "destructiveCommandRejected": true,
+            "wrapperInspection": "recursive-shell-and-env-wrapper"
+          },
+          "registryRule": {
+            "registryPath": null,
+            "ruleId": "VC-002",
+            "evidenceId": "VC-002",
+            "kind": "command",
+            "severity": "P1",
+            "ownerSkill": "xian-verify",
+            "covers": [
+              "AC-001",
+              "AC-002",
+              "AC-003",
+              "AC-004",
+              "AC-005",
+              "AC-006"
+            ]
+          },
+          "wrapperPolicy": {
+            "shellAggregateOperators": "reject",
+            "envSplitString": "reject",
+            "commandBuiltinInspection": "safe-introspection-only"
+          },
+          "resourceContract": null
+        },
+        "environmentHash": "sha256:508d5be8c793d8faf99c6ab87d42a2dfcbc1889923e1c0f6b6607b13d49a06f3",
+        "status": "pass",
+        "logDigest": "2dade4a376730ed14fce7d561fd6db220de846beac727dace0cdd86834eef0f0"
+      }
+    ],
+    "graphFingerprint": "sha256:e6a0ede34d86086c8450f6be15731f48077e4c1f46d4aa8af59230cec33a615f"
+  },
+  "summary": {
+    "commandCount": 2,
+    "executedCommandCount": 2,
+    "reusedCommandCount": 0,
+    "estimatedSavedCommandDurationMs": 0,
+    "totalCommandDurationMs": 12806,
+    "wallClockDurationMs": 14288,
+    "harnessOverheadMs": 1482,
+    "slowestCommand": {
+      "commandIndex": 1,
+      "command": ".venv/bin/python -m pytest -q tests/test_codex_cli_llm.py",
+      "durationMs": 7712
+    },
+    "resourceSummary": {
+      "parallelSafeCommandCount": 0,
+      "serialCommandCount": 2,
+      "resourceLocks": [],
+      "isolatedPorts": [],
+      "isolatedDirectories": [],
+      "envKeys": [],
+      "recommendation": "Keep verification execution serial unless every selected command is marked parallelSafe and resource locks do not overlap."
+    },
+    "strategyHints": [],
+    "changePaths": [
+      "config/settings.example.json",
+      "frontend/src/App.vue",
+      "frontend/src/components/SettingsModal.vue",
+      "frontend/src/components/Sidebar.vue",
+      "frontend/src/composables/useTaskViewModel.ts",
+      "frontend/src/types.ts",
+      "src/main/python/xianwen/api.py",
+      "src/main/python/xianwen/config/settings.py",
+      "src/main/python/xianwen/llm/llm.py",
+      "src/main/python/xianwen/llm/llm_worker.py",
+      "src/main/python/xianwen/llm/provider_manager.py",
+      "src/main/python/xianwen/llm/codex_cli_client.py",
+      "tests/test_codex_cli_llm.py"
+    ],
+    "workspaceNoisePaths": [
+      ".xian-harness/changes/.projection-log.jsonl",
+      ".xian-harness/state.yaml",
+      ".xian-harness/changes/add-codex-cli-llm-provider/.change-state.json",
+      ".xian-harness/changes/add-codex-cli-llm-provider/.change-transition.log",
+      ".xian-harness/changes/add-codex-cli-llm-provider/acceptance-revisions.jsonl",
+      ".xian-harness/changes/add-codex-cli-llm-provider/activate/acceptance-snapshot.json",
+      ".xian-harness/changes/add-codex-cli-llm-provider/activate/activation-result.json",
+      ".xian-harness/changes/add-codex-cli-llm-provider/activate/activation.md",
+      ".xian-harness/changes/add-codex-cli-llm-provider/change.md",
+      ".xian-harness/changes/add-codex-cli-llm-provider/contract-patches.jsonl",
+      ".xian-harness/changes/add-codex-cli-llm-provider/contract-revisions/rev-0001.json",
+      ".xian-harness/changes/add-codex-cli-llm-provider/contract-revisions/rev-0002.json",
+      ".xian-harness/changes/add-codex-cli-llm-provider/contract-revisions/rev-0003.json",
+      ".xian-harness/changes/add-codex-cli-llm-provider/contract-revisions/rev-0004.json",
+      ".xian-harness/changes/add-codex-cli-llm-provider/contract-revisions/rev-0005.json",
+      ".xian-harness/changes/add-codex-cli-llm-provider/contract-state.json",
+      ".xian-harness/changes/add-codex-cli-llm-provider/events.jsonl",
+      ".xian-harness/changes/add-codex-cli-llm-provider/spec/phase-results/afea502ea62540fffa8e31fa288544b93251c8cdf172bb0902dc1aee82f44078.json",
+      ".xian-harness/changes/add-codex-cli-llm-provider/spec/spec-result.json"
+    ],
+    "sourceAttribution": {
+      "version": 1,
+      "source": "activation-baseline",
+      "sourceBaseCommit": "3625b73121deb0918162f2e6591cb493bd71f541",
+      "verifiedHeadCommit": "3625b73121deb0918162f2e6591cb493bd71f541",
+      "verifiedHeadTree": "2cb9898be72d6428ccd6d2bb82645f4605eb1565",
+      "candidatePathFingerprint": "sha256:c5a064643182d2527be55a6e8f5af432b8acea0f73a8217c4a544556eb6f6bc4",
+      "attributedPathFingerprint": "sha256:298cad6fa23e181e2476100f693631ce8c504daf0924918599219a4c6f5535ef",
+      "attributedSourceFingerprint": "sha256:4277458196ea9aeba464cc382560e5d8b4246ee2f011b001b01a96830482315f",
+      "candidatePathCount": 32,
+      "attributedPathCount": 13
+    },
+    "testPortfolioSupersetCoverage": {
+      "beforeCommandCount": 2,
+      "afterCommandCount": 2,
+      "removedCommandCount": 0,
+      "estimatedSavedCommandDurationMs": 0,
+      "estimatedSavedWallClockMs": 0,
+      "removedCommands": []
+    }
+  },
+  "performanceWarnings": [],
+  "runtimeSourceIdentity": {
+    "version": 1,
+    "sourceKind": "pinned-install",
+    "implementationHash": "sha256:11896794c6d655ef7fd26b5f096dfebee7cc8588140e75d19d6bb0c8f32acb43",
+    "packSourceSnapshotContentHash": "effe772110ffb79aee238ee00fe0f955034477b36c7bb6efac47b6efe7fa1d43",
+    "sourceCommit": null
+  },
+  "stableSnapshot": {
+    "action": "formal.verify",
+    "identity": "sha256:8f68e5ae9eac8f2cde817b8216e0ea2dd8682408af562f9038c9dad4fa72d570"
+  }
+}

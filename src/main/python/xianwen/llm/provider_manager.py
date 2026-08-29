@@ -6,7 +6,7 @@ from threading import Lock
 from typing import Any
 
 from ..utils.logger import logger
-from .llm import LLMConfig
+from .llm import LLMConfig, get_llm
 
 
 @dataclass(frozen=True)
@@ -58,6 +58,9 @@ class LLMProviderManager:
             temperature=initial_config.temperature,
             context_window_size=initial_config.context_window_size,
             provider=initial_provider_id,
+            cli_path=initial_config.cli_path,
+            reasoning_effort=initial_config.reasoning_effort,
+            cli_timeout_sec=initial_config.cli_timeout_sec,
         )
         self._profile_meta[initial_profile_id] = {
             "name": provider_def.label if provider_def else initial_provider_id,
@@ -110,13 +113,20 @@ class LLMProviderManager:
                 default_model_id="deepseek-v4-flash",
                 description="DeepSeek OpenAI 兼容接口",
             ),
+            LLMProvider(
+                id="codex_cli",
+                label="Codex CLI（本机）",
+                default_base_url="",
+                default_model_id="",
+                description="使用本机已登录的 Codex CLI 分析内容，无需 API Key",
+            ),
         ]
         return {provider.id: provider for provider in providers}
 
     def _infer_provider_id(self, base_url: str) -> str:
         normalized = _normalize_base_url(base_url)
         for provider in self._providers.values():
-            if _normalize_base_url(provider.default_base_url) == normalized:
+            if provider.default_base_url and _normalize_base_url(provider.default_base_url) == normalized:
                 return provider.id
         if "openrouter.ai" in normalized:
             return "openrouter"
@@ -138,17 +148,14 @@ class LLMProviderManager:
     def _apply_config_to_worker_locked(self) -> None:
         if self._llm_worker is None:
             return
-        llm_client = getattr(self._llm_worker, "_llm_client", None)
-        if llm_client is None:
-            logger.warning("[LLMProviderManager] 未找到 llm_worker._llm_client，跳过运行时配置应用。")
-            return
         active_config = self._profiles.get(self._active_profile_id)
         if active_config is None:
             return
-        if hasattr(llm_client, "update_runtime_config"):
-            llm_client.update_runtime_config(active_config)
+        llm_client = get_llm(active_config)
+        if hasattr(self._llm_worker, "update_llm_client"):
+            self._llm_worker.update_llm_client(llm_client)
         else:
-            llm_client.config = active_config
+            self._llm_worker._llm_client = llm_client
 
     def list_providers(self) -> list[dict[str, str]]:
         with self._lock:
@@ -169,6 +176,9 @@ class LLMProviderManager:
                     "model_id": cfg.model_id,
                     "temperature": cfg.temperature,
                     "context_window_size": cfg.context_window_size,
+                    "cli_path": cfg.cli_path,
+                    "reasoning_effort": cfg.reasoning_effort,
+                    "cli_timeout_sec": cfg.cli_timeout_sec,
                     "has_api_key": bool(cfg.api_key),
                     "api_key_hint": _mask_api_key(cfg.api_key),
                 })
@@ -198,6 +208,9 @@ class LLMProviderManager:
                 temperature=cfg.temperature,
                 context_window_size=cfg.context_window_size,
                 provider=cfg.provider,
+                cli_path=cfg.cli_path,
+                reasoning_effort=cfg.reasoning_effort,
+                cli_timeout_sec=cfg.cli_timeout_sec,
             )
 
     def add_profile(
@@ -208,6 +221,9 @@ class LLMProviderManager:
         api_key: str | None = None,
         model_id: str | None = None,
         temperature: float | None = None,
+        cli_path: str | None = None,
+        reasoning_effort: str | None = None,
+        cli_timeout_sec: int | None = None,
     ) -> dict[str, Any]:
         """Create a new profile and set it as active."""
         provider_def = self._providers.get(provider)
@@ -222,6 +238,9 @@ class LLMProviderManager:
             temperature=temperature if temperature is not None else 0.7,
             context_window_size=1000000,
             provider=provider,
+            cli_path=(cli_path or "codex").strip() or "codex",
+            reasoning_effort=(reasoning_effort or "").strip().lower(),
+            cli_timeout_sec=max(10, int(cli_timeout_sec if cli_timeout_sec is not None else 900)),
         )
         with self._lock:
             self._profiles[profile_id] = new_config
@@ -247,6 +266,9 @@ class LLMProviderManager:
         model_id: str | None = None,
         temperature: float | None = None,
         context_window_size: int | None = None,
+        cli_path: str | None = None,
+        reasoning_effort: str | None = None,
+        cli_timeout_sec: int | None = None,
     ) -> dict[str, Any]:
         """Update a specific profile's config and set it as active."""
         with self._lock:
@@ -273,6 +295,13 @@ class LLMProviderManager:
             next_api_key = current.api_key if api_key is None or not api_key.strip() else api_key.strip()
             next_temperature = current.temperature if temperature is None else temperature
             next_context_window_size = current.context_window_size if context_window_size is None else context_window_size
+            next_cli_path = current.cli_path if cli_path is None else (cli_path.strip() or "codex")
+            next_reasoning_effort = (
+                current.reasoning_effort if reasoning_effort is None else reasoning_effort.strip().lower()
+            )
+            next_cli_timeout_sec = (
+                current.cli_timeout_sec if cli_timeout_sec is None else max(10, int(cli_timeout_sec))
+            )
 
             self._profiles[profile_id] = LLMConfig(
                 base_url=next_base_url,
@@ -281,6 +310,9 @@ class LLMProviderManager:
                 temperature=next_temperature,
                 context_window_size=next_context_window_size,
                 provider=new_provider,
+                cli_path=next_cli_path,
+                reasoning_effort=next_reasoning_effort,
+                cli_timeout_sec=next_cli_timeout_sec,
             )
             if name is not None:
                 meta["name"] = name
@@ -340,6 +372,9 @@ class LLMProviderManager:
                     temperature=float(p.get("temperature", 0.7)),
                     context_window_size=int(p.get("context_window_size", 1000000)),
                     provider=provider,
+                    cli_path=str(p.get("cli_path") or "codex"),
+                    reasoning_effort=str(p.get("reasoning_effort") or "").strip().lower(),
+                    cli_timeout_sec=max(10, int(p.get("cli_timeout_sec", 900))),
                 )
                 self._profile_meta[pid] = {
                     "name": str(p.get("name") or ""),

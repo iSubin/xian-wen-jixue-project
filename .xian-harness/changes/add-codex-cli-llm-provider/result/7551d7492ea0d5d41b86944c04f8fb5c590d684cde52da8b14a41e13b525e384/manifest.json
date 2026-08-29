@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "scope": "change",
+  "resultCommitIdentity": "sha256:7551d7492ea0d5d41b86944c04f8fb5c590d684cde52da8b14a41e13b525e384",
+  "changeId": "add-codex-cli-llm-provider",
+  "candidateInputIdentity": "sha256:86e5955b68bb6b98275063dbdbf67a874948bfaeb253482cd11cccf10ead66af",
+  "sourceManifestDigest": "sha256:06003a10b86de7f9fb3083f838f8c7a1015bcb50bc8ebf1646c042371472e34f",
+  "acceptanceDigest": "sha256:a92876bd88ce823824f8746a21543efbd2acb5f2d4dd7f9d602a473daa7f79da",
+  "selectedActions": {
+    "specReview": null,
+    "buildReview": null,
+    "verify": {
+      "action": "formal.verify",
+      "attemptId": "attempt-2026-08-29T16-23-14-08-00-1787991794609-42346-b0mg9x7qkg",
+      "resultPath": ".xian-harness/changes/add-codex-cli-llm-provider/verify/attempts/attempt-2026-08-29T16-23-14-08-00-1787991794609-42346-b0mg9x7qkg/result.json",
+      "resultBytesDigest": "sha256:05e427428a4bcedf1d9ef2cf79110ccb259342f97811db7e3b2b3a030e32ee54"
+    },
+    "gate": {
+      "action": "quality.gate",
+      "attemptId": "gate-4cbd6f09-d5ba-4fab-ba06-904c6d996d3a",
+      "resultPath": ".xian-harness/changes/add-codex-cli-llm-provider/gate/attempts/gate-4cbd6f09-d5ba-4fab-ba06-904c6d996d3a/result.json",
+      "resultBytesDigest": "sha256:031c16deeadc56dc6fe2a7368edfa1c3809f26642c0c72c58795fccc948712c2"
+    }
+  },
+  "outputManifest": [
+    {
+      "path": "config/settings.example.json",
+      "state": "present",
+      "bytesDigest": "sha256:80bed267fc589aaf55bbfa26ed313e1d01175f88527d47289c9153cf2448d2f1"
+    },
+    {
+      "path": "frontend/src/App.vue",
+      "state": "present",
+      "bytesDigest": "sha256:c5e58982a645d2a228c419c994748ddef10bc4de27cb0da3538690fcf8032b84"
+    },
+    {
+      "path": "frontend/src/components/SettingsModal.vue",
+      "state": "present",
+      "bytesDigest": "sha256:a590b939d94aed13f1341c40b647a448b6ef4c4d303074165ab62f778cea2c5a"
+    },
+    {
+      "path": "frontend/src/components/Sidebar.vue",
+      "state": "present",
+      "bytesDigest": "sha256:4551f140c8c79f4972b0bec75a314c651624782addd36f3515ee490da451d621"
+    },
+    {
+      "path": "frontend/src/composables/useTaskViewModel.ts",
+      "state": "present",
+      "bytesDigest": "sha256:11fcf57899921edcc02984fd05a18c51d6a40e0d3cca0f630049b2188b74012d"
+    },
+    {
+      "path": "frontend/src/types.ts",
+      "state": "present",
+      "bytesDigest": "sha256:4b72734e9dae1270cc859e83c811115f9070d7d61e267d6e1b3e82600c9015fc"
+    },
+    {
+      "path": "src/main/python/xianwen/api.py",
+      "state": "present",
+      "bytesDigest": "sha256:938a9ff3440698b41227841e9009fa94b78981c80460b5fcb992fc66232a562d"
+    },
+    {
+      "path": "src/main/python/xianwen/config/settings.py",
+      "state": "present",
+      "bytesDigest": "sha256:94bdef86321d0f1b6d9c6c7fb39d27031c666488e2156fc8a12678c3c5a2a50c"
+    },
+    {
+      "path": "src/main/python/xianwen/llm/codex_cli_client.py",
+      "state": "present",
+      "bytesDigest": "sha256:0e61e623f37ba71ba602b5bf760a084a04dbd30dc39ef72a49b2f4b9c884179f"
+    },
+    {
+      "path": "src/main/python/xianwen/llm/llm.py",
+      "state": "present",
+      "bytesDigest": "sha256:1f240c1317cf89441d5b47e918c212328043aeb125a47c0c1f383d1c83bac496"
+    },
+    {
+      "path": "src/main/python/xianwen/llm/llm_worker.py",
+      "state": "present",
+      "bytesDigest": "sha256:285146819e2220145a272e3edaefd47a6f6e0b8ca19799a9b4b6069ef44d1a2b"
+    },
+    {
+      "path": "src/main/python/xianwen/llm/provider_manager.py",
+      "state": "present",
+      "bytesDigest": "sha256:29f192e2ba6ddcd7f2edd06651a3f0c9c31304bbaf5e551ca3d4171a12867094"
+    },
+    {
+      "path": "tests/test_codex_cli_llm.py",
+      "state": "present",
+      "bytesDigest": "sha256:a030828698f5eeafa1ee8ec349f95addc4c436a0bdffad974fd2c4b330c93f17"
+    }
+  ],
+  "outputManifestDigest": "sha256:039b74eb2e1c20320717794ec7a63b219bcce36b78eb3a5aec1cc5610528be1a",
+  "commitPolicyDigest": "sha256:966b1ad7c207fd4a50c81933b643a32d205868382053596362e3734059f1585d",
+  "commitAuthority": {
+    "fencingToken": 1,
+    "writerGeneration": 1
+  },
+  "predecessor": null,
+  "publicationIntents": [],
+  "committedAt": "2026-08-29T16:23:39+08:00"
+}

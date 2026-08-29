@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "changeId": "add-codex-cli-llm-provider",
+  "sequence": 1,
+  "candidateInputIdentity": "sha256:86e5955b68bb6b98275063dbdbf67a874948bfaeb253482cd11cccf10ead66af",
+  "priorCandidateInputIdentity": null,
+  "acceptedBusinessContractIdentity": "sha256:2e440fc061ba4223eb92b9b9fa4eb4f3f6390e524ad367baa0743717c97d4594",
+  "authorizationIdentity": "sha256:2377f80ed0acc8a8160c7bbf75646e60e886121fe353443b479f097dd205967d",
+  "acceptedContractRevision": "rev-0005",
+  "sourceSnapshotIdentity": "sha256:06003a10b86de7f9fb3083f838f8c7a1015bcb50bc8ebf1646c042371472e34f",
+  "buildFactsPath": ".xian-harness/changes/add-codex-cli-llm-provider/build/drafts/26d1b921c392a9c7053fa5f75fc2ceba76499343db17a2ec7cd851d63cdebeb6.json",
+  "buildFactsSemanticIdentity": "sha256:26d1b921c392a9c7053fa5f75fc2ceba76499343db17a2ec7cd851d63cdebeb6",
+  "buildFactsBytesDigest": "sha256:78671d085228c896acfff7a5f2651807d7e56aeeb148356c04eb959a8fe1a8f2",
+  "declaredTier": "standard",
+  "effectiveTier": "standard",
+  "mode": "governed",
+  "changedPaths": [
+    "config/settings.example.json",
+    "frontend/src/App.vue",
+    "frontend/src/components/SettingsModal.vue",
+    "frontend/src/components/Sidebar.vue",
+    "frontend/src/composables/useTaskViewModel.ts",
+    "frontend/src/types.ts",
+    "src/main/python/xianwen/api.py",
+    "src/main/python/xianwen/config/settings.py",
+    "src/main/python/xianwen/llm/codex_cli_client.py",
+    "src/main/python/xianwen/llm/llm_worker.py",
+    "src/main/python/xianwen/llm/llm.py",
+    "src/main/python/xianwen/llm/provider_manager.py",
+    "tests/test_codex_cli_llm.py"
+  ],
+  "acceptance": [
+    {
+      "id": "AC-001",
+      "text": "LLM 设置可创建、保存、切换和识别 codex_cli Profile，且不要求 API Key。",
+      "group": "business"
+    },
+    {
+      "id": "AC-002",
+      "text": "codex_cli 通过无 shell subprocess、stdin、read-only sandbox、ephemeral session 和隔离环境执行，并从结构化结果读取最终 Markdown。",
+      "group": "business"
+    },
+    {
+      "id": "AC-003",
+      "text": "Codex CLI 不可用、未登录、超时、取消、异常退出或输出超限时给出可操作错误，并可靠回收子进程。",
+      "group": "business"
+    },
+    {
+      "id": "AC-004",
+      "text": "standard 与 agent 总结可使用 codex_cli，现有 DeepSeek/OpenAI兼容 provider 无回归。",
+      "group": "business"
+    },
+    {
+      "id": "AC-005",
+      "text": "后端聚焦测试与前端构建通过。",
+      "group": "business"
+    },
+    {
+      "id": "AC-006",
+      "text": "Generated contract views, tasks, and verification mappings remain consistent with the captured facts.",
+      "group": "technical"
+    }
+  ],
+  "verificationCommands": [
+    {
+      "id": "VC-001",
+      "command": ".venv/bin/python -m pytest -q tests/test_codex_cli_llm.py",
+      "commandFingerprint": "sha256:2926a0f0ced673a1af624fb0f7c608874b86f4887a13ad80f2393ff4437ccedb",
+      "covers": [
+        "AC-001",
+        "AC-002",
+        "AC-003",
+        "AC-004",
+        "AC-005",
+        "AC-006"
+      ],
+      "required": true
+    },
+    {
+      "id": "VC-002",
+      "command": "frontend/node_modules/.bin/vue-tsc -b frontend/tsconfig.json",
+      "commandFingerprint": "sha256:b2be0b05e732164ba36dde289655c52e8139dcd58d94eedcbf40659356d7e7c5",
+      "covers": [
+        "AC-001",
+        "AC-002",
+        "AC-003",
+        "AC-004",
+        "AC-005",
+        "AC-006"
+      ],
+      "required": true
+    }
+  ],
+  "contractFingerprints": {
+    "designHash": "sha256:dff29cdaecced80699f05dbe4090b23859019c3e9fbe0ef3ffe52a9bf6d3e21f",
+    "tasksHash": "sha256:1689af2793a778e1a44e1234f4e43e89a37593772c383838aea38441a2991ccd",
+    "sourceDeltaHash": "sha256:b732887c9a29b53874146beb0bb13dc89f5006f374358942b01ab2aaac3f337e",
+    "verificationPlanHash": "sha256:45e9108d9a1cc78fc5359d27c79eb5aaef48484c3e8cd4f52b04980d62463cee",
+    "reviewPolicyHash": "sha256:e595f5e437775312cb66921d1a77c1fbddb8fb60135c564bdaa18f25891c1c33",
+    "runtimePlanHash": "sha256:205f2a0fb49915bc649abea994569bfada2f30961e3029087c6fb75d3a837828"
+  },
+  "lifecycleReviewAuthorityProfileIdentity": "sha256:1ec34cd3bce76b64bd71c9f6c4a05893b46b183b943778fb1d6d423376dca587",
+  "specReviewPolicyIdentity": "sha256:45660adcf90309ee7b28ecc5835a1090fced99ee031611ea204553a1ac7a6bc2",
+  "specReviewRequired": false,
+  "specReviewSubjectIdentity": "sha256:db6a6e345508a3e22e013e9e06c713ac28b5867795fbe2efc89f5922929ba09f",
+  "buildReviewPolicyIdentity": "sha256:69da74315b8dd056b115ce678ffa7e3b54f5af76f835e3fa4359bb429fa879fb",
+  "buildReviewRequired": false,
+  "harnessRuntimeSourceIdentity": {
+    "version": 1,
+    "sourceKind": "pinned-install",
+    "implementationHash": "sha256:11896794c6d655ef7fd26b5f096dfebee7cc8588140e75d19d6bb0c8f32acb43",
+    "packSourceSnapshotContentHash": "effe772110ffb79aee238ee00fe0f955034477b36c7bb6efac47b6efe7fa1d43",
+    "sourceCommit": null
+  },
+  "toolchainIdentity": "sha256:508d5be8c793d8faf99c6ab87d42a2dfcbc1889923e1c0f6b6607b13d49a06f3",
+  "sealContentHash": "sha256:1cad4e1a284aa4d18a460f093b883c02a8b6be863a691b5a6d2f48b560ade520",
+  "sealedAt": "2026-08-29T16:23:14+08:00"
+}

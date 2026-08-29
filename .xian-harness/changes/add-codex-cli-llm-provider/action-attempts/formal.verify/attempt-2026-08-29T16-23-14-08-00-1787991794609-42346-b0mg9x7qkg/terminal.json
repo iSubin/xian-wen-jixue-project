@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "terminalId": "14374709-fe8a-45b9-b935-82e11e8cf3ae",
+  "changeId": "add-codex-cli-llm-provider",
+  "action": "formal.verify",
+  "actionSubjectIdentity": "sha256:25646ac50c6e38a3a5106c83f3477e04a81084f26977e6d7deccd2e72207aae4",
+  "candidateInputIdentity": "sha256:86e5955b68bb6b98275063dbdbf67a874948bfaeb253482cd11cccf10ead66af",
+  "attemptId": "attempt-2026-08-29T16-23-14-08-00-1787991794609-42346-b0mg9x7qkg",
+  "fencingToken": 1,
+  "writerGeneration": 1,
+  "status": "pass",
+  "completion": "normal",
+  "completedAt": "2026-08-29T16:23:28+08:00",
+  "resultPath": ".xian-harness/changes/add-codex-cli-llm-provider/verify/attempts/attempt-2026-08-29T16-23-14-08-00-1787991794609-42346-b0mg9x7qkg/result.json",
+  "resultPayloadDigest": "sha256:9ae1a5bbdf0f67f46de730d290ac036291e567745eefc87a87c433df865d166e",
+  "resultBytesDigest": "sha256:05e427428a4bcedf1d9ef2cf79110ccb259342f97811db7e3b2b3a030e32ee54",
+  "completionProof": {
+    "kind": "verify",
+    "inventoryCount": 2,
+    "inventoryDigest": "sha256:63c57d8603c6ca22a0811fe8debdaa07d6dc1b6f6e2dfb77b6cd48b8a6f2ec3f",
+    "status": "pass"
+  },
+  "reason": null
+}

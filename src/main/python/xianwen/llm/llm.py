@@ -28,12 +28,15 @@ class LLMMessage:
 @dataclass
 class LLMConfig:
     """LLM 配置的数据类。"""
-    base_url: str
-    api_key: str
-    model_id: str
+    base_url: str = ""
+    api_key: str = ""
+    model_id: str = ""
     temperature: float = 0.7
     context_window_size: int = 1000000
     provider: str = "openai_compatible"
+    cli_path: str = "codex"
+    reasoning_effort: str = ""
+    cli_timeout_sec: int = 900
 
 # --- 抽象基类 ---
 
@@ -73,7 +76,7 @@ class LLM(ABC):
 
 # --- 工厂函数 ---
 
-def get_llm(config: LLMConfig, llm_type: str = "litellm", **kwargs) -> LLM:
+def get_llm(config: LLMConfig, llm_type: str | None = None, **kwargs) -> LLM:
     """
     LLM 客户端工厂函数。
 
@@ -91,16 +94,19 @@ def get_llm(config: LLMConfig, llm_type: str = "litellm", **kwargs) -> LLM:
         ValueError: 如果指定的 llm_type 无效。
     """
     # 延迟导入以避免循环依赖
+    from .codex_cli_client import CodexCliClient
     from .litellm_client import LiteLLMClient
     # from .mock_llm import MockLLM # 如果需要，可以取消注释
 
     llm_clients = {
         "litellm": LiteLLMClient,
+        "codex_cli": CodexCliClient,
         # "mock": MockLLM,
     }
 
-    client_class = llm_clients.get(llm_type)
+    resolved_type = llm_type or ("codex_cli" if config.provider == "codex_cli" else "litellm")
+    client_class = llm_clients.get(resolved_type)
     if not client_class:
-        raise ValueError(f"未知的 LLM 类型: {llm_type}")
+        raise ValueError(f"未知的 LLM 类型: {resolved_type}")
     
     return client_class(config, **kwargs)

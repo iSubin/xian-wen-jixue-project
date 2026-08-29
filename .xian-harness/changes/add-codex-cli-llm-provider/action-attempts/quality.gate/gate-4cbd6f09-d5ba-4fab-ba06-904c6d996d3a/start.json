@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "changeId": "add-codex-cli-llm-provider",
+  "action": "quality.gate",
+  "actionSubjectIdentity": "sha256:9394777bd17d44404aec7e6a0433850d93b05a61d0e87599b230e43fdadb44a4",
+  "candidateInputIdentity": "sha256:86e5955b68bb6b98275063dbdbf67a874948bfaeb253482cd11cccf10ead66af",
+  "attemptId": "gate-4cbd6f09-d5ba-4fab-ba06-904c6d996d3a",
+  "fencingToken": 1,
+  "writerGeneration": 1,
+  "leaseToken": "37c75c0e-0ffa-4cdd-ab4a-0e9fc3ac2ad8",
+  "processIncarnationIdentity": "sha256:ed0de0d8987c854a247e03fa287e7b6f1895eb31045866ca7ef79bf947efdf1d",
+  "startedAt": "2026-08-29T16:23:33+08:00",
+  "evidencePointer": ".xian-harness/changes/add-codex-cli-llm-provider/gate",
+  "expectedResultPath": ".xian-harness/changes/add-codex-cli-llm-provider/gate/attempts/gate-4cbd6f09-d5ba-4fab-ba06-904c6d996d3a/result.json",
+  "retryPolicyIdentity": "quality-gate-recovery.v1",
+  "retryOfAttemptId": null
+}

@@ -163,7 +163,17 @@ export function useTaskViewModel() {
   const isUpdatingLlmSettings = ref(false)
   const activeProfileId = ref('')
   const editingProfileId = ref('')
-  const profileFormState = ref({ name: '', provider: '', base_url: '', model_id: '', temperature: 0.7, api_key: '' })
+  const profileFormState = ref({
+    name: '',
+    provider: '',
+    base_url: '',
+    model_id: '',
+    temperature: 0.7,
+    api_key: '',
+    cli_path: 'codex',
+    reasoning_effort: '',
+    cli_timeout_sec: 900,
+  })
   const isSwitchingProfile = ref(false)
   const transcriptionSettings = ref<TranscriptionSettings | null>(null)
   const isUpdatingTranscriptionSettings = ref(false)
@@ -535,6 +545,9 @@ export function useTaskViewModel() {
         model_id: profile.model_id,
         temperature: profile.temperature,
         api_key: '',
+        cli_path: profile.cli_path || 'codex',
+        reasoning_effort: profile.reasoning_effort || '',
+        cli_timeout_sec: profile.cli_timeout_sec || 900,
       }
     }
   }
@@ -550,6 +563,9 @@ export function useTaskViewModel() {
         model_id: profile.model_id,
         temperature: profile.temperature,
         api_key: '',
+        cli_path: profile.cli_path || 'codex',
+        reasoning_effort: profile.reasoning_effort || '',
+        cli_timeout_sec: profile.cli_timeout_sec || 900,
       }
     }
   }
