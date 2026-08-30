@@ -36,6 +36,8 @@ Use this skill after open when the request needs new or updated requirement cont
 
 ROI 约束：如果判断不能改变 Scope、Non-goals、Acceptance Criteria、设计约束、验证策略或 Review 重点，就不产生额外治理内容。Small 和普通 Standard change 默认只做内部判断；Protocol、Authority、Security、Audit 上下文必须在现有 Spec/Design 位置显式留下适用结论。
 
+机器风险事实优先：当 canonical Change facts 提供 `sourceDelta.riskDelta` 时，其中所有适用的 canonical machine-risk categories 都直接触发条件式 failure modeling，包括 external side effects（含 `external.*`）、multiple authorities、asynchronous delivery、retry/idempotency、concurrency、auth/tenant boundaries、migration/deployment 与 irreversible operations。`owner-declared risk categories` 只在 canonical machine facts 缺失时补充风险事实；自然语言关键词命中本身不能成为第二套触发 authority。没有适用风险的 low-risk UI、copy、documentation 或 pure-function Change 可以完全省略 failure model 和 pilot measurement 内容。
+
 本纪律不新增 phase、不新增 schema，也不新增固定“四问”章节、per-change attestation 或 Gate 条件。Skill contract 只能证明提示文本已安装，不能证明具体 change 实际应用或质量提升。
 
 ## 执行前必须确认
@@ -54,13 +56,27 @@ ROI 约束：如果判断不能改变 Scope、Non-goals、Acceptance Criteria、
 - adapter docs and vertical profile rules when scope touches a known stack
 - user constraints and business language
 
+## Xian-Native Semantic Provider Overlay
+
+默认继续使用 native provider。只有 bounded multi-file Change 已经具备完整、repo-contained 的外部 semantic artifacts 时，才可把它们作为 optional authoring inputs 引用；trivial、read-only、operational 和没有这些 artifacts 的 Change 不增加任何负担。
+
+每个被引用的 artifact 必须同时满足：
+
+- 是 repo 内 regular non-symlink file；不得依赖 external semantic-provider CLI/runtime、provider cache 或第二事实存储。
+- 在 accepted contract 的 `sections.sourceDelta.boundaryDelta[].item.semanticProviderArtifact` 中记录 `version: 1`、repo-relative `path` 与 `sha256:<64-lowercase-hex>`。
+- 同一规范化 `path` 必须是 `sections.scope.changedPaths` 的 exact member，使现有 current Candidate Workset/source snapshot 绑定实际 bytes；late writer 由现有 seal/revalidation fail closed。
+
+External artifacts 只组织 authoring。不得复制第二份 proposal、design、spec、task 或 acceptance authority；Harness 仍是 Scope、Candidate、Review、Verify、Gate、Result 与 publication 的 mandatory sole execution authority。
+
+分类边界必须可观察：source identity/digest、accepted Scope、Candidate freshness、Review、Verify、Gate 或 publication rejection 是 product/runtime blocker；仅 wording、layout 或 duplicated narrative，且所有 machine facts 完整时，才是 governance presentation Quality Issue。
+
 ## 执行流程
 
 1. Capture background, target user, business outcome, and non-goals.
-2. Apply the confirmation boundary; trigger the other quality lenses only when their risk conditions exist.
-3. Separate product requirements from implementation decisions.
+2. Read canonical `sourceDelta.riskDelta` when available, then apply the confirmation boundary and trigger the other quality lenses only from applicable machine facts or explicit owner-declared risk categories.
+3. Separate product requirements from implementation decisions; acceptance criteria describe observable business outcomes and must not freeze implementation order unless that order is independently confirmed as a business invariant.
 4. Define acceptance criteria before implementation.
-5. Note affected modules, data, permissions, deployment, rollback, and observability concerns.
+5. Note affected modules, data, permissions, deployment, rollback, and observability concerns. For an unverified external transaction, idempotency, uniqueness, delivery, or rollback assumption, require a probe, a design that removes the dependency, or an explicit residual-risk decision before Spec acceptance.
 6. Update `change.md`; for legacy/audit changes, update `proposal.md`, `acceptance-criteria.md`, or Xian spec contract delta specs.
 
 ## 确定性工具

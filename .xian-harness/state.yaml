@@ -51,15 +51,15 @@ lastPackSync:
     manifestName: xian-harness-pack
     manifestVersion: 1
     fileCount: 133
-    contentHash: 6f06a3d450e076185541fd4f6fe8ad08129b66f374c896b561e70d7f2cf8377c
+    contentHash: 9d31109c3ed3980fc66c9a4334ebb8d8f61665c6cf9e3a6e7ffc24a70d59b136
   statePath: .xian-harness/pack-state.json
   reportPath: null
   markdownPath: null
   summary:
     total: 133
     created: 0
-    unchanged: 128
-    updated: 5
+    unchanged: 126
+    updated: 7
     conflict: 0
     installed: 0
     missing: 0
@@ -68,4 +68,4 @@ lastPackSync:
     removed: 0
     profileExcluded: 0
     acceptedDrift: 0
-  syncedAt: 2026-08-27T21:09:44+08:00
+  syncedAt: 2026-08-31T06:45:37+08:00

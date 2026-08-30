@@ -35,6 +35,14 @@ Use this skill after requirements are clear and before implementation for cross-
 
 本纪律不新增 phase、不新增 schema，也不新增独立 Design artifact 或 Runtime 状态。独立证据只降低证据共模；同一个设计者的推理共模仍需现有独立 Review 策略处理。
 
+## Conditional Failure Modeling
+
+canonical `sourceDelta.riskDelta` machine facts 中所有适用的 canonical machine-risk categories 都直接触发在现有 design / `riskAndRollback` 内容中补充 failure model，包括 external side effects（含 `external.*`）、multiple authorities、asynchronous delivery、retry/idempotency、concurrency、auth/tenant boundaries、migration/deployment 与 irreversible operations。Owner-declared risk category 只在 canonical machine facts 缺失时补充风险事实；自然语言关键词不构成第二套触发 authority。Low-risk UI、copy、documentation 和 pure-function Change 可以完全省略本节及 pilot measurement plan。
+
+触发时记录 1 至 3 条 observable technical invariants，并为每条绑定 `failureCutPoint`、`expectedState`、`recovery` 与 `probeEvidence`。Business acceptance 只固定可观察结果，不固定实现顺序；只有顺序本身被独立确认是 business invariant 时才可以进入 acceptance。任何未验证的 external transaction、idempotency、uniqueness、delivery 或 rollback 假设，都必须在 Spec acceptance 前提供 probe、移除该依赖的设计，或明确的 residual-risk decision。
+
+Pack guidance 只准备可审查事实；formal `spec.review` 仍是唯一 Core Agent Pair acceptance authority，不新增 Pack review result、phase、schema 或 lifecycle owner。需要后续真实试点时，只交付 `observationStatus: pending` 的 measurement plan，记录 `addedSpecMinutes`、`falsePositive`、`avoidedBuildRework` 和 `avoidedReplacement`；plan 不能声称 external observation 已经发生。
+
 ## 执行前必须确认
 
 - 必须：restate the accepted WHAT from proposal and acceptance before choosing implementation details.
@@ -55,7 +63,7 @@ Use this skill after requirements are clear and before implementation for cross-
 ## 执行流程
 
 1. Restate the requirement briefly.
-2. Translate applicable product invariants into technical invariants, failure models, and cheapest counterexamples.
+2. Consume canonical `sourceDelta.riskDelta` where available, then translate applicable product invariants into technical invariants, failure models, and cheapest counterexamples only when the conditional risk boundary is met.
 3. Identify affected components, ownership boundaries, data flow, and integration points.
 4. Define error handling, rollback, observability, and migration concerns.
 5. Define verification and quality gate strategy, including an independent evidence source only for high-risk conclusions.

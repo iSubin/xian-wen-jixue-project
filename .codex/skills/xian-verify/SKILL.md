@@ -81,6 +81,35 @@ Change Runtime contract revision 进入 verify 时，`xian-verify` 只消费 fro
 - delivery lane：验证命令必须能支撑 full gate、release acceptance 和 archive；客户验收、安全边界和上线门禁不能只保留自然语言说明。
 - 自然语言可以解释验收意图，但 verification rule 的执行载体优先写可执行命令、脚本或明确证据路径。
 
+## 产品范围与治理深度分离
+
+进入 substantial implementation（实质实现）前，Host 必须显式给出：
+
+- `Requested outcome`：owner 本轮要求的可观察结果。
+- `Must-have capabilities`：实现该结果不可缺少的能力；不能把证据要求写成产品能力。
+- `Existing mechanisms to reuse`：当前可复用的 Runtime、Pack、CLI 或项目机制。
+- `Explicitly deferred items`：非必要 hardening、generalized recovery 和 platform capability；记录为 `non-blocking deferred risks`，不吸收到当前 Scope。
+- `Route/lane evidence`：选择治理深度的当前事实，以及相对更轻/更重 lane 的理由。
+
+按以下优先级裁决：
+
+1. 当前 Runtime command result 若提供本 Change 的 `tierDecision.riskSignals`、`runtimePlan.budget.riskSignalIds` 或 `structured Verify/Gate blockers`，消费这些 current machine facts；它们只能提高 Review、Verify、Gate 和 evidence 深度，不能扩展产品能力。
+2. 上述 current machine facts 不存在时，检查 concrete changed paths 和 intended side effects。`keyword-only` 的 production、deployment、delivery 或 security 文本不是 capability、Scope 或 operational authority。
+3. `owner-authorized Scope` 始终约束产品结果。ordinary 与 audit route 面对同一 requested outcome 时，`capabilityDiff` 必须为空；治理深度只改变 evidence obligations。`mid-task owner scope contraction` 立即收窄后续实现，已发现但非必须的风险进入 deferred items。
+4. `production helper authoring` 可因 executable-surface risk 进入更深治理，但不等于 `real production execution`；真实外部变更必须另有 `separate explicit operational authorization`。read-only review 不获得 mutation authority。
+
+| Scenario | Expected decision |
+|---|---|
+| current machine risk facts | Raise evidence obligations only; keep `owner-authorized Scope` and `capabilityDiff` unchanged. |
+| production-keyword-only request | Do not escalate capability or authorize mutation; inspect concrete paths and side effects. |
+| production helper authoring | Deeper evidence is allowed; no real production operation is authorized. |
+| real production execution | Require `separate explicit operational authorization` before mutation. |
+| read-only review | Keep mutation authority absent. |
+| mid-task owner scope contraction | Stop or remove out-of-scope implementation; the narrower owner boundary wins. |
+| non-blocking deferred risks | Record them without expanding the current capability or Scope. |
+
+不得新增 phase、schema、scheduler、daemon、persistent authority、generalized recovery 或 canonical Scope object 来实现本规则。
+
 ## 必需证据
 
 - `.xian-harness/changes/{change-id}/verify/verify-result.json`
