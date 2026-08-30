@@ -11,6 +11,7 @@ from src.main.python.xianwen.downloader.homeway_resolver import (
     HomewayResolveError,
     HomewayResolvedVideo,
     HomewayVideoResolver,
+    is_homeway_graphic_class_lesson_url,
     is_homeway_graphic_video_url,
     transform_vhall_play_token,
 )
@@ -42,6 +43,29 @@ class FakeHomewayResolver(HomewayVideoResolver):
                         "vh_live_id": "260368304",
                     }
                 },
+            }
+
+        if parsed.netloc == "tydsapi.homeway.com.cn" and parsed.path == "/lecturers/book/getbookinfo":
+            assert query["course_id"] == ["15"]
+            assert query["token"] == ["login-token"]
+            return {
+                "code": 1000,
+                "data": {"courseSeriesDto": {"title": "三板斧战法密训", "is_buy": True}},
+            }
+
+        if parsed.netloc == "tydsapi.homeway.com.cn" and parsed.path == "/lecturers/book/courseList":
+            assert query["course_id"] == ["15"]
+            assert query["token"] == ["login-token"]
+            return {
+                "code": 1000,
+                "data": [
+                    {
+                        "id": "42",
+                        "course_title": "01：情绪周期体系总览与核心心法",
+                        "vh_live_id": "260368304",
+                        "is_audition": False,
+                    }
+                ],
             }
 
         if parsed.netloc == "hexun.vhall.homeway.com.cn" and parsed.path == "/v3/webinars/watch/init":
@@ -121,6 +145,15 @@ class TestHomewayResolver(unittest.TestCase):
         )
         self.assertFalse(is_homeway_graphic_video_url("https://www.bilibili.com/video/BV123"))
 
+    def test_detects_homeway_graphic_class_lesson_url(self):
+        course_url = "https://tyds.homeway.com.cn/#/GraphicClass?key=15&lessonId=42"
+        self.assertTrue(is_homeway_graphic_class_lesson_url(course_url))
+        self.assertFalse(
+            is_homeway_graphic_class_lesson_url(
+                "https://tyds.homeway.com.cn/#/GraphicClass?key=15"
+            )
+        )
+
     def test_resolves_graphic_video_page_to_tokenized_hls(self):
         resolver = FakeHomewayResolver()
 
@@ -136,6 +169,20 @@ class TestHomewayResolver(unittest.TestCase):
             "https://cdn.example.com/vhallyun/video.m3u8?token=7792124F_media",
         )
         self.assertEqual(len(resolver.post_calls), 1)
+
+    def test_resolves_purchased_graphic_class_lesson_to_tokenized_hls(self):
+        resolver = FakeHomewayResolver()
+
+        resolved = resolver.resolve_course_lesson(
+            "https://tyds.homeway.com.cn/#/GraphicClass?key=15&lessonId=42"
+        )
+
+        self.assertEqual(resolved.title, "01：情绪周期体系总览与核心心法")
+        self.assertEqual(resolved.vhall_id, "260368304")
+        self.assertEqual(
+            resolved.media_url,
+            "https://cdn.example.com/vhallyun/video.m3u8?token=7792124F_media",
+        )
 
     def test_transforms_vhall_origin_token_before_attaching_to_hls(self):
         self.assertEqual(transform_vhall_play_token("rawtoken_media"), "7792124F_media")

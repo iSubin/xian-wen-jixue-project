@@ -21,8 +21,10 @@ from ..storage import (
 from .bilibili_author_resolver import resolve_bilibili_author, BilibiliAuthorResolveError
 from .homeway_resolver import (
     HomewayResolveError,
+    is_homeway_graphic_class_lesson_url,
     is_homeway_graphic_video_url,
     redact_sensitive_url,
+    resolve_homeway_graphic_class_lesson,
     resolve_homeway_graphic_video,
 )
 from .xiaoet_resolver import (
@@ -878,12 +880,18 @@ class VideoDownloaderWorker(Worker):
             if self._try_process_with_bilibili_subtitle(payload):
                 return
 
-            if is_homeway_graphic_video_url(video_url):
+            if is_homeway_graphic_video_url(video_url) or is_homeway_graphic_class_lesson_url(video_url):
                 source_url = video_url
-                resolved_homeway = resolve_homeway_graphic_video(
-                    video_url,
-                    payload.get("homeway_web_qtstr"),
-                )
+                if is_homeway_graphic_class_lesson_url(video_url):
+                    resolved_homeway = resolve_homeway_graphic_class_lesson(
+                        video_url,
+                        payload.get("homeway_web_qtstr"),
+                    )
+                else:
+                    resolved_homeway = resolve_homeway_graphic_video(
+                        video_url,
+                        payload.get("homeway_web_qtstr"),
+                    )
                 video_url = resolved_homeway.media_url
                 payload = payload.copy()
                 payload["video_url"] = video_url

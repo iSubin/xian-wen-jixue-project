@@ -61,11 +61,38 @@ def is_homeway_graphic_video_url(video_url: str) -> bool:
     return bool(fragment_params.get("key"))
 
 
+def is_homeway_graphic_class_lesson_url(video_url: str) -> bool:
+    try:
+        parsed = urlparse(str(video_url or ""))
+    except Exception:
+        return False
+    host = (parsed.hostname or "").lower()
+    if host != "tyds.homeway.com.cn":
+        return False
+    fragment_path, fragment_params = _parse_fragment_route(parsed.fragment)
+    if fragment_path != "/GraphicClass":
+        return False
+    return bool(
+        fragment_params.get("key")
+        and (fragment_params.get("lessonId") or fragment_params.get("lesson_id"))
+    )
+
+
 def resolve_homeway_graphic_video(video_url: str, web_qtstr: str | None = None) -> HomewayResolvedVideo:
     token = _sanitize_cookie_value(web_qtstr)
     if token:
         return HomewayVideoResolver(token_provider=lambda: token).resolve(video_url)
     return HomewayVideoResolver().resolve(video_url)
+
+
+def resolve_homeway_graphic_class_lesson(
+    video_url: str,
+    web_qtstr: str | None = None,
+) -> HomewayResolvedVideo:
+    token = _sanitize_cookie_value(web_qtstr)
+    if token:
+        return HomewayVideoResolver(token_provider=lambda: token).resolve_course_lesson(video_url)
+    return HomewayVideoResolver().resolve_course_lesson(video_url)
 
 
 def transform_vhall_play_token(origin_token: str) -> str:
@@ -110,6 +137,22 @@ def _extract_homeway_params(video_url: str) -> tuple[str, str, str]:
         or HOMEWAY_DEFAULT_BIGVID
     )
     return video_id, token, big_vid
+
+
+def _extract_homeway_course_lesson_params(video_url: str) -> tuple[str, str, str]:
+    parsed = urlparse(video_url)
+    page_query = parse_qs(parsed.query)
+    _, fragment_query = _parse_fragment_route(parsed.fragment)
+
+    course_id = _first_query_value(fragment_query, "key") or _first_query_value(page_query, "key")
+    lesson_id = (
+        _first_query_value(fragment_query, "lessonId")
+        or _first_query_value(fragment_query, "lesson_id")
+        or _first_query_value(page_query, "lessonId")
+        or _first_query_value(page_query, "lesson_id")
+    )
+    token = _first_query_value(fragment_query, "token") or _first_query_value(page_query, "token")
+    return course_id, lesson_id, token
 
 
 def _sanitize_cookie_value(value: str | None) -> str:
@@ -264,6 +307,49 @@ class HomewayVideoResolver:
             vhall_id=vhall_id,
         )
 
+    def resolve_course_lesson(self, video_url: str) -> HomewayResolvedVideo:
+        if not is_homeway_graphic_class_lesson_url(video_url):
+            raise HomewayResolveError("不是支持的投研大师课程课时链接。")
+
+        course_id, lesson_id, url_token = _extract_homeway_course_lesson_params(video_url)
+        if not course_id or not lesson_id:
+            raise HomewayResolveError("投研大师课程课时链接缺少 key 或 lessonId 参数。")
+
+        token = _sanitize_cookie_value(url_token or self.token_provider())
+        if not token:
+            raise HomewayResolveError(
+                "未找到投研大师登录态 web_qtstr。请先连接投研大师账号后重试。"
+            )
+
+        course_info = self._fetch_course_info(course_id=course_id, token=token)
+        course_block = ((course_info.get("data") or {}).get("courseSeriesDto") or {})
+        lessons = self._fetch_course_lessons(course_id=course_id, token=token)
+        lesson = next(
+            (item for item in lessons if str(item.get("id") or "").strip() == lesson_id),
+            None,
+        )
+        if not lesson:
+            raise HomewayResolveError("投研大师课程中没有找到指定课时。")
+        if not bool(course_block.get("is_buy")) and not bool(lesson.get("is_audition")):
+            raise HomewayResolveError("当前投研大师账号尚未购买该课程，无法采集此课时。")
+
+        title = str(lesson.get("course_title") or course_block.get("title") or "投研大师课程")
+        vhall_id = str(lesson.get("vh_live_id") or "").strip()
+        if not vhall_id:
+            raise HomewayResolveError("投研大师课程课时未返回 vh_live_id。")
+
+        watch_init = self._fetch_vhall_watch_init(vhall_id)
+        watch_data = watch_init.get("data") or {}
+        record_info = self._fetch_vhall_record_info(watch_data)
+        media_url = self._dispatch_vhall_replay(watch_data, record_info)
+
+        return HomewayResolvedVideo(
+            media_url=media_url,
+            title=title,
+            source_url=video_url,
+            vhall_id=vhall_id,
+        )
+
     def _fetch_video_info(self, video_id: str, token: str, big_vid: str) -> Dict[str, Any]:
         query = urlencode({"id": video_id, "token": token, "bigVId": big_vid})
         url = f"{HOMEWAY_API_BASE}/lecturers/video/videoInfo?{query}"
@@ -271,6 +357,25 @@ class HomewayVideoResolver:
         if str(data.get("code")) != "1000":
             raise HomewayResolveError(f"投研大师 videoInfo 请求失败: {data.get('msg') or data.get('code')}")
         return data
+
+    def _fetch_course_info(self, course_id: str, token: str) -> Dict[str, Any]:
+        query = urlencode({"course_id": course_id, "token": token})
+        url = f"{HOMEWAY_API_BASE}/lecturers/book/getbookinfo?{query}"
+        data = self._get_json(url, headers={"Referer": "https://tyds.homeway.com.cn/"})
+        if str(data.get("code")) != "1000":
+            raise HomewayResolveError(f"投研大师课程信息请求失败: {data.get('msg') or data.get('code')}")
+        return data
+
+    def _fetch_course_lessons(self, course_id: str, token: str) -> list[Dict[str, Any]]:
+        query = urlencode({"course_id": course_id, "token": token})
+        url = f"{HOMEWAY_API_BASE}/lecturers/book/courseList?{query}"
+        data = self._get_json(url, headers={"Referer": "https://tyds.homeway.com.cn/"})
+        if str(data.get("code")) != "1000":
+            raise HomewayResolveError(f"投研大师课程目录请求失败: {data.get('msg') or data.get('code')}")
+        lessons = data.get("data") or []
+        if not isinstance(lessons, list):
+            raise HomewayResolveError("投研大师课程目录返回格式异常。")
+        return [item for item in lessons if isinstance(item, dict)]
 
     def _fetch_vhall_watch_init(self, vhall_id: str) -> Dict[str, Any]:
         query = urlencode({

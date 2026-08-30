@@ -55,6 +55,7 @@ from .downloader.bilibili_author_resolver import (
 from .downloader.homeway_resolver import (
     _read_homeway_token_from_browser_cookie3,
     _read_homeway_token_from_macos_chrome,
+    is_homeway_graphic_class_lesson_url,
     is_homeway_graphic_video_url,
 )
 from .downloader.xiaoet_resolver import (
@@ -202,7 +203,7 @@ def _attach_connected_account_credentials(request: Request, video_url: str, task
             task_payload["xiaoet_cookie_header"] = cookie_header
         return
 
-    if is_homeway_graphic_video_url(video_url):
+    if is_homeway_graphic_video_url(video_url) or is_homeway_graphic_class_lesson_url(video_url):
         secret = _find_connected_account_secret(user_id, "homeway", "web_qtstr", video_url)
         web_qtstr = _sanitize_cookie_value((secret or {}).get("web_qtstr"))
         if web_qtstr:
@@ -2146,7 +2147,7 @@ def _guess_collection_provider(urls: List[str]) -> str:
             providers.add("wechat")
         elif is_xiaoet_video_url(url):
             providers.add("xiaoetong")
-        elif is_homeway_graphic_video_url(url):
+        elif is_homeway_graphic_video_url(url) or is_homeway_graphic_class_lesson_url(url):
             providers.add("homeway")
         else:
             providers.add("generic")
