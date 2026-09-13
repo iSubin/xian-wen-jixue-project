@@ -1,6 +1,6 @@
 ---
 name: xian-open
-description: Use when receiving a concrete user request, opening or resuming a governed change, activating a parked change, or deciding whether work needs a change lifecycle. Must come before spec for any non-trivial work.
+description: Use when opening or resuming a governed Change, or deciding its route; not ordinary chat or direct non-executable maintenance.
 ---
 
 # xian-open
@@ -25,7 +25,7 @@ open -> verify -> gate -> close
 
 ## 触发条件
 
-在用户提出具体需求、bugfix、refactor、文档更新、运维动作，或请求可能对应已有 / parked change 时使用。
+当请求属于 governed Change 或需要判断与已有 / parked Change 的关系时使用；普通聊天直接回答，符合项目直接维护边界的非执行态文档不因此创建 Change。运维动作的真实外部权限另行确认。
 
 不要因裸回复“继续 / 下一步 / go”触发本 skill；这些词属于 `xian-next`。
 
@@ -125,6 +125,8 @@ open -> verify -> gate -> close
 
 ## 首次 Review 的配置准备
 
+已 materialized、非 terminal Change 在提交完整合同补丁前，可用 `change contract-patch <change-id> --file <patch.json> --preflight --target <target-project> --json` 做成功/失败零写的公开前置检查。按 xian-spec 区分已检查与 not-run；报告不是接受 token，不代替 Workset/source fence、Reviewer、完整命令 readiness 或正式锁内重验。无关查询和身份未变的相同输入不重复执行；未 materialized 不为预检隐式初始化。
+
 仅当 current policy 要求 formal Review 时，在首次调用前核对项目选择的持久 Reviewer profile 与自动 Review（包括 contract-patch 内部调用）一致。CLI override 不等于持久配置；不要在第一次显式调用后假定后续无参数调用会沿用它。使用现役项目或 change-local policy 输入及 parser，保持既有 logical/physical Reviewer，不改旧 session 或 Review facts；通用 Pack 不指定 provider。
 
 不要求 formal Review 的 ordinary/quick 不新增 Reviewer 配置、Spec Review 或固定表单。已有 parked/capture 必须先确认真实 Scope 和完整设计能由当前支持路径物化；不能把 capture 的默认 diff-check 当行为证据。准备失败按具体 owner 修正，不先 seal 再猜合同。
@@ -174,18 +176,18 @@ open -> verify -> gate -> close
 
 ## 交互预算
 
-- 必须：obey the current hook-provided Interaction Budget before reading files or running commands.
-- 必须：keep chat-mode requests tool-free unless the user explicitly asks for inspection, snapshot refresh, deep audit, or change execution.
-- 必须：require explicit deep-audit or change intent before reading pack state, workbench, quality-gate, archive, or other large project status artifacts.
+- 遵守当前实际提供的 Interaction Budget；没有提供时不虚构 hook 预算或额外审批。
+- 普通聊天保持 tool-free，除非用户明确要求检查；已授权任务的必要定向读取不另索 deep-audit。
+- 不为无关问题预读大型 pack state、workbench、quality-gate、archive 或历史材料；专用 release 的等待与失败边界不被本段覆盖。
 
 ## 交接规则
 
 - 当前请求携带 publish intent 且不存在真实阻塞时，不要输出等待用户回复“继续”的 handoff；在同一任务中直接进入下一 lifecycle skill，直到 Git delivery 完成。
-- 当前请求不携带 publish intent 时，从运行时 `nextAction` 开始；先输出 scene、target project、流程债务和 recommended route；末尾输出 `下一步建议：<中文下一步>`，空一行后单独输出 `$xian-xxx`，再空一行输出 `直接回复“继续”即可进入该步骤。`；不要在首屏附加“因为...”。
+- 当前请求不携带 publish intent 时，自然收尾：说明结论、必要风险和仍待决定的具体问题，不强制固定末尾、skill 行或回复“继续”；仅真实待决问题才请求明确选择。已有 Runtime 路由时从运行时 `nextAction` 开始，不把建议变成授权。
 - 如果运行时 `recommendedAction` 是 `project-idle-next` 或下一步需要用户二选一，不要输出 `直接回复“继续”即可进入该步骤。`；改为提示用户明确回复“查看项目状态”或给出一个真实小需求。
 - 如果下一步来自 proposal / design / tasks 中的 future implementation path 或 future batch change name，不要输出 `直接回复“继续”即可进入该步骤。`；改为提示用户明确选择要创建的 change，或先查看项目状态。
-- 如果用户需求是 small hotfix 候选，末尾建议写成：`下一步建议：按 small hotfix 打开轻量 change，使用 targeted verification 后 quick-close`，下一行 skill 使用 `$xian-spec`；不要把 small hotfix 写成免验证路径。
-- 如果命中升级信号，末尾建议写成：`下一步建议：本需求命中升级信号，按 Standard / Major lane 明确 spec 和 design`，下一行 skill 使用 `$xian-spec`。
+- small hotfix 候选可说明“按 small hotfix 打开轻量 change，使用 targeted verification 后 quick-close”，按实际需要路由到 `xian-spec`；不固定输出尾句，也不把 small hotfix 写成免验证路径。
+- 命中升级信号时说明需要 Standard / Major lane 的原因，路由到 `xian-spec` 明确 spec 和 design，不强制末尾格式。
 - 表达层原则：中文优先，默认用自然中文给结论、必要风险和下一步；必须保留英文术语、协议字段、状态名或命令名时，紧跟中文括注解释；不写“流程报告 / Review 报告 / evidence 清单”式长篇；只有 deep-audit、gate、verify 或用户明确要求完整显性化时才展开治理细节。
 - Default mapping: concrete demand -> `xian-open`; fresh evidence needed -> `xian-verify`; gate decision needed -> `xian-gate`; governed delivery close -> `xian-commit` / close. Use `xian-spec` / `xian-design` / `xian-plan` / `xian-build` only when the current request actually needs requirement clarification, design, task sequencing, or implementation work.
 - If the mapping conflicts with runtime `nextAction`, state the conflict and run `$xian-next` or `xian-harness continue --json` for arbitration.

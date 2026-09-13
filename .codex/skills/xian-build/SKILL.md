@@ -1,6 +1,6 @@
 ---
 name: xian-build
-description: Use when implementing approved tasks from change.md or legacy tasks.md, modifying files, or coordinating builder agents. Never approve your own gate.
+description: Use when implementing authorized tasks in an active governed Change; not arbitrary file edits or temporary delegation.
 ---
 
 # xian-build
@@ -15,7 +15,7 @@ description: Use when implementing approved tasks from change.md or legacy tasks
 
 当 `change.md` 中存在已批准的 plan / acceptance / verify 任务，或 legacy/audit change 的 `tasks.md` 中存在已批准任务，或用户明确授权一个范围清晰的 hotfix 时使用。
 
-不要在需求、设计、验收口径仍不清楚时直接进入 `xian-build`。
+不要在需求、设计、验收口径仍不清楚时直接进入 `xian-build`。任意文件编辑或临时委派本身不触发本 skill；任务必须已合法进入 active Change。
 
 ## 方法论来源
 
@@ -33,7 +33,11 @@ description: Use when implementing approved tasks from change.md or legacy tasks
 - 必须：确认本次编辑要满足的 AC、任务和验证规则。
 - 必须：在行为变更前新增或选择测试、smoke、静态检查或等价验证命令。
 - 必须：无法 test-first 时记录 `TDD Exception`，说明原因和替代验证证据。
-- 必须：确认当前任务属于 active change；如果任务只是 design 中列出的 future implementation path，停止并要求用户明确选择或先创建对应 change。
+- 必须：确认当前任务属于 active change；如果任务只是 design 中列出的 future implementation path，不得直接实施。无既有明确授权时请求用户选择；已有明确授权时按现役 lifecycle 创建或激活对应 change 后继续，不重复请求同一选择。
+
+## 决策衔接
+
+遇到影响下一步的分叉时应用 [决策暂停与答复适用性](../xian-spec/SKILL.md#决策暂停与答复适用性)。已批准任务的同 Scope 修复不重复索取同一许可；future path 仍须经现役 lifecycle 成为可执行任务，已有明确批次授权时按支持路径衔接。机器 blocker 不用聊天覆盖，有进展的长操作保持同一进程。
 
 ## 协议输入
 
@@ -115,6 +119,10 @@ active Change、Review、Candidate 期间的其他写入或 commit 先按路径�
 
 当实现发现需求、设计、验收或 verification plan 需要语义调整时，Builder 只能提交 candidate contract patch，并标明 `semanticImpact`、`baseRevision`、`reason` 和受影响 section。不要在 build 中原地修改已冻结 revision；需要重开 spec / plan / build / verify 时，交还 lifecycle 决策。
 
+reviewed revision 接受后，先读取 current readiness / nextAction 与 owning phase。若 Runtime 重开 spec，必须由 official phase-result 或 phase transition 生成绑定当前 semantic identity 的 fresh spec facts，再按官方 advance 回到 plan / build，之后才写 build facts。不得手写 authority、强制 transition 或复用旧 semantic identity 的 phase facts。
+
+是否需要再次 Spec Review 由 current readiness 和完整 Review 身份决定：sections 相同不是复用依据，也不无条件追加第二次 Review。policy、reviewer/runtime、Candidate、source snapshot 或 reviewInputIdentity 变化仍按现役 freshness 处理；不得跳过既有复用条件。
+
 ## 参考样例
 
 - `harden-xian-next-user-facing-guidance`: 用户引导类变更的 build / verify / gate 闭环参考。
@@ -137,14 +145,14 @@ active Change、Review、Candidate 期间的其他写入或 commit 先按路径�
 
 ## 交互预算
 
-- 必须：读取文件或运行命令前遵守当前 hook 提供的 Interaction Budget。
-- 必须：chat-mode 请求保持 tool-free，除非用户明确要求 inspection、snapshot refresh、deep audit 或 change execution。
-- 必须：读取 pack state、workbench、quality-gate、archive 或其他大型项目状态前，确认用户有明确 deep-audit 或 change intent。
+- 遵守当前实际提供的 Interaction Budget；没有提供时不虚构 hook 预算或额外审批。
+- 普通聊天保持 tool-free，除非用户明确要求检查；已授权任务的必要定向读取不另索 deep-audit。
+- 不为无关问题预读大型 pack state、workbench、quality-gate、archive 或历史材料；专用 release 的等待与失败边界不被本段覆盖。
 
 ## 交接规则
 
 - 当前请求携带 publish intent 且不存在真实阻塞时，完成 build 后由同一主 Agent 在同一任务中直接进入下一个 lifecycle skill，不输出等待用户回复“继续”的 handoff。
-- 当前请求不携带 publish intent 时，从运行时 `nextAction` 开始；末尾输出 `下一步建议：<中文下一步>`，空一行后单独输出 `$xian-xxx`，再空一行输出 `直接回复“继续”即可进入该步骤。`；不要在首屏附加“因为...”。
+- 当前请求不携带 publish intent 时，自然收尾：说明结论、必要风险和仍待决定的具体问题，不强制固定末尾、skill 行或回复“继续”；仅真实待决问题才请求明确选择。已有 Runtime 路由时从运行时 `nextAction` 开始，不把建议变成授权。
 - 表达层原则：中文优先，默认用自然中文给结论、必要风险和下一步；必须保留英文术语、协议字段、状态名或命令名时，紧跟中文括注解释；不写“流程报告 / Review 报告 / evidence 清单”式长篇；只有 deep-audit、gate、verify 或用户明确要求完整显性化时才展开治理细节。
 - 默认映射：实现完成 -> `xian-verify`；本地检查失败 -> 留在 `xian-build` 修复；需求歧义 -> `xian-spec` 或 `xian-design`。
 - 如果静态映射与运行时 `nextAction` 冲突，说明冲突，并 run `$xian-next` or `xian-harness continue --json` for arbitration。

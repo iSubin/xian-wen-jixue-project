@@ -112,13 +112,14 @@ Evidence source（证据来源）独立不等于 reasoning source（推理来源
 
 ## 交互预算
 
-- 必须：obey the current hook-provided Interaction Budget before reading files or running commands.
-- 必须：keep chat-mode requests tool-free unless the user explicitly asks for inspection, snapshot refresh, deep audit, or change execution.
-- 必须：require explicit deep-audit or change intent before reading pack state, workbench, quality-gate, archive, or other large project status artifacts.
+- 遵守当前实际提供的 Interaction Budget；没有提供时不虚构 hook 预算或额外审批。
+- 普通聊天保持 tool-free，除非用户明确要求检查；已授权任务的必要定向读取不另索 deep-audit。
+- 不为无关问题预读大型 pack state、workbench、quality-gate、archive 或历史材料；专用 release 的等待与失败边界不被本段覆盖。
 
 ## 交接规则
 
-- 输出时先说明当前结论、证据缺口和风险；末尾输出 `下一步建议：<中文下一步>`，空一行后单独输出 `$xian-xxx`，再空一行输出 `直接回复“继续”即可进入该步骤。`；不要在首屏附加“因为...”。
+- 当前请求携带 publish intent 且不存在真实阻塞时，按 current nextAction 在同一任务内连续完成已授权工作，不等待重复许可；只读 Review 不获得写入权。
+- 当前请求不携带 publish intent 时，自然收尾：说明结论、必要风险和仍待决定的具体问题，不强制固定末尾、skill 行或回复“继续”；仅真实待决问题才请求明确选择。已有 Runtime 路由时从运行时 `nextAction` 开始，不把建议变成授权。
 
 - P0/P1 issue -> `xian-build`.
 - Fixed issue -> `xian-verify`.

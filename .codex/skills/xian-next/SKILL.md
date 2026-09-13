@@ -15,6 +15,10 @@ description: Use when the user explicitly invokes $xian-next, or gives a bare �
 
 裸“继续”融合规则：优先继续执行当前已经存在但没有完成的任务；如果当前没有可继续执行的任务，则进入方向建议，回答“接下来应该做什么”。这两个语义必须在用户可见输出中明确区分，避免把建议误解释成执行授权。
 
+## 答复与继续
+
+应用 [决策暂停与答复适用性](../xian-spec/SKILL.md#决策暂停与答复适用性)：resume 建议不是 owner 答复。先核对待决对象与当前事实；已有授权且没有待决问题时直接路由到 nextSkill，不追加要求用户再回复“继续”的往返。方向建议仍不自动执行，机器 blocker 与待决业务问题保持各自边界。
+
 ## 迁移说明
 
 `xian-harness continue` 现在返回五要素 `direction` 结构。`nextAction` 是方向事实源；命令和 skill 名称只是派生指引，不能覆盖它。
@@ -48,7 +52,7 @@ description: Use when the user explicitly invokes $xian-next, or gives a bare �
 
 1. **reasonCode 验证**：基于 continue CLI 提供的 `reasonCode` 枚举（`failed-gate` / `active-change-continue` / `release-pending-archive` / `baseline-create` / `dirty-workspace-close` / `inspect-parked-changes` / `inspect-orphan-changes` / `pending-push-close` / `high-priority-todo` / `docs-sync-drift` / `project-idle-next`）判断推荐类别，不要混淆"必须做"和"建议做"。
 2. **confidence 验证**：基于 `confidence`（`high` / `medium` / `low`）调整 handoff 语气：
-   - `high`：允许 executable handoff（"直接回复'继续'即可进入该步骤"）。
+   - `high`：已有明确授权且无待决问题时连续路由；未授权时才给 executable handoff，请用户明确选择。confidence 本身不是授权。
    - `medium`：要求用户明确动作或选择，不提示 bare `继续`。
    - `low`：只报告，不催促行动；如果同时是 `project-idle-next`，必须进入方向建议态。
 3. **selectedChangeId 相关性验证**：如果 `selectedChangeId` 非 null，核对它与当前 dirty worktree 的 path overlap（基于 `git status` 输出和 change 的 changed-path）；若 zero overlap 且 `confidence` 不是 `high`，降级为 inspect 而非 executable handoff，并在输出说明"CLI 推荐与当前工作上下文弱相关"。
@@ -60,7 +64,7 @@ description: Use when the user explicitly invokes $xian-next, or gives a bare �
 
 | 状态 | 判定 | 输出要求 | 是否可提示“直接回复继续” |
 |---|---|---|---|
-| 执行态 | 存在 active change、failed gate、release pending archive、dirty workspace、pending push、baseline create、high-priority todo 或其他 high-confidence 可执行下一步 | 开头写“当前是执行态：已有可继续推进的任务。”并说明将继续推进什么 | 仅当 `confidence=high` 且下一步不需要额外人工选择时可以 |
+| 执行态 | 存在 active change、failed gate、release pending archive、dirty workspace、pending push、baseline create、high-priority todo 或其他 high-confidence 可执行下一步 | 开头写“当前是执行态：已有可继续推进的任务。”并说明将继续推进什么 | 已授权且无待决问题时不提示，直接路由；未授权时请求明确选择 |
 | 方向建议态 | 项目 clean / idle、`reasonCode=project-idle-next`、`confidence=low`，或没有明确可执行任务 | 开头写“当前是方向建议态：没有可继续执行的任务。以下是下一步建议，不会自动执行。” | 不可以 |
 
 方向建议态可以给出推荐方向和候选 change id，但必须写清：
@@ -71,8 +75,8 @@ description: Use when the user explicitly invokes $xian-next, or gives a bare �
 
 ## 常见分支
 
-- 明确 `$xian-next`：使用本 skill，输出方向和下一步建议。
-- 普通“继续/下一步/推进当前项目/go”等重新判断请求：留在 `xian-next`，解释 `xian-harness continue` 的 canonical direction；有可执行任务时输出执行态，没有可执行任务时输出方向建议态；如果项目基线缺失，`continue` 应给出 `xian-project-startup`。
+- 明确 `$xian-next`：使用本 skill；已授权执行态连续路由，纯建议或未授权时给 handoff。
+- 普通“继续/下一步/推进当前项目/go”等重新判断请求：由 `xian-next` 解释 canonical direction；已授权执行态且无待决问题时交给下一 skill 连续执行，不留在此处再索取“继续”。没有可执行任务时输出方向建议态；如果项目基线缺失，`continue` 应给出 `xian-project-startup`。
 - 有具体新需求：交给 `xian-open` 判断下一条 route，不在 `xian-next` 内创建 change。
 - `direction.nextSkill` 存在：优先使用该字段。
 - `nextAction` 与静态预期冲突：说明冲突，并重新运行 `xian-harness continue --json` 仲裁。
@@ -122,13 +126,13 @@ description: Use when the user explicitly invokes $xian-next, or gives a bare �
 
 ## 交互预算
 
-- 必须：读取文件或运行命令前遵守当前 hook 提供的 Interaction Budget。
-- 必须：chat-mode 请求保持 tool-free，除非用户明确要求 inspection、snapshot refresh、deep audit 或 change execution。
-- 必须：读取 pack state、workbench、quality-gate、archive 或其他大型项目状态前，确认用户有明确 deep-audit 或 change intent。
+- 遵守当前实际提供的 Interaction Budget；没有提供时不虚构 hook 预算或额外审批。
+- 普通聊天保持 tool-free，除非用户明确要求检查；已授权任务的必要定向读取不另索 deep-audit。
+- 不为无关问题预读大型 pack state、workbench、quality-gate、archive 或历史材料；专用 release 的等待与失败边界不被本段覆盖。
 
 ## 交接规则
 
-- 从运行时 `nextAction` 开始，并读取 `direction.nextSkill`；先输出 current situation、process debt、recommended target、minimum next step 和 confidence；再判断执行态 / 方向建议态。执行态且 `confidence=high` 时，末尾可以输出 `下一步建议：<中文下一步>`，空一行后单独输出 `$xian-xxx`，再空一行输出 `直接回复“继续”即可进入该步骤。`。方向建议态、`confidence=low` 或需要用户明确选择时，不要输出 `直接回复“继续”即可进入该步骤。`，改为提示“要执行它，请明确回复‘开这个 change’或‘执行这个方向’”。不要在首屏附加“因为...”。
+- 从运行时 `nextAction` 开始，并读取 `direction.nextSkill`；简述 current situation、process debt、recommended target、minimum next step 和 confidence，再判断执行态 / 方向建议态。已有明确授权、无待决问题的执行态直接连续路由，不输出等待再次“继续”的 handoff。仅纯建议或未授权时自然收尾，说明需要的具体选择，不强制固定末尾或 skill 行；不要输出 `直接回复“继续”即可进入该步骤。`。low confidence 只报告，不自动执行或催促授权。不要在首屏附加“因为...”。
 - 表达层原则：中文优先，默认用自然中文给结论、必要风险和下一步；必须保留英文术语、协议字段、状态名或命令名时，紧跟中文括注解释；不写“流程报告 / Review 报告 / evidence 清单”式长篇；只有 deep-audit、gate、verify 或用户明确要求完整显性化时才展开治理细节。
 - 优先使用 `direction.nextSkill`；如果缺失，再从 `nextAction` 推导 skill。
 - 如果静态预期与运行时 `nextAction` 冲突，说明冲突，并 run `$xian-next` or `xian-harness continue --json` for arbitration。

@@ -1,6 +1,6 @@
 ---
 name: xian-skill-governance
-description: Use when modifying harness skills, SKILL.md contracts, registry, or trigger rules.
+description: Use when authoring Harness-owned Skill sources, scoped development mirrors, references or registry triggers; not unrelated third-party skills.
 ---
 
 # xian-skill-governance
@@ -11,7 +11,7 @@ description: Use when modifying harness skills, SKILL.md contracts, registry, or
 
 ## 触发条件
 
-在修改任何 `SKILL.md`、增删 skill 目录、更新 frontmatter、调整触发描述，或修改 `.xian-harness/skill-registry.json` 前使用。
+在修改 Harness-owned Skill 的 source、同 Scope 开发镜像、references 或 registry 触发描述时使用；不覆盖无关第三方 Skill，也不由编写授权推导真实安装权限。
 
 ## 协议输入
 
@@ -67,7 +67,7 @@ Primary Asset Scope: skills and skill registry entries
 4. SKILL.md 使用中文 Skill 契约 v2；技术锚点、命令、字段名和路径保持英文。
 5. 补齐“常见分支”、“参考样例”、“自检清单”和“约束与原因”段；暂无参考样例时说明补齐条件。
 6. 每条约束必须写具体原因，引用协议边界、证据链、profile 隔离或已发生教训，不能写成笼统最佳实践。
-7. 修改 installable skill 后只更新 `harness-pack` source Skill 与 canonical registry，运行 compiler/check；当前工作区 root mirror 由后续 owner-authorized Pack lifecycle 投影，不在本流程手工同步。
+7. 同一 accepted Scope 明确包含 Pack source、当前仓库开发镜像和 references 时，可配对编写并验证 bytes/引用闭包；Pack source 仍是唯一分发源，开发镜像不是 authority。canonical registry 经现有 compiler/check 生成；仅本仓已授权的开发 registry 可取 compiler base 输出原 bytes，同步不改 pack-state 或 installed 账本。真实用户/项目安装、Pack rollout 仍须独立授权与现役 exact-source Release Verify，不能用开发镜像一致冒充安装完成。
 
 ## 晋升规则
 
@@ -90,13 +90,14 @@ Primary Asset Scope: skills and skill registry entries
 
 ## 交互预算
 
-- 必须：obey the current hook-provided Interaction Budget before reading files or running commands.
-- 必须：keep chat-mode requests tool-free unless the user explicitly asks for inspection, snapshot refresh, deep audit, or change execution.
-- 必须：require explicit deep-audit or change intent before reading pack state, workbench, quality-gate, archive, or other large project status artifacts.
+- 遵守当前实际提供的 Interaction Budget；没有提供时不虚构 hook 预算或额外审批。
+- 普通聊天保持 tool-free，除非用户明确要求检查；已授权任务的必要定向读取不另索 deep-audit。
+- 不为无关问题预读大型 pack state、workbench、quality-gate、archive 或历史材料；专用 release 的等待与失败边界不被本段覆盖。
 
 ## 交接规则
 
-- 输出时先说明当前结论、证据缺口和风险；末尾输出 `下一步建议：<中文下一步>`，空一行后单独输出 `$xian-xxx`，再空一行输出 `直接回复“继续”即可进入该步骤。`；不要在首屏附加“因为...”。
+- 当前请求携带 publish intent 且不存在真实阻塞时，按 current nextAction 在同一任务内连续完成已授权工作，不等待重复许可；只读 Review 不获得写入权。
+- 当前请求不携带 publish intent 时，自然收尾：说明结论、必要风险和仍待决定的具体问题，不强制固定末尾、skill 行或回复“继续”；仅真实待决问题才请求明确选择。已有 Runtime 路由时从运行时 `nextAction` 开始，不把建议变成授权。
 
 - Hook trigger or bootstrap behavior -> `xian-hook-governance`.
 - Profile install boundary -> `xian-pack-governance`.

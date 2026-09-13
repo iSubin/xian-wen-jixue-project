@@ -21,7 +21,19 @@ Use this skill after open when the request needs new or updated requirement cont
 
 ## 吸收的纪律
 
-- `brainstorming`: clarify intent, constraints, options, and confirmation before locking scope.
+- `brainstorming`: clarify outcome-changing uncertainty before locking scope; reuse explicit decisions already made for the same boundary.
+
+## 决策暂停与答复适用性
+
+仅在重大歧义、关键假设被证伪、实质方案/成本/风险分叉，或无新信息的重复失败会改变下一步时提出 Checkpoint。已授权的同 Scope 修复、正常阶段衔接与有进展的长操作不是新决策：不新增固定阶段审批，不重复索取同一许可，保留同一在途长操作。
+
+先区分产品取舍、技术澄清、权限请求、机器 blocker 与进度通知。机器拒绝不能由聊天批准绕过；进度通知不要求答复。确需决策时，一次给出目标、新事实、影响、推荐方案/替代项、一个明确问题、已停动作与可继续工作，以及预期暂停时间；未知时标明未知，不猜测 owner 答复时长。只暂停依赖答案的动作，无关已授权工作可继续。
+
+有 active Change 时使用现役官方 human-decision 暂停路径并读回状态；研究或未建 Change 场景不为询问制造空 Change。答复到达后核对 target/Change、当前 contract/Candidate、待决问题、答案和原假设。重复、迟到、错误对象或上下文缺失的答复不得重放旧操作；只对不适用部分澄清。resume 建议不是 owner 答复，也不是新授权。
+
+答复改变 Scope/AC 时必须经支持的 contract revision 与现役准入，保持 append-only 历史；不能手写 accepted/frozen 或修改旧 Attempt。先查 readiness 和合法 pause/revision/resume 顺序，不承诺任何阶段都能先 patch。若合法修订要求先 resume，待决边界解决前仍不恢复受影响构建。普通已授权继续请求直接路由，不要求第二次“继续”。
+
+本节是 Agent 指导，不新增 CLI、schema、phase、权限或 Runtime enforcement；跨 Host 一致执行和自动暂停恢复未得到保证。
 
 ## Change Design Quality Lenses
 
@@ -85,7 +97,7 @@ External artifacts 只组织 authoring。不得复制第二份 proposal、design
 
 先区分实际 lifecycle/freeze 和 directCompile 对应的调用分支（现役 requiresReviewedPromotion）；仅适用 reviewed promotion 时检查其 admission。compile pass 不等于实际 admission，但未进入分支的失败也不是当前调用 blocker。prospective owner self-binding 使用当前 Runtime 所需 patch identity 和 canonical path，保留旧授权，不安装固定 patch id。
 
-当前没有 public prepare/dry-run：contract-patch 是写入口，不把它当零写预检。inspect 与 verify plan 只证明其声明范围；外部项目不能被要求导入可变 self-hosted 私有 TS。自举开发确有必要时，可在 Candidate 外用当前已提交来源的既有 prepare API 做隔离只读探针；它不是新公共工具或接受事实。公开能力不足时明确人工草案检查与正式 admission 的区别，不能伪称全自动预检。
+对已 materialized、非 terminal Change 的拟提交完整补丁，使用 `xian-harness change contract-patch <change-id> --file <patch.json> --preflight --target <target-project> --json`。这是成功/失败均零写（含 telemetry）的公开前置检查；读取 checks 的 source、fail 和 not-run 原因。报告不覆盖完整命令 readiness、Workset/source fence、Reviewer 或锁内最终重验，不是接受 token；正式提交仍重验当前事实。原始 inputBytesDigest 与 normalizedInputIdentity 分开，不能把补 proposedAt 后的投影视为原文件字节。不要对无关查询或身份未变化的相同输入反复预检，不要求外部导入私有 TS。未 materialized/terminal 等前提不满足时拒绝，不隐式初始化。省略 --preflight 的 contract-patch 仍是写入口。
 
 ## 确定性工具
 
@@ -131,14 +143,14 @@ Agent Pair 启用时，首次 `spec.review` 为该 Change 建立唯一的持续 
 
 ## 交互预算
 
-- 必须：obey the current hook-provided Interaction Budget before reading files or running commands.
-- 必须：keep chat-mode requests tool-free unless the user explicitly asks for inspection, snapshot refresh, deep audit, or change execution.
-- 必须：require explicit deep-audit or change intent before reading pack state, workbench, quality-gate, archive, or other large project status artifacts.
+- 遵守当前实际提供的 Interaction Budget；没有提供时不虚构 hook 预算或额外审批。
+- 普通聊天保持 tool-free，除非用户明确要求检查；已授权任务的必要定向读取不另索 deep-audit。
+- 不为无关问题预读大型 pack state、workbench、quality-gate、archive 或历史材料；专用 release 的等待与失败边界不被本段覆盖。
 
 ## 交接规则
 
 - 当前请求携带 publish intent 且不存在真实阻塞时，完成 spec 后由同一主 Agent 在同一任务中直接进入下一个 lifecycle skill，不输出等待用户回复“继续”的 handoff。
-- 当前请求不携带 publish intent 时，输出时先说明当前结论、证据缺口和风险；末尾输出 `下一步建议：<中文下一步>`，空一行后单独输出 `$xian-xxx`，再空一行输出 `直接回复“继续”即可进入该步骤。`；不要在首屏附加“因为...”。
+- 当前请求不携带 publish intent 时，自然收尾：说明结论、必要风险和仍待决定的具体问题，不强制固定末尾、skill 行或回复“继续”；仅真实待决问题才请求明确选择。已有 Runtime 路由时从运行时 `nextAction` 开始，不把建议变成授权。
 
 - Ambiguous requirements remain in `xian-spec`.
 - Requirements with architectural risk -> `xian-design`.

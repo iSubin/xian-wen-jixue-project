@@ -21,7 +21,7 @@
           "开新"
         ]
       },
-      "shortDescription": "Open or resume governed changes.",
+      "shortDescription": "Route governed Changes, not direct maintenance.",
       "keywords": [
         "open",
         "intake",
@@ -230,7 +230,7 @@
         ],
         "lastReviewedAt": "2026-06-10"
       },
-      "shortDescription": "Implement approved tasks with evidence.",
+      "shortDescription": "Build authorized active Change tasks.",
       "keywords": [
         "build",
         "implement",
@@ -445,7 +445,7 @@
           "自测"
         ]
       },
-      "shortDescription": "Run tests and persist verification evidence.",
+      "shortDescription": "Formal Change checks, not each development test.",
       "keywords": [
         "verify",
         "test",
@@ -734,7 +734,7 @@
           "触发词"
         ]
       },
-      "shortDescription": "Govern skills and registry activation.",
+      "shortDescription": "Author Harness Skills; installation is separate.",
       "keywords": [
         "skill",
         "registry",
